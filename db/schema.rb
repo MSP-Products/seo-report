@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_28_160020) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
   create_table "admin_users", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", null: false
@@ -59,6 +59,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160020) do
     t.string "address"
     t.boolean "ai_seo_enrolled", default: false
     t.datetime "created_at", null: false
+    t.datetime "discarded_at"
     t.datetime "last_page_scan_at"
     t.string "last_page_scan_status"
     t.string "logo_url"
@@ -70,6 +71,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160020) do
     t.string "sitemap_url"
     t.datetime "updated_at", null: false
     t.string "website_url"
+    t.index ["discarded_at"], name: "index_clients_on_discarded_at"
   end
 
   create_table "gbp_photos", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
