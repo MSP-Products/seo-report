@@ -11,6 +11,6 @@ class CreateReportGenerationLogs < ActiveRecord::Migration[8.1]
     end
 
     add_foreign_key :report_generation_logs, :monthly_reports
-    add_index :report_generation_logs, [:monthly_report_id, :attempted_at], name: "idx_report_gen_logs_on_report_and_attempted"
+    add_index :report_generation_logs, [ :monthly_report_id, :attempted_at ], name: "idx_report_gen_logs_on_report_and_attempted"
   end
 end

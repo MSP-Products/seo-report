@@ -16,6 +16,6 @@ class CreateMonthlyReports < ActiveRecord::Migration[8.1]
 
     add_foreign_key :monthly_reports, :clients
     add_index :monthly_reports, :access_token, unique: true
-    add_index :monthly_reports, [:client_id, :report_month], unique: true
+    add_index :monthly_reports, [ :client_id, :report_month ], unique: true
   end
 end

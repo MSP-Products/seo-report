@@ -16,6 +16,6 @@ class CreateGbpReviews < ActiveRecord::Migration[8.1]
     end
 
     add_foreign_key :gbp_reviews, :monthly_reports, column: :report_id
-    add_index :gbp_reviews, [:report_id, :external_id], unique: true
+    add_index :gbp_reviews, [ :report_id, :external_id ], unique: true
   end
 end

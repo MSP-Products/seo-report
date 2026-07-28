@@ -14,6 +14,6 @@ class CreateClientServiceLinks < ActiveRecord::Migration[8.1]
     end
 
     add_foreign_key :client_service_links, :clients
-    add_index :client_service_links, [:client_id, :service], unique: true
+    add_index :client_service_links, [ :client_id, :service ], unique: true
   end
 end

@@ -12,6 +12,6 @@ class CreateReportKeywordRankings < ActiveRecord::Migration[8.1]
     end
 
     add_foreign_key :report_keyword_rankings, :monthly_reports, column: :report_id
-    add_index :report_keyword_rankings, [:report_id, :keyword_id], unique: true
+    add_index :report_keyword_rankings, [ :report_id, :keyword_id ], unique: true
   end
 end
