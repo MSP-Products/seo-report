@@ -21,5 +21,5 @@ class ClientServiceLink < ApplicationRecord
   }, validate: true
 
   # Validations
-  validates :service, uniqueness: { scope: :client_id }
+  validates :service, presence: true, uniqueness: { scope: :client_id }
 end
