@@ -1,0 +1,41 @@
+<% content_for :title, "Log In — My Social Practice" %>
+
+<main class="flex flex-col items-center justify-center min-h-screen p-6 bg-gradient-to-br from-teal-dark via-teal-primary to-cyan-primary bg-fixed" id="login-page">
+  <div class="w-full max-w-[440px] bg-white rounded-2xl shadow-xl px-10 pt-10 pb-8 sm:px-10 max-sm:px-5 max-sm:py-6">
+    <%= render "shared/login_header" %>
+
+    <%= form_with url: login_path, method: :post, class: "flex flex-col gap-5", id: "login-form" do |f| %>
+      <%= render "shared/form_group",
+            label: "Email",
+            field_name: "email",
+            type: "email",
+            value: params[:email],
+            placeholder: "admin@example.com",
+            has_error: flash[:error].present? %>
+
+      <%= render "shared/form_group",
+            label: "Password",
+            field_name: "password",
+            type: "password",
+            placeholder: "",
+            has_error: flash[:error].present?,
+            toggle: true %>
+
+      <div class="-mt-2 text-right">
+        <%= link_to "Forgot password?", "#", class: "text-sm font-medium text-teal-primary hover:text-teal-dark hover:underline transition-colors duration-150", id: "forgot-password-link" %>
+      </div>
+
+      <div class="mt-2">
+        <%= f.submit "Log In", class: "w-full px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-teal-dark via-teal-primary to-cyan-primary rounded-full shadow-md cursor-pointer transition-all duration-250 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm focus-visible:ring-3 focus-visible:ring-teal-primary/40 outline-none", id: "login-submit-btn" %>
+      </div>
+
+      <div class="mt-1">
+        <%= render "shared/alert", type: "error", message: flash[:error] %>
+      </div>
+    <% end %>
+  </div>
+
+  <footer class="mt-8 text-center text-sm text-white/85" id="login-footer">
+    <p>My Social Practice · <a href="mailto:support@mysocialpractice.com" class="text-white/85 hover:text-white transition-colors duration-150">support@mysocialpractice.com</a></p>
+  </footer>
+</main>

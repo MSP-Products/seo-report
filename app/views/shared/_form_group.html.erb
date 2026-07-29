@@ -1,0 +1,59 @@
+<%# Shared form group component
+     locals:
+       label       (String)  — field label text
+       field_name  (String)  — input name attribute
+       type        (String)  — input type ("email", "password", "text")
+       value       (String)  — current field value (optional)
+       placeholder (String)  — placeholder text (optional)
+       has_error   (Boolean) — whether to show error styling (optional, default false)
+       toggle      (Boolean) — whether to show password visibility toggle (optional, default false) %>
+
+<% input_classes = "w-full px-4 py-3 text-sm text-gray-800 bg-gray-50 border-[1.5px] rounded-lg outline-none transition-all duration-150 placeholder:text-gray-400 focus:border-teal-600 focus:bg-white focus:ring-3 focus:ring-teal-600/15" %>
+<% error_classes = "border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/15" %>
+<% normal_classes = "border-gray-300" %>
+
+<div class="flex flex-col gap-2">
+  <label for="<%= field_name %>" class="text-sm font-medium text-gray-700"><%= label %></label>
+
+  <% if local_assigns.fetch(:toggle, false) %>
+    <div class="relative flex items-center" data-controller="password-visibility">
+      <input
+        type="<%= type %>"
+        name="<%= field_name %>"
+        id="<%= field_name %>"
+        value="<%= local_assigns.fetch(:value, '') %>"
+        placeholder="<%= local_assigns.fetch(:placeholder, '') %>"
+        class="<%= input_classes %> pr-10 <%= local_assigns.fetch(:has_error, false) ? error_classes : normal_classes %>"
+        autocomplete="<%= type == 'password' ? 'current-password' : field_name %>"
+        data-password-visibility-target="input"
+      >
+      <button type="button"
+              class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center p-1 text-gray-400 hover:text-gray-600 transition-colors duration-150 bg-transparent border-none cursor-pointer"
+              data-action="click->password-visibility#toggle"
+              aria-label="Toggle password visibility">
+        <%# Eye icon (visible when password is hidden) %>
+        <svg data-password-visibility-target="eyeIcon" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+        <%# Eye-off icon (visible when password is shown) %>
+        <svg data-password-visibility-target="eyeOffIcon" class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path>
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+        </svg>
+      </button>
+    </div>
+  <% else %>
+    <div class="relative flex items-center">
+      <input
+        type="<%= type %>"
+        name="<%= field_name %>"
+        id="<%= field_name %>"
+        value="<%= local_assigns.fetch(:value, '') %>"
+        placeholder="<%= local_assigns.fetch(:placeholder, '') %>"
+        class="<%= input_classes %> <%= local_assigns.fetch(:has_error, false) ? error_classes : normal_classes %>"
+        autocomplete="<%= type == 'email' ? 'email' : field_name %>"
+      >
+    </div>
+  <% end %>
+</div>

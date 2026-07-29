@@ -3,6 +3,7 @@
   <head>
     <title><%= content_for(:title) || "My Social Practice — SEO Reports Admin" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="description" content="My Social Practice SEO Reports Admin Panel">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="application-name" content="MSP SEO Reports">
     <meta name="mobile-web-app-capable" content="yes">
@@ -21,8 +22,7 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="font-sans antialiased bg-gray-50 text-gray-800">
+  <body class="font-sans antialiased">
     <%= yield %>
   </body>
 </html>
-

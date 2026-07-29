@@ -1,0 +1,14 @@
+/* Inter font from Google Fonts — must precede @import "tailwindcss" */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* Custom theme tokens */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-teal-primary: #0d9488;
+  --color-teal-dark: #0f766e;
+  --color-cyan-primary: #06b6d4;
+  --color-cyan-light: #22d3ee;
+}
