@@ -22,7 +22,22 @@
   </head>
 
   <body class="font-sans antialiased bg-gray-50 text-gray-800">
-    <%= yield %>
+    <% if current_admin_user %>
+      <div class="flex min-h-screen">
+        <%= render "shared/admin_sidebar" %>
+        <main class="flex-1 overflow-y-auto p-8">
+          <% if notice %>
+            <%= render "shared/alert", type: "success", message: notice %>
+          <% end %>
+          <% if alert %>
+            <%= render "shared/alert", type: "error", message: alert %>
+          <% end %>
+          <%= yield %>
+        </main>
+      </div>
+    <% else %>
+      <%= yield %>
+    <% end %>
   </body>
 </html>
 

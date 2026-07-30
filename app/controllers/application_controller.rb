@@ -20,5 +20,12 @@ class ApplicationController < ActionController::Base
       redirect_to login_path, alert: "Please log in to continue."
     end
   end
-end
 
+  # Guards mutating actions — "support" admins can view everything but not
+  # change it. Controllers opt in with `before_action :require_editor!, only: [...]`.
+  def require_editor!
+    unless current_admin_user&.admin?
+      redirect_to request.referer || root_path, alert: "You don't have permission to do that."
+    end
+  end
+end

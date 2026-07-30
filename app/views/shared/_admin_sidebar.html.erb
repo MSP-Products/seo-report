@@ -1,0 +1,38 @@
+<%# Sidebar nav shell, shown on every authenticated admin page (see layouts/application.html.erb).
+    Dashboard and Clients aren't built yet — they route to Connections for now,
+    same as the rest of the nav, so nothing 404s. %>
+<aside class="flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+  <div class="flex items-center gap-2.5 border-b border-slate-200 px-5 py-4">
+    <div class="flex size-9 items-center justify-center rounded-lg bg-teal-primary text-sm font-bold text-white">MSP</div>
+    <span class="font-semibold text-slate-900">My Social Practice</span>
+  </div>
+
+  <nav class="flex-1 space-y-1 px-3 py-4">
+    <% [
+      [:dashboard, "Dashboard", connections_path],
+      [:clients, "Clients", connections_path],
+      [:connections, "Connections", connections_path]
+    ].each do |key, label, path| %>
+      <% active = key == :connections %>
+      <%= link_to path, class: "flex items-center gap-3 rounded-lg px-3 py-2 text-sm #{active ? "bg-teal-primary/10 font-medium text-teal-dark" : "text-slate-600 hover:bg-slate-50"}" do %>
+        <%= report_icon(admin_nav_icon(key), css_class: "size-4") %>
+        <%= label %>
+      <% end %>
+    <% end %>
+  </nav>
+
+  <div class="border-t border-slate-200 p-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex size-8 items-center justify-center rounded-full bg-teal-primary/10 text-xs font-semibold text-teal-dark">
+        <%= current_admin_user.email.first.upcase %>
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-sm font-medium text-slate-900"><%= current_admin_user.email %></p>
+        <p class="text-xs capitalize text-slate-500"><%= current_admin_user.role %></p>
+      </div>
+      <%= button_to logout_path, method: :delete, class: "text-slate-400 hover:text-slate-600", title: "Log out" do %>
+        <%= report_icon(:logout, css_class: "size-4") %>
+      <% end %>
+    </div>
+  </div>
+</aside>

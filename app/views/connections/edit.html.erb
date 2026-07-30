@@ -1,0 +1,29 @@
+<% content_for :title, "#{@connection.display_name} — Connections" %>
+
+<div class="mb-6">
+  <%= link_to "← Connections", connections_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+  <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900"><%= @connection.display_name %></h1>
+  <p class="mt-1 text-sm text-slate-500">
+    <%= @connection.configured? ? "Update the credentials used for every client's #{@connection.display_name} data." : "Set the credentials used for every client's #{@connection.display_name} data." %>
+  </p>
+</div>
+
+<div class="max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+  <%= form_with url: connection_path(@connection.service), method: :patch, class: "space-y-5" do %>
+    <% @connection.credential_fields.each do |field| %>
+      <%= render "shared/form_group",
+            label: field[:label],
+            field_name: "agency_connection[#{field[:key]}]",
+            type: "password",
+            toggle: true,
+            placeholder: @connection.configured? ? "Leave blank to keep the current value" : "Enter #{field[:label].downcase}" %>
+    <% end %>
+
+    <div class="flex items-center gap-3">
+      <button type="submit" class="rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark">
+        Save
+      </button>
+      <%= link_to "Cancel", connections_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+    </div>
+  <% end %>
+</div>

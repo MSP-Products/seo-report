@@ -18,6 +18,9 @@ Rails.application.routes.draw do
   # (a random secure token, never a sequential/predictable ID — see CONVENTIONS.md #10)
   get "reports/:access_token", to: "reports#show", as: :public_report
 
+  # Agency-wide API credentials for the external data-source adapters
+  resources :connections, only: [ :index, :edit, :update ], param: :service
+
   # Defines the root path route ("/")
-  root "sessions#new"
+  root "connections#index"
 end
