@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class MonthlyReport < ApplicationRecord
+  include HasUuidPrimaryKey
+
   # Associations
   belongs_to :client
   has_many :report_generation_logs, dependent: :destroy
@@ -14,7 +16,7 @@ class MonthlyReport < ApplicationRecord
   has_many :gbp_posts, foreign_key: :report_id, dependent: :destroy
   has_many :gbp_reviews, foreign_key: :report_id, dependent: :destroy
   has_many :gbp_photos, foreign_key: :report_id, dependent: :destroy
-  has_many :report_pages_published, foreign_key: :report_id, dependent: :destroy
+  has_many :report_pages_published, class_name: "ReportPagePublished", foreign_key: :report_id, dependent: :destroy
 
   # Validations
   validates :report_month, presence: true

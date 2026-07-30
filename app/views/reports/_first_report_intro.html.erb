@@ -1,0 +1,33 @@
+<%# locals: report (ReportPresenter)
+    Static templated onboarding narrative — describes the generic first-month setup
+    work done for every new client, not per-client AI-generated copy (see plan's
+    "First-report onboarding" design decision). %>
+<div class="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
+  <span class="inline-flex items-center rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold tracking-wide uppercase text-cyan-700">
+    First report — baseline month
+  </span>
+
+  <h2 class="mt-4 text-2xl font-bold text-slate-900">Building the foundation for your SEO growth</h2>
+  <p class="mt-3 text-slate-600 leading-relaxed">
+    This is your first SEO report, so the numbers below are your baseline. This month we
+    focused on the upfront work that makes future ranking gains possible: optimizing your
+    website, cleaning up your online presence, and setting up reliable tracking.
+  </p>
+
+  <div class="mt-6 grid sm:grid-cols-2 gap-4">
+    <% [
+      [:globe, "Website setup & optimization", "Installed and configured RankMath, set local SEO and image SEO settings, optimized your homepage with targeted keywords, and connected Google Analytics and Search Console."],
+      [:map_pin, "Directory listings setup", "Pushed accurate practice information to dozens of directories, identified and suppressed duplicate listings, and enabled monitoring to prevent unwanted changes."],
+      [:star, "Google Business Profile optimization", "Updated categories, service areas, phone number, and hours. Optimized your description with relevant services and added fresh photos to make your profile more engaging."],
+      [:calendar_check, "First GBP posts scheduled", "Scheduled posts highlighting a key service and a patient review to keep your profile active and build trust with prospective patients."],
+      [:search, "Tracking & keyword research", "Ran a technical site audit, set up position tracking for your most important keywords, and balanced broad terms with service and location-specific keywords."],
+      [:sparkles, "AI visibility baseline", "Established baseline tracking for how your practice appears in AI-powered search tools like ChatGPT, Google Gemini, and Perplexity."]
+    ].each do |icon, title, body| %>
+      <div class="rounded-xl border border-slate-200 p-5">
+        <%= icon_badge(icon, bg_class: "bg-teal-primary/10", text_class: "text-teal-dark") %>
+        <p class="mt-3 font-semibold text-slate-900"><%= title %></p>
+        <p class="mt-1.5 text-sm text-slate-600 leading-relaxed"><%= body %></p>
+      </div>
+    <% end %>
+  </div>
+</div>

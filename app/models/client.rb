@@ -2,11 +2,15 @@
 
 class Client < ApplicationRecord
   include Discard::Model
+  include HasUuidPrimaryKey
 
   # Enums
   enum :onboarding_status, { pending: "pending", active: "active", offboarded: "offboarded" }, validate: true
-  enum :page_scan_method, { sitemap: "sitemap", crawler: "crawler", failed: "failed" }, prefix: :page_scan, validate: true
-  enum :last_page_scan_status, { success: "success", failed: "failed" }, prefix: :last_page_scan, validate: true
+  # allow_nil: a client has no scan method/status until its first sitemap/crawler run
+  enum :page_scan_method, { sitemap: "sitemap", crawler: "crawler", failed: "failed" },
+    prefix: :page_scan, validate: { allow_nil: true }
+  enum :last_page_scan_status, { success: "success", failed: "failed" },
+    prefix: :last_page_scan, validate: { allow_nil: true }
 
   # Associations
   has_many :client_service_links, dependent: :destroy

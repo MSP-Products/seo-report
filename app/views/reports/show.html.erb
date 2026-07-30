@@ -1,0 +1,30 @@
+<% content_for :title, "#{@report.client.name} — #{@report.month_label} SEO Report" %>
+
+<main class="min-h-screen bg-slate-50">
+  <%= render "reports/header", report: @report %>
+
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-10">
+    <% if @report.first_report? %>
+      <%= render "reports/first_report_intro", report: @report %>
+    <% else %>
+      <%= render "reports/highlights", report: @report %>
+    <% end %>
+
+    <%= render "reports/traffic", report: @report %>
+    <%= render "reports/citations", report: @report %>
+
+    <% if @report.ai_visibility_available? %>
+      <%= render "reports/ai_visibility", report: @report %>
+    <% end %>
+
+    <%= render "reports/keyword_performance", report: @report %>
+    <%= render "reports/gbp_activity", report: @report %>
+    <%= render "reports/pages_published", report: @report %>
+
+    <% if @report.first_report? %>
+      <%= render "reports/partnership_cta" %>
+    <% end %>
+  </div>
+
+  <%= render "reports/footer" %>
+</main>

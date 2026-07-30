@@ -1,0 +1,49 @@
+<%# locals: report (ReportPresenter) %>
+<header class="relative overflow-hidden bg-gradient-to-br from-teal-primary to-cyan-primary text-white">
+  <div class="relative mx-auto max-w-4xl px-4 sm:px-6 py-10 sm:py-14">
+    <div class="flex flex-wrap items-start justify-between gap-6">
+      <div>
+        <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white ring-1 ring-white/25">
+          <%= report_icon(:sparkles, css_class: "size-3") %> Monthly SEO Report
+        </span>
+
+        <h1 class="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl"><%= report.client.name %></h1>
+
+        <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-white/80">
+          <% if report.client.address.present? %>
+            <span class="inline-flex items-center gap-1.5"><%= report_icon(:map_pin, css_class: "size-3.5") %><%= report.client.address %></span>
+          <% end %>
+          <% if report.client.website_url.present? %>
+            <span class="inline-flex items-center gap-1.5"><%= report_icon(:globe, css_class: "size-3.5") %><%= report.client.website_url %></span>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="inline-flex min-w-[260px] items-center justify-between gap-3 rounded-xl border border-white/40 bg-white px-4 py-2.5 text-left shadow-lg">
+        <span class="flex items-center gap-2.5">
+          <%= icon_badge(:calendar_check, bg_class: "bg-teal-primary/10", text_class: "text-teal-dark", size: "size-8") %>
+          <span class="flex flex-col leading-tight">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Report Month</span>
+            <% if report.available_months.size > 1 %>
+              <select
+                data-controller="month-switcher"
+                data-action="month-switcher#navigate"
+                class="-ml-0.5 rounded border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-teal-primary"
+              >
+                <% report.available_months.each do |monthly_report| %>
+                  <option
+                    value="<%= public_report_path(monthly_report.access_token) %>"
+                    <%= "selected" if monthly_report.access_token == report.access_token %>
+                  ><%= monthly_report.report_month.strftime("%B %Y") %></option>
+                <% end %>
+              </select>
+            <% else %>
+              <span class="text-sm font-semibold text-slate-900"><%= report.month_label %></span>
+            <% end %>
+          </span>
+        </span>
+        <%= report_icon(:chevron_down, css_class: "size-4 text-slate-400") %>
+      </div>
+    </div>
+  </div>
+</header>

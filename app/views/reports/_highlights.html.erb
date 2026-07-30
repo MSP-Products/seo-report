@@ -1,0 +1,19 @@
+<%# locals: report (ReportPresenter) — AI-generated banners; each omits itself when blank
+    per the SOW guardrail ("if there's nothing genuinely positive, omit rather than
+    generate filler"), so this whole partial may render nothing. %>
+<% if report.general_summary.present? || report.ai_seo_summary.present? %>
+  <div class="space-y-4">
+    <% if report.general_summary.present? %>
+      <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-6">
+        <p class="text-sm leading-relaxed text-emerald-950"><%= report.general_summary %></p>
+      </div>
+    <% end %>
+
+    <% if report.ai_seo_summary.present? %>
+      <div class="rounded-2xl border border-violet-500/20 bg-violet-500/10 p-6">
+        <p class="text-xs font-semibold uppercase tracking-wider text-violet-700">AI SEO Update</p>
+        <p class="mt-2 text-sm leading-relaxed text-violet-950"><%= report.ai_seo_summary %></p>
+      </div>
+    <% end %>
+  </div>
+<% end %>

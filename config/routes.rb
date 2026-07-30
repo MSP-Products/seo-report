@@ -14,6 +14,10 @@ Rails.application.routes.draw do
   post "login", to: "sessions#create"
   delete "logout", to: "sessions#destroy", as: :logout
 
+  # Public client-facing monthly SEO report, keyed by MonthlyReport#access_token
+  # (a random secure token, never a sequential/predictable ID — see CONVENTIONS.md #10)
+  get "reports/:access_token", to: "reports#show", as: :public_report
+
   # Defines the root path route ("/")
   root "sessions#new"
 end

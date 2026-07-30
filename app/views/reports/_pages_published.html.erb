@@ -1,0 +1,28 @@
+<%# locals: report (ReportPresenter) %>
+<% if report.pages_published.any? %>
+  <div>
+    <%= render "reports/section_card", eyebrow: "Content Updates", title: "Website Pages Published",
+          description: "New and refreshed pages published on your site this month." %>
+
+    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="flex items-center gap-2 text-teal-dark">
+        <%= report_icon(:file_text) %>
+        <span class="text-xs font-semibold uppercase tracking-wider">New Content</span>
+      </div>
+      <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <% report.pages_published.each do |page| %>
+          <li>
+            <a href="<%= page.url %>" target="_blank" rel="noreferrer"
+               class="group flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-teal-primary/30 hover:bg-teal-primary/5">
+              <%= icon_badge(:external_link, bg_class: "bg-teal-primary/10", text_class: "text-teal-dark") %>
+              <div class="min-w-0">
+                <div class="text-sm font-semibold text-slate-900 group-hover:text-teal-dark"><%= page.title %></div>
+                <div class="mt-0.5 truncate text-xs text-slate-500"><%= page.url %></div>
+              </div>
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  </div>
+<% end %>

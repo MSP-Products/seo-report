@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "rails-dev",
+      "runtimeExecutable": "bin/rails",
+      "runtimeArgs": ["server"],
+      "port": 3000
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+<%# locals: value, label, sublabel (optional), badge (optional string), badge_icon (optional symbol),
+    value_class (optional), icon (optional symbol), icon_bg/icon_text (optional, default teal),
+    hero (optional bool — dark filled "hero" treatment for the one number worth calling out, e.g. real revenue) %>
+<% hero = local_assigns.fetch(:hero, false) %>
+<div class="rounded-2xl border p-5 shadow-sm <%= hero ? "border-emerald-400/30 bg-gradient-to-br from-emerald-600 via-emerald-800 to-emerald-950" : "border-slate-200 bg-white" %>">
+  <div class="flex items-center justify-between">
+    <% if local_assigns.fetch(:icon, nil).present? %>
+      <%= icon_badge(icon,
+            bg_class: hero ? "bg-white/15" : local_assigns.fetch(:icon_bg, "bg-teal-primary/10"),
+            text_class: hero ? "text-white" : local_assigns.fetch(:icon_text, "text-teal-dark")) %>
+    <% end %>
+    <% if local_assigns.fetch(:badge, nil).present? %>
+      <span class="inline-flex items-center gap-1 rounded-full <%= hero ? "bg-white/15 text-white" : local_assigns.fetch(:badge_class, "bg-emerald-50 text-emerald-700") %> px-2 py-0.5 text-xs font-medium">
+        <%= report_icon(local_assigns.fetch(:badge_icon, :trending_up), css_class: "size-3") if local_assigns.fetch(:badge_icon, nil) || hero %>
+        <%= badge %>
+      </span>
+    <% end %>
+  </div>
+
+  <p class="mt-4 text-3xl tracking-tight <%= hero ? "font-bold text-white" : "font-semibold #{local_assigns.fetch(:value_class, "text-slate-900")}" %>"><%= value %></p>
+  <p class="mt-1 text-sm <%= hero ? "font-semibold text-emerald-50" : "font-medium text-slate-900" %>"><%= label %></p>
+  <% if local_assigns.fetch(:sublabel, nil).present? %>
+    <p class="mt-0.5 text-xs <%= hero ? "text-emerald-200/70" : "text-slate-500" %>"><%= sublabel %></p>
+  <% end %>
+</div>
