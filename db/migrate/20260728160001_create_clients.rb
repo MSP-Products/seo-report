@@ -3,7 +3,7 @@
 class CreateClients < ActiveRecord::Migration[8.1]
   def change
     create_table :clients, id: false do |t|
-      t.string :id, limit: 36, primary_key: true, default: -> { "(UUID())" }
+      t.string :id, limit: 36, primary_key: true, default: -> { "gen_random_uuid()" }
       t.string :name, null: false
       t.string :address
       t.string :phone
