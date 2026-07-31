@@ -8,16 +8,38 @@ module Adapters
   # Credentials shape: {"api_key" => "..."}.
   # external_id: the Yext entity/location ID for this client.
   #
-  # LOWER CONFIDENCE: Scout is a newer Yext product with thin public API docs
-  # at the time this was written. `fetch_ai_visibility`'s endpoint/response
-  # shape is a best-effort placeholder — confirm against Yext's actual Scout
-  # API reference once available and adjust the mapping in that one method.
+  # Citations and AI Visibility below are verified against a real account's
+  # Analytics Reports API (POST /analytics/reports) — metrics, dimensions, and
+  # response shape confirmed empirically, not just from docs. Two things this
+  # confirmed that don't match assumptions baked into the schema/report page:
+  #   - Sentiment metrics are fractions (0-1), not 0-100 percentages, and there
+  #     is no separate "positive sentiment" metric — it's derived as
+  #     1 - negative - neutral.
+  #   - AI_MODEL values returned by this account (e.g. "GEMINI", "PERPLEXITY")
+  #     don't match ReportAiPlatformScore's old fixed enum, which is why that
+  #     enum was removed in favor of storing whatever Yext returns directly.
+  #   - Yext has no distinct metrics for "driving directions" vs "website
+  #     clicks" — only a combined total (TOTAL_LISTINGS_ACTIONS). Those two
+  #     fields are left nil; the report page omits that breakdown when blank.
+  #   - SCOUT_GOOGLE_RANK's scale is unconfirmed (observed 0.0 for an account
+  #     with no ranked keywords) — flagged here in case it turns out to need
+  #     different handling once more accounts/data are available.
+  #
+  # LOWER CONFIDENCE: fetch_gbp_activity is still an unverified placeholder
+  # endpoint — confirm against a real response before relying on it.
   class YextAdapter < Base
     SERVICE = "yext"
     BASE_URL = "https://api.yextapis.com"
     API_VERSION = "20240101"
+    REPORTS_PATH = "/v2/accounts/me/analytics/reports".freeze
 
-    PLATFORM_KEYS = %w[chatgpt google_ai_overview ai_mode gemini].freeze
+    AI_VISIBILITY_METRICS = {
+      overall_score: "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE",
+      google_rank: "SCOUT_GOOGLE_RANK",
+      ai_rank: "SCOUT_AI_RANK_SCORE",
+      sentiment_negative_pct: "SCOUT_NEGATIVE_SENTIMENT_SCORE",
+      sentiment_neutral_pct: "SCOUT_NEUTRAL_SENTIMENT_SCORE"
+    }.freeze
 
     private
 
@@ -33,20 +55,24 @@ module Adapters
     end
 
     def fetch_citations
-      response = api_connection.get("/v2/accounts/me/analytics/listings", {
-        locationId: external_id,
-        startDate: month_range.begin.iso8601,
-        endDate: month_range.end.iso8601
-      })
-      body = JSON.parse(response.body).fetch("response", {})
+      impressions = run_report(
+        metrics: [ "TOTAL_LISTINGS_IMPRESSIONS" ], dimensions: [ "LOCATION_IDS" ],
+        filters: { locationIds: [ external_id ] }
+      )
+      engagements = run_report(
+        metrics: [ "TOTAL_LISTINGS_ACTIONS" ], dimensions: [ "ENTITY_IDS" ],
+        filters: { entityIds: [ external_id ] }
+      )
 
       {
         ok: true,
         data: {
-          total_impressions: body["impressions"],
-          total_engagements: body["engagements"],
-          driving_directions_count: body.dig("engagementBreakdown", "drivingDirections"),
-          website_clicks_count: body.dig("engagementBreakdown", "websiteClicks")
+          total_impressions: metric_value(impressions, %w[LOCATION_IDS]),
+          total_engagements: metric_value(engagements, %w[ENTITY_IDS]),
+          # Not available: Yext only exposes a combined actions total, no
+          # per-type (driving directions vs. website clicks) breakdown.
+          driving_directions_count: nil,
+          website_clicks_count: nil
         }
       }
     rescue Faraday::Error => e
@@ -54,25 +80,48 @@ module Adapters
     end
 
     def fetch_ai_visibility
-      response = api_connection.get("/v2/accounts/me/scout/ai-visibility", { locationId: external_id })
-      body = JSON.parse(response.body).fetch("response", {})
+      row = run_report(
+        metrics: AI_VISIBILITY_METRICS.values, dimensions: [ "ENTITY_IDS" ],
+        filters: { entityIds: [ external_id ] }
+      )
+      return nil if row.nil?
+
+      negative = (row[AI_VISIBILITY_METRICS[:sentiment_negative_pct]].to_f * 100).round
+      neutral = (row[AI_VISIBILITY_METRICS[:sentiment_neutral_pct]].to_f * 100).round
 
       {
-        overall_score: body["overallScore"],
-        previous_score: body["previousScore"],
-        google_rank: body["googleRank"],
-        ai_rank: body["aiRank"],
-        sentiment_positive_pct: body.dig("sentiment", "positive"),
-        sentiment_neutral_pct: body.dig("sentiment", "neutral"),
-        sentiment_negative_pct: body.dig("sentiment", "negative"),
-        citation_own_site_pct: body.dig("citationSources", "ownSite"),
-        citation_listings_pct: body.dig("citationSources", "listings"),
-        citation_reputation_pct: body.dig("citationSources", "reputation"),
-        citation_third_party_pct: body.dig("citationSources", "thirdParty"),
-        platform_scores: PLATFORM_KEYS.filter_map { |key| [ key, body.dig("platformScores", key) ] if body.dig("platformScores", key) }.to_h
+        overall_score: row[AI_VISIBILITY_METRICS[:overall_score]],
+        google_rank: row[AI_VISIBILITY_METRICS[:google_rank]],
+        ai_rank: row[AI_VISIBILITY_METRICS[:ai_rank]],
+        sentiment_negative_pct: negative,
+        sentiment_neutral_pct: neutral,
+        sentiment_positive_pct: [ 100 - negative - neutral, 0 ].max,
+        # Not available: no citation-source-breakdown metric found in Yext's
+        # analytics catalog for this account.
+        citation_own_site_pct: nil,
+        citation_listings_pct: nil,
+        citation_reputation_pct: nil,
+        citation_third_party_pct: nil,
+        platform_scores: fetch_platform_scores
       }
     rescue Faraday::Error
       nil
+    end
+
+    def fetch_platform_scores
+      rows = run_report_rows(
+        metrics: [ AI_VISIBILITY_METRICS[:ai_rank] ], dimensions: [ "AI_MODEL", "ENTITY_IDS" ],
+        filters: { entityIds: [ external_id ] }
+      )
+
+      rows.to_a.filter_map do |row|
+        platform = row["AI_MODEL"]
+        next if platform.blank?
+
+        [ platform.downcase, metric_value(row, %w[AI_MODEL ENTITY_IDS]) ]
+      end.to_h
+    rescue Faraday::Error
+      {}
     end
 
     def fetch_gbp_activity
@@ -98,6 +147,34 @@ module Adapters
       }
     rescue Faraday::Error
       nil
+    end
+
+    # Runs an analytics report and returns the single data row (a Hash), or
+    # nil if the report came back empty.
+    def run_report(metrics:, dimensions:, filters:)
+      run_report_rows(metrics: metrics, dimensions: dimensions, filters: filters).first
+    end
+
+    def run_report_rows(metrics:, dimensions:, filters:)
+      response = api_connection.post(REPORTS_PATH) do |req|
+        req.body = {
+          metrics: metrics,
+          dimensions: dimensions,
+          filters: filters.merge(startDate: month_range.begin.iso8601, endDate: month_range.end.iso8601)
+        }.to_json
+      end
+
+      JSON.parse(response.body).dig("response", "data")
+    end
+
+    # Yext sometimes keys a report row by the metric's raw ID and sometimes by
+    # its human-friendly display name (observed both, even within the same
+    # account) — rather than guess the label, take whichever value remains
+    # after excluding the known dimension keys.
+    def metric_value(row, dimension_keys)
+      return nil if row.nil?
+
+      row.reject { |key, _| dimension_keys.include?(key) }.values.first
     end
 
     def api_connection

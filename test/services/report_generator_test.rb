@@ -26,12 +26,25 @@ class ReportGeneratorTest < ActiveSupport::TestCase
       .with(query: hash_including("location_id"))
       .to_return(status: 200, body: { opportunities: [ { monetaryValue: 500 } ] }.to_json)
 
-    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/analytics/listings")
-      .with(query: hash_including("locationId"))
-      .to_return(status: 200, body: { response: { impressions: 900, engagements: 253 } }.to_json)
-    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/scout/ai-visibility")
-      .with(query: hash_including("locationId"))
-      .to_return(status: 200, body: { response: { overallScore: 26, googleRank: 1, aiRank: 6 } }.to_json)
+    yext_reports_url = "https://api.yextapis.com/v2/accounts/me/analytics/reports"
+    stub_request(:post, yext_reports_url)
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_IMPRESSIONS" ]))
+      .to_return(status: 200, body: { response: { data: [ { "LOCATION_IDS" => "entity-1", "Total Listings Impressions" => 900 } ] } }.to_json)
+    stub_request(:post, yext_reports_url)
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_ACTIONS" ]))
+      .to_return(status: 200, body: { response: { data: [ { "ENTITY_IDS" => "entity-1", "TOTAL_LISTINGS_ACTIONS" => 253 } ] } }.to_json)
+    stub_request(:post, yext_reports_url)
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [
+        "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE", "SCOUT_GOOGLE_RANK", "SCOUT_AI_RANK_SCORE",
+        "SCOUT_NEGATIVE_SENTIMENT_SCORE", "SCOUT_NEUTRAL_SENTIMENT_SCORE"
+      ]))
+      .to_return(status: 200, body: { response: { data: [ {
+        "ENTITY_IDS" => "entity-1", "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE" => 26, "SCOUT_GOOGLE_RANK" => 1,
+        "SCOUT_AI_RANK_SCORE" => 6, "SCOUT_NEGATIVE_SENTIMENT_SCORE" => 0.03, "SCOUT_NEUTRAL_SENTIMENT_SCORE" => 0.33
+      } ] } }.to_json)
+    stub_request(:post, yext_reports_url)
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("dimensions" => [ "AI_MODEL", "ENTITY_IDS" ]))
+      .to_return(status: 200, body: { response: { data: [ { "AI_MODEL" => "GEMINI", "ENTITY_IDS" => "entity-1", "SCOUT_AI_RANK_SCORE" => 6 } ] } }.to_json)
     stub_request(:get, "https://api.yextapis.com/v2/accounts/me/locations/entity-1/gbp-activity")
       .with(query: hash_including("api_key"))
       .to_return(status: 200, body: {
