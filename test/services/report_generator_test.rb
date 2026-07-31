@@ -56,9 +56,13 @@ class ReportGeneratorTest < ActiveSupport::TestCase
         }
       }.to_json)
 
-    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/rankings")
-      .with(query: hash_including("key"))
-      .to_return(status: 200, body: "Ph;Po;Pp\ndentist near me;7;0.81\n")
+    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/")
+      .with(query: hash_including("key" => "semrush-key", "type" => "tracking_position_organic",
+        "action" => "report", "url" => "*.example.com/*"))
+      .to_return(status: 200, body: {
+        data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 7 },
+          "Tr" => { "20260630" => { "*.example.com/*" => 0.81 } } } }
+      }.to_json)
   end
 
   test "generates a full report from all adapters" do
@@ -100,10 +104,15 @@ class ReportGeneratorTest < ActiveSupport::TestCase
 
   test "carries the previous month's position forward as previous_position" do
     earlier_month = @month - 1.month
-    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/rankings")
-      .with(query: hash_including("key"))
-      .to_return({ status: 200, body: "Ph;Po;Pp\ndentist near me;12;0.50\n" },
-                 { status: 200, body: "Ph;Po;Pp\ndentist near me;7;0.81\n" })
+    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/")
+      .with(query: hash_including("key" => "semrush-key", "type" => "tracking_position_organic",
+        "action" => "report", "url" => "*.example.com/*"))
+      .to_return(
+        { status: 200, body: { data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 12 },
+          "Tr" => { "20260530" => { "*.example.com/*" => 0.50 } } } } }.to_json },
+        { status: 200, body: { data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 7 },
+          "Tr" => { "20260630" => { "*.example.com/*" => 0.81 } } } } }.to_json }
+      )
 
     ReportGenerator.new(client: @client, month: earlier_month).call
     report = ReportGenerator.new(client: @client, month: @month).call

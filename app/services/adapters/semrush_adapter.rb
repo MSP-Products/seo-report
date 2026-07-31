@@ -6,16 +6,36 @@ module Adapters
   # forward into this month's `previous_position`).
   #
   # Credentials shape: {"api_key" => "..."}.
-  # external_id: the SEMrush Position Tracking project ID for this client's
-  # tracked domain (client.website_url).
+  # external_id: the SEMrush Position Tracking campaign ID for this client's
+  # tracked domain (client.website_url) — note this is the FULL
+  # "{project_id}_{campaign_id}" pair from the project's Position Tracking
+  # URL (e.g. semrush.com/tracking/landscape/30632499_5220001.html), not the
+  # shorter project ID shown on the domain overview page. The API returns
+  # "campaign not found" if only the project ID half is sent.
   #
-  # LOWER CONFIDENCE: the exact export_columns codes/endpoint path for
-  # Position Tracking + Trends are a best-effort reconstruction from SEMrush's
-  # public API docs, not verified against a live project — re-check column
-  # meanings once real credentials/a real project are available.
+  # Endpoint and response shape both confirmed live against a real project:
+  #   - No "/rankings" suffix; type=tracking_position_organic + action=report
+  #     are required.
+  #   - The response is JSON, not the semicolon-delimited text the classic
+  #     Domain Analytics reports use — and export_columns is silently
+  #     ignored here; this report always returns its own fixed field set.
+  #   - Each row is keyed by index under "data". "Ph" is the keyword phrase.
+  #     "Fi"/"Be" are keyed by url mask and give the most-recent/earliest
+  #     ranking position in the requested date range (confirmed by
+  #     cross-checking against the per-date "Dt" breakdown) — "-" means not
+  #     ranked. previous_position is still our own historical record (see
+  #     ReportGenerator), not read from SEMrush's own Be/Diff figures.
+  #
+  # LOWER CONFIDENCE: "Tr" (traffic share, keyed by date then url mask) is
+  # the closest available stand-in for potential_traffic — SEMrush doesn't
+  # expose a dedicated "potential traffic" figure on this report, so this is
+  # an approximation, not a confirmed match to the old semantic.
   class SemrushAdapter < Base
     SERVICE = "semrush"
     BASE_URL = "https://api.semrush.com"
+    # Comfortably above any realistic per-client tracked-keyword count — the
+    # report defaults to 10 rows per page and doesn't paginate otherwise.
+    DISPLAY_LIMIT = 500
 
     private
 
@@ -25,16 +45,18 @@ module Adapters
       keywords = client.client_keywords.active
       return Result.success(rankings: []) if keywords.empty?
 
-      response = connection(BASE_URL).get("/reports/v1/projects/#{external_id}/tracking/rankings", {
+      response = connection(BASE_URL).get("/reports/v1/projects/#{external_id}/tracking/", {
         key: credentials["api_key"],
-        domain: client.website_url,
-        export_columns: "Ph,Po,Pp"
+        type: "tracking_position_organic",
+        action: "report",
+        url: tracked_url_mask,
+        display_limit: DISPLAY_LIMIT
       })
 
       rows_by_keyword = parse_rankings(response.body)
 
       rankings = keywords.map do |keyword|
-        row = rows_by_keyword[keyword.keyword]
+        row = rows_by_keyword[keyword.keyword.downcase]
         {
           client_keyword_id: keyword.id,
           position: row && row[:position],
@@ -45,14 +67,28 @@ module Adapters
       Result.success(rankings: rankings)
     end
 
-    # SEMrush's classic reporting APIs return semicolon-delimited CSV-style
-    # text (`Ph;Po;Pp` per requested export_columns), not JSON.
+    # A wildcard mask ("*.example.com/*") matching however the tracked URL was
+    # registered when the Position Tracking project was set up in SEMrush.
+    def tracked_url_mask
+      domain = client.website_url.to_s.sub(%r{\Ahttps?://}, "").sub(/\Awww\./, "").sub(%r{/\z}, "")
+      "*.#{domain}/*"
+    end
+
     def parse_rankings(body)
-      body.to_s.each_line.drop(1).each_with_object({}) do |line, memo|
-        keyword, position, potential_traffic = line.strip.split(";")
+      rows = JSON.parse(body).fetch("data", {}).values
+
+      rows.each_with_object({}) do |row, memo|
+        keyword = row["Ph"]
         next if keyword.blank?
 
-        memo[keyword] = { position: position&.to_i, potential_traffic: potential_traffic&.to_f }
+        position = row.dig("Fi", tracked_url_mask)
+        traffic_by_date = row["Tr"] || {}
+        latest_date = traffic_by_date.keys.max
+
+        memo[keyword.downcase] = {
+          position: (position if position.is_a?(Numeric)),
+          potential_traffic: traffic_by_date.dig(latest_date, tracked_url_mask)
+        }
       end
     end
   end
