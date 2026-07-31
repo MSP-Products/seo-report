@@ -62,6 +62,8 @@ module Adapters
 
     def connection(base_url, headers: {})
       Faraday.new(url: base_url, headers: headers) do |f|
+        f.options.open_timeout = 10
+        f.options.timeout = 15
         f.request :retry, max: 2, interval: 0.5, backoff_factor: 2,
           exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed ]
         f.response :raise_error
