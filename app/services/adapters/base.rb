@@ -64,7 +64,14 @@ module Adapters
       Faraday.new(url: base_url, headers: headers) do |f|
         f.options.open_timeout = 10
         f.options.timeout = 15
-        f.request :retry, max: 2, interval: 0.5, backoff_factor: 2,
+        # Net::HTTP commits to a single resolved address per attempt and, unlike
+        # curl, never falls back to a different one from a DNS round-robin pool
+        # if that address is unreachable — so a real retry needs real spacing
+        # (not just more attempts) to have a chance of a fresh DNS answer,
+        # since resolvers commonly rotate record order between lookups but the
+        # OS-level cache can hold an answer for a while. 4 tries spaced
+        # 2s/4s/8s/16s apart is still fine for a background report job.
+        f.request :retry, max: 4, interval: 2, backoff_factor: 2,
           exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed ]
         f.response :raise_error
         f.adapter Faraday.default_adapter
