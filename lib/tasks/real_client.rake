@@ -15,16 +15,30 @@ namespace :reports do
       "hubspot" => { credentials: { access_token: ENV["HUBSPOT_ACCESS_TOKEN"] }, external_id: ENV["HUBSPOT_COMPANY_ID"] },
       "ghl" => { credentials: { access_token: ENV["GHL_ACCESS_TOKEN"] }, external_id: ENV["GHL_LOCATION_ID"] },
       "yext" => { credentials: { api_key: ENV["YEXT_API_KEY"] }, external_id: ENV["YEXT_ENTITY_ID"] },
-      "semrush" => { credentials: { api_key: ENV["SEMRUSH_API_KEY"] }, external_id: ENV["SEMRUSH_PROJECT_ID"] }
+      "semrush" => { credentials: { api_key: ENV["SEMRUSH_API_KEY"] }, external_id: ENV["SEMRUSH_PROJECT_ID"] },
+      # GA4 has no per-client credentials — external_id (the property ID) is
+      # the only client-specific piece; the service account itself is
+      # agency-wide (see the AgencyConnection block below).
+      "google_analytics" => { credentials: {}, external_id: ENV["GA4_PROPERTY_ID"] }
     }.each do |service, creds|
-      if creds[:external_id].blank? || creds[:credentials].values.all?(&:blank?)
+      credentials_missing = creds[:credentials].present? && creds[:credentials].values.all?(&:blank?)
+      if creds[:external_id].blank? || credentials_missing
         puts "  #{service}: skipped (no ENV credentials given)"
         next
       end
 
       link = client.client_service_links.find_or_initialize_by(service: service)
-      link.update!(external_id: creds[:external_id], override_credentials: creds[:credentials].to_json)
+      link.update!(external_id: creds[:external_id], override_credentials: creds[:credentials].presence&.to_json)
       puts "  #{service}: linked to #{creds[:external_id]}"
+    end
+
+    if ENV["GA4_SERVICE_ACCOUNT_EMAIL"].present? && ENV["GA4_SERVICE_ACCOUNT_PRIVATE_KEY"].present?
+      agency_connection = AgencyConnection.find_or_initialize_by(service: "google_analytics")
+      agency_connection.update!(encrypted_credentials: {
+        client_email: ENV["GA4_SERVICE_ACCOUNT_EMAIL"],
+        private_key: ENV["GA4_SERVICE_ACCOUNT_PRIVATE_KEY"]
+      }.to_json)
+      puts "  google_analytics: agency-wide service account credentials saved"
     end
 
     puts "Seeded #{client.name} (#{client.id})"
