@@ -2,7 +2,7 @@
 
 > **Source**: Based on the [official Ruby on Rails Guides](https://guides.rubyonrails.org/) for Rails 8.1.  
 > **Purpose**: This file defines conventions, patterns, and guardrails for any developer or AI agent contributing to this codebase. Read this before writing any code.  
-> **Stack**: Rails 8.1.2 · Ruby 3.3.7 · MySQL 8 (`mysql2`) · Propshaft · Importmap · Hotwire (Turbo + Stimulus) · Solid Queue/Cache/Cable
+> **Stack**: Rails 8.1.2 · Ruby 3.3.7 · PostgreSQL 16 (`pg`) · Propshaft · Importmap · Hotwire (Turbo + Stimulus) · Solid Queue/Cache/Cable
 
 ---
 
@@ -928,7 +928,7 @@ app/
     └── shared/                  ← Shared partials
 config/
 ├── credentials.yml.enc         ← Encrypted secrets (committed)
-├── database.yml                ← MySQL connection config
+├── database.yml                ← PostgreSQL connection config
 ├── importmap.rb                ← JS pin declarations
 ├── recurring.yml               ← Solid Queue scheduled jobs
 ├── routes.rb                   ← URL routing

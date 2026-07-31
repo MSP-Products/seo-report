@@ -12,6 +12,6 @@ class CreateSitemapPages < ActiveRecord::Migration[8.1]
     end
 
     add_foreign_key :sitemap_pages, :clients
-    add_index :sitemap_pages, [ :client_id, :url ], unique: true, length: { url: 255 }
+    add_index :sitemap_pages, [ :client_id, :url ], unique: true
   end
 end

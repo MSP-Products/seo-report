@@ -11,7 +11,10 @@
 # It's strongly recommended that you check this file into your version control system.
 
 ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
-  create_table "admin_users", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "pg_catalog.plpgsql"
+
+  create_table "admin_users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.string "password_digest"
@@ -20,7 +23,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["email"], name: "index_admin_users_on_email", unique: true
   end
 
-  create_table "agency_connections", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "agency_connections", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "credential_status"
     t.text "encrypted_credentials"
@@ -31,7 +34,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["service"], name: "index_agency_connections_on_service", unique: true
   end
 
-  create_table "client_keywords", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "client_keywords", force: :cascade do |t|
     t.boolean "active", default: true
     t.string "client_id", limit: 36, null: false
     t.datetime "created_at", null: false
@@ -40,10 +43,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.integer "keyword_difficulty"
     t.integer "serp_features"
     t.datetime "updated_at", null: false
-    t.index ["client_id"], name: "fk_rails_ff22c74841"
   end
 
-  create_table "client_service_links", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "client_service_links", force: :cascade do |t|
     t.string "client_id", limit: 36, null: false
     t.datetime "created_at", null: false
     t.string "credential_status"
@@ -55,7 +57,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["client_id", "service"], name: "index_client_service_links_on_client_id_and_service", unique: true
   end
 
-  create_table "clients", id: { type: :string, limit: 36, default: -> { "(uuid())" } }, charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "clients", id: { type: :string, limit: 36, default: -> { "gen_random_uuid()" } }, force: :cascade do |t|
     t.string "address"
     t.boolean "ai_seo_enrolled", default: false
     t.datetime "created_at", null: false
@@ -74,22 +76,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["discarded_at"], name: "index_clients_on_discarded_at"
   end
 
-  create_table "gbp_photos", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "gbp_photos", force: :cascade do |t|
     t.string "caption"
     t.string "image_url"
     t.string "report_id", limit: 36, null: false
-    t.index ["report_id"], name: "fk_rails_b1aa7ec04f"
   end
 
-  create_table "gbp_posts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "gbp_posts", force: :cascade do |t|
     t.text "description"
     t.date "published_at"
     t.string "report_id", limit: 36, null: false
     t.string "title"
-    t.index ["report_id"], name: "fk_rails_601bb308d9"
   end
 
-  create_table "gbp_reviews", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "gbp_reviews", force: :cascade do |t|
     t.string "author_name"
     t.text "body"
     t.string "external_id"
@@ -103,7 +103,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["report_id", "external_id"], name: "index_gbp_reviews_on_report_id_and_external_id", unique: true
   end
 
-  create_table "monthly_reports", id: { type: :string, limit: 36, default: -> { "(uuid())" } }, charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "monthly_reports", id: { type: :string, limit: 36, default: -> { "gen_random_uuid()" } }, force: :cascade do |t|
     t.string "access_token", null: false
     t.string "client_id", limit: 36, null: false
     t.datetime "created_at", null: false
@@ -116,14 +116,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["client_id", "report_month"], name: "index_monthly_reports_on_client_id_and_report_month", unique: true
   end
 
-  create_table "report_ai_platform_scores", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_ai_platform_scores", force: :cascade do |t|
     t.string "platform", null: false
     t.bigint "report_ai_visibility_id", null: false
     t.integer "score"
     t.index ["report_ai_visibility_id"], name: "index_report_ai_platform_scores_on_report_ai_visibility_id"
   end
 
-  create_table "report_ai_visibilities", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_ai_visibilities", force: :cascade do |t|
     t.integer "ai_rank"
     t.integer "citation_listings_pct"
     t.integer "citation_own_site_pct"
@@ -139,7 +139,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["report_id"], name: "index_report_ai_visibilities_on_report_id", unique: true
   end
 
-  create_table "report_citations", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_citations", force: :cascade do |t|
     t.integer "driving_directions_count"
     t.integer "previous_engagements"
     t.integer "previous_impressions"
@@ -150,7 +150,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["report_id"], name: "index_report_citations_on_report_id", unique: true
   end
 
-  create_table "report_gbp_summaries", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_gbp_summaries", force: :cascade do |t|
     t.decimal "average_rating", precision: 3, scale: 2
     t.boolean "needs_photos", default: false
     t.integer "new_negative_reviews"
@@ -160,7 +160,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["report_id"], name: "index_report_gbp_summaries_on_report_id", unique: true
   end
 
-  create_table "report_generation_logs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_generation_logs", force: :cascade do |t|
     t.datetime "attempted_at", null: false
     t.text "error_log"
     t.string "error_summary"
@@ -169,7 +169,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["monthly_report_id", "attempted_at"], name: "idx_report_gen_logs_on_report_and_attempted"
   end
 
-  create_table "report_highlights", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_highlights", force: :cascade do |t|
     t.text "ai_seo_summary_text"
     t.datetime "generated_at"
     t.string "model_used"
@@ -178,7 +178,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["report_id"], name: "index_report_highlights_on_report_id", unique: true
   end
 
-  create_table "report_keyword_rankings", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_keyword_rankings", force: :cascade do |t|
     t.decimal "growth", precision: 10, scale: 2
     t.bigint "keyword_id", null: false
     t.integer "position"
@@ -189,17 +189,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["report_id", "keyword_id"], name: "index_report_keyword_rankings_on_report_id_and_keyword_id", unique: true
   end
 
-  create_table "report_pages_published", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_pages_published", force: :cascade do |t|
     t.text "description"
     t.string "report_id", limit: 36, null: false
     t.bigint "sitemap_page_id", null: false
     t.string "title"
     t.string "url"
-    t.index ["report_id"], name: "fk_rails_14c31e0e5c"
     t.index ["sitemap_page_id"], name: "index_report_pages_published_on_sitemap_page_id"
   end
 
-  create_table "report_traffics", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "report_traffics", force: :cascade do |t|
     t.integer "appointments_booked"
     t.integer "direct_visits"
     t.decimal "estimated_revenue", precision: 12, scale: 2
@@ -221,15 +220,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["report_id"], name: "index_report_traffics_on_report_id", unique: true
   end
 
-  create_table "send_logs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "send_logs", force: :cascade do |t|
     t.datetime "attempted_at", null: false
     t.text "error_message"
     t.string "monthly_report_id", limit: 36, null: false
     t.string "status", null: false
-    t.index ["monthly_report_id"], name: "fk_rails_7b7fc24721"
   end
 
-  create_table "sitemap_pages", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "sitemap_pages", force: :cascade do |t|
     t.string "client_id", limit: 36, null: false
     t.datetime "first_seen_at"
     t.datetime "last_seen_at"
