@@ -14,8 +14,8 @@
       <%= render "shared/form_group",
             label: field[:label],
             field_name: "agency_connection[#{field[:key]}]",
-            type: "password",
-            toggle: true,
+            type: field[:multiline] ? "textarea" : "password",
+            toggle: !field[:multiline],
             placeholder: @connection.configured? ? "Leave blank to keep the current value" : "Enter #{field[:label].downcase}" %>
     <% end %>
 

@@ -33,13 +33,19 @@ class AgencyConnection < ApplicationRecord
 
   # Friendly per-service credential field(s) for the Connections form — so an
   # MSP admin fills in "Access Token"/"API Key", never raw JSON.
-  # google_analytics has none: it's a stub with no live integration yet.
+  # google_analytics is a Google Cloud service account JSON key, not a simple
+  # token — its private_key is `multiline: true` so the form renders a
+  # textarea instead of a single-line input (the key is a multi-line PEM
+  # string; browsers can mangle newlines pasted into a plain <input>).
   CREDENTIAL_FIELDS = {
     "hubspot" => [ { key: "access_token", label: "Access Token" } ],
     "ghl" => [ { key: "access_token", label: "Access Token" } ],
     "yext" => [ { key: "api_key", label: "API Key" } ],
     "semrush" => [ { key: "api_key", label: "API Key" } ],
-    "google_analytics" => []
+    "google_analytics" => [
+      { key: "client_email", label: "Client Email" },
+      { key: "private_key", label: "Private Key", multiline: true }
+    ]
   }.freeze
 
   # Display metadata for the Connections page (badge letter/full class, name).
