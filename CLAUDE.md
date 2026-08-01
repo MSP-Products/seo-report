@@ -17,6 +17,45 @@ on structure and naming. Neither is optional.
 Do not duplicate CONVENTIONS.md content here. If you learn a durable *mechanical* rule, add it
 there; a durable *craft* rule, add it here.
 
+**[docs/](docs/) answers a third question — what the system *does*, not how to write Rails.**
+`docs/README.md` holds the documentation convention, `docs/TEMPLATE.md` the shape every feature
+document follows, and `docs/MSP-GUIDE.md` how MSP staff operate the system.
+
+---
+
+## Updating the documentation
+
+**A change that alters behaviour is not finished until its document is updated.** This is part of
+Done, not a follow-up. A document that lies is worse than none, because the next person trusts it.
+
+**Find the affected document by grepping for the file you changed** — every feature document
+carries a Key files table naming its paths:
+
+```bash
+grep -rl "app/services/report_generator.rb" docs/
+```
+
+No match means either the file isn't feature-level (fine, not everything needs a document), or a
+Key files table is missing a row — add it.
+
+| You changed | Update |
+|---|---|
+| What a user sees or can do | The feature doc's **How it behaves** |
+| How a missing integration degrades | **When data is missing** *and* `MSP-GUIDE.md`'s equivalent table |
+| An external integration's behaviour | **Failure modes**, and the ID/setup steps in `MSP-GUIDE.md` |
+| Which files implement a feature | **Key files** — this is what keeps the doc findable |
+| A model, column, or constraint | **Data** |
+| How MSP performs any task | **[docs/MSP-GUIDE.md](docs/MSP-GUIDE.md)** |
+| A business rule that came from the client | **Changing this feature** |
+
+Then bump `last_verified` — but **only** if you re-read the document against the code. It is a
+claim the document was true that day, not a timestamp of your edit.
+
+Two rules that keep these usable: **describe behaviour, not implementation, above the developer
+line** in a feature doc; and **`MSP-GUIDE.md` must stay honest about what needs a developer.**
+Most admin tasks are console or rake commands today — if you build UI that replaces one, move it
+out of the "Needs a developer" section in the same change.
+
 ---
 
 ## The project in one paragraph
