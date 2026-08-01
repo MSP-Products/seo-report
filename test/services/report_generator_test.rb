@@ -45,16 +45,23 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     stub_request(:post, yext_reports_url)
       .with(query: hash_including("api_key" => "yext-key"), body: hash_including("dimensions" => [ "AI_MODEL", "ENTITY_IDS" ]))
       .to_return(status: 200, body: { response: { data: [ { "AI_MODEL" => "GEMINI", "ENTITY_IDS" => "entity-1", "SCOUT_AI_RANK_SCORE" => 6 } ] } }.to_json)
-    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/locations/entity-1/gbp-activity")
-      .with(query: hash_including("api_key"))
-      .to_return(status: 200, body: {
-        response: {
-          totalReviewCount: 312, averageRating: 4.7,
-          posts: [ { title: "Hi", description: "Hello", publishedAt: "2026-06-01" } ],
-          reviews: [ { id: "r1", authorName: "Jess", rating: 5, comment: "Great!", postedAt: "2026-06-02" } ],
-          photos: []
-        }
-      }.to_json)
+    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/reviews")
+      .with(query: hash_including("limit" => "1"))
+      .to_return(status: 200, body: { response: { count: 312, averageRating: 4.7 } }.to_json)
+    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/reviews")
+      .with(query: hash_including("limit" => "100"))
+      .to_return(status: 200, body: { response: { reviews: [
+        { "id" => 1, "authorName" => "Jess", "rating" => 5, "content" => "Great!",
+          "publisherDate" => Time.current.to_i * 1000, "comments" => [] }
+      ] } }.to_json)
+    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/posts")
+      .with(query: hash_including("entityIds" => "entity-1"))
+      .to_return(status: 200, body: { response: { posts: [
+        { "postTitle" => "Hi", "text" => "Hello", "postDate" => (@month + 1.day).strftime("%Y-%m-%d %H:%M:%S") }
+      ] } }.to_json)
+    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/entities/entity-1")
+      .with(query: hash_including("api_key" => "yext-key"))
+      .to_return(status: 200, body: { response: { photoGallery: [] } }.to_json)
 
     stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/")
       .with(query: hash_including("key" => "semrush-key", "type" => "tracking_position_organic",

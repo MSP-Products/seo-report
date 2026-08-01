@@ -167,7 +167,8 @@ class ReportGenerator
       report.gbp_reviews.create!(
         external_id: review[:external_id], author_name: review[:author_name], rating: review[:rating],
         body: review[:body], posted_at: review[:posted_at], sentiment: sentiment,
-        needs_action: review[:rating].to_i <= 2
+        needs_action: review[:rating].to_i <= 2 && review[:owner_reply_text].blank?,
+        owner_reply_text: review[:owner_reply_text], owner_replied_at: review[:owner_replied_at]
       )
     end
 
