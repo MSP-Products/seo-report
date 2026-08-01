@@ -29,6 +29,7 @@ class ReportGenerator
     sync_traffic(report)
     sync_yext(report)
     sync_keywords(report)
+    sync_pages_published(report)
     sync_highlights(report) unless report.is_first_report?
 
     report.update!(generated_at: Time.current)
@@ -188,6 +189,23 @@ class ReportGenerator
         previous_position: previous_position
       )
     end
+  end
+
+  # Only reads pages SitemapScanner has already discovered — this doesn't
+  # trigger a scan itself, since site scanning runs on its own recurring
+  # schedule (config/recurring.yml), independent of report generation.
+  def sync_pages_published(report)
+    report.report_pages_published.destroy_all
+
+    client.sitemap_pages.where(first_seen_at: month_range).find_each do |page|
+      report.report_pages_published.create!(
+        sitemap_page: page, url: page.url, title: page.title, description: page.meta_description
+      )
+    end
+  end
+
+  def month_range
+    month..month.end_of_month
   end
 
   def sync_highlights(report)

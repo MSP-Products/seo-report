@@ -93,6 +93,21 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     assert_equal "success", report.report_generation_logs.last.status
   end
 
+  test "snapshots only pages first seen within the report month" do
+    in_month = @client.sitemap_pages.create!(url: "https://example.com/new-page/", title: "New Page",
+      meta_description: "Fresh content", first_seen_at: @month.beginning_of_month + 3.days)
+    @client.sitemap_pages.create!(url: "https://example.com/old-page/", title: "Old Page",
+      first_seen_at: @month - 2.months)
+
+    report = ReportGenerator.new(client: @client, month: @month).call
+
+    published = report.report_pages_published
+    assert_equal 1, published.count
+    assert_equal in_month.id, published.first.sitemap_page_id
+    assert_equal "New Page", published.first.title
+    assert_equal "Fresh content", published.first.description
+  end
+
   test "is idempotent — re-running updates rather than duplicating" do
     ReportGenerator.new(client: @client, month: @month).call
     report = ReportGenerator.new(client: @client, month: @month).call
