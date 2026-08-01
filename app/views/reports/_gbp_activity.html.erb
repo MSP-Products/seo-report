@@ -57,12 +57,12 @@
         </div>
       <% end %>
 
-      <% if report.gbp_reviews.any? %>
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div class="flex items-center gap-2 text-teal-dark">
-            <%= report_icon(:star) %>
-            <span class="text-xs font-semibold uppercase tracking-wider">New Reviews</span>
-          </div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center gap-2 text-teal-dark">
+          <%= report_icon(:star) %>
+          <span class="text-xs font-semibold uppercase tracking-wider">New Reviews</span>
+        </div>
+        <% if report.gbp_reviews.any? %>
           <ul class="mt-4 space-y-4">
             <% report.gbp_reviews.each do |review| %>
               <li class="<%= review.needs_action? ? "-mx-3 rounded-lg border border-red-200 bg-red-50/60 p-3" : "border-b border-slate-200 pb-3" %> last:border-0 last:pb-0">
@@ -84,8 +84,10 @@
               </li>
             <% end %>
           </ul>
-        </div>
-      <% end %>
+        <% else %>
+          <p class="mt-4 text-sm text-slate-500">No reviews posted this month.</p>
+        <% end %>
+      </div>
 
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex items-center gap-2 text-teal-dark">
