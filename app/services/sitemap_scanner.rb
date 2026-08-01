@@ -118,11 +118,6 @@ class SitemapScanner
   end
 
   def connection
-    Faraday.new(headers: { "User-Agent" => USER_AGENT }) do |f|
-      f.options.open_timeout = 10
-      f.options.timeout = 15
-      f.response :raise_error
-      f.adapter Faraday.default_adapter
-    end
+    Adapters::ConnectionBuilder.build(headers: { "User-Agent" => USER_AGENT })
   end
 end

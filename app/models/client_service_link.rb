@@ -7,13 +7,7 @@ class ClientServiceLink < ApplicationRecord
   belongs_to :client
 
   # Enums
-  enum :service, {
-    semrush: "semrush",
-    yext: "yext",
-    google_analytics: "google_analytics",
-    ghl: "ghl",
-    hubspot: "hubspot"
-  }, validate: true
+  enum :service, Service::KEYS.index_by(&:itself), validate: true
 
   # prefix avoids "invalid?" clashing with ActiveRecord::Base#invalid? (validation state);
   # allow_nil since a link has no status until first verified.

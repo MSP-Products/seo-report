@@ -10,6 +10,8 @@
 # an unexpected exception (a bug, not an API being down) marks the attempt
 # "failed".
 class ReportGenerator
+  include MonthlyRange
+
   class MonthNotCompleteError < StandardError; end
 
   def initialize(client:, month:)
@@ -206,7 +208,7 @@ class ReportGenerator
   end
 
   def month_range
-    month..month.end_of_month
+    month_range_for(month)
   end
 
   def sync_highlights(report)

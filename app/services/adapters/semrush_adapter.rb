@@ -13,23 +13,15 @@ module Adapters
   # shorter project ID shown on the domain overview page. The API returns
   # "campaign not found" if only the project ID half is sent.
   #
-  # Endpoint and response shape both confirmed live against a real project:
-  #   - No "/rankings" suffix; type=tracking_position_organic + action=report
-  #     are required.
-  #   - The response is JSON, not the semicolon-delimited text the classic
-  #     Domain Analytics reports use — and export_columns is silently
-  #     ignored here; this report always returns its own fixed field set.
-  #   - Each row is keyed by index under "data". "Ph" is the keyword phrase.
-  #     "Fi"/"Be" are keyed by url mask and give the most-recent/earliest
-  #     ranking position in the requested date range (confirmed by
-  #     cross-checking against the per-date "Dt" breakdown) — "-" means not
-  #     ranked. previous_position is still our own historical record (see
-  #     ReportGenerator), not read from SEMrush's own Be/Diff figures.
+  # No "/rankings" suffix; type=tracking_position_organic + action=report are
+  # required. Response is JSON (not the classic Domain Analytics reports'
+  # semicolon-delimited text) with its own fixed field set — export_columns
+  # is silently ignored. Per row: "Ph" is the keyword phrase; "Fi"/"Be" (keyed
+  # by url mask) give the most-recent/earliest ranking position in range,
+  # "-" meaning not ranked.
   #
-  # LOWER CONFIDENCE: "Tr" (traffic share, keyed by date then url mask) is
-  # the closest available stand-in for potential_traffic — SEMrush doesn't
-  # expose a dedicated "potential traffic" figure on this report, so this is
-  # an approximation, not a confirmed match to the old semantic.
+  # LOWER CONFIDENCE: "Tr" (traffic share) is the closest stand-in for
+  # potential_traffic — SEMrush has no dedicated "potential traffic" figure.
   class SemrushAdapter < Base
     SERVICE = "semrush"
     BASE_URL = "https://api.semrush.com"
@@ -70,8 +62,10 @@ module Adapters
     # A wildcard mask ("*.example.com/*") matching however the tracked URL was
     # registered when the Position Tracking project was set up in SEMrush.
     def tracked_url_mask
-      domain = client.website_url.to_s.sub(%r{\Ahttps?://}, "").sub(/\Awww\./, "").sub(%r{/\z}, "")
-      "*.#{domain}/*"
+      @tracked_url_mask ||= begin
+        domain = client.website_url.to_s.sub(%r{\Ahttps?://}, "").sub(/\Awww\./, "").sub(%r{/\z}, "")
+        "*.#{domain}/*"
+      end
     end
 
     def parse_rankings(body)

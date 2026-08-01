@@ -3,32 +3,24 @@ module Adapters
   # (SOW #4). Populates report_traffic's total_visits, organic/direct/
   # referral/paid visits, unique_visitors, and pages_per_visit.
   #
-  # Credentials shape (agency-wide only — see AgencyConnection; there's no
-  # per-client override, since a single Google Cloud service account can read
-  # any client's property once that client shares Viewer access with it):
+  # Credentials are agency-wide (see AgencyConnection) — one Google Cloud
+  # service account reads any client's property once that client grants it
+  # Viewer access, no per-client credentials needed:
   #   {"client_email" => "...", "private_key" => "-----BEGIN PRIVATE KEY-----\n..."}
-  # taken directly from a downloaded service account JSON key.
-  # external_id: the client's GA4 property ID (the bare number, e.g. "384938446" —
-  # not the "properties/384938446" path form the API itself uses).
+  # external_id: the bare GA4 property ID (e.g. "384938446", not the
+  # "properties/384938446" path form the API itself uses).
   #
-  # Auth is Google's server-to-server JWT Bearer flow (RFC 7523), confirmed
-  # against Google's own OAuth docs — no OAuth consent screen or per-client
-  # authorization needed, unlike GHL. Endpoint/request/response shapes for
-  # the Data API's runReport confirmed against Google's own API reference.
+  # Auth is Google's server-to-server JWT Bearer flow (RFC 7523) — no OAuth
+  # consent screen or per-client authorization needed, unlike GHL.
   #
   # Two separate runReport calls, not one: GA4's per-channel breakdown can't
   # be safely summed into sitewide totals (a user who visits via both organic
   # and direct in the same month would be double-counted in unique_visitors),
   # so totals come from a dimension-less report and the organic/direct/
   # referral/paid split comes from a second, sessions-only report grouped by
-  # channel.
-  #
-  # LOWER CONFIDENCE: this hasn't been verified against a real GA4 property
-  # yet (no credentials available) — in particular, whether the four channel
-  # buckets below are the only ones worth surfacing, or whether a client's
-  # real traffic mix warrants adding Organic Social/Email/Affiliates as their
-  # own columns instead of leaving them uncounted in the breakdown (they're
-  # still included in the true total_visits figure, just not broken out).
+  # channel. Verified live against a real property; channels outside the four
+  # tracked here (Organic Social, Email, etc.) still count toward total_visits,
+  # just aren't broken out into their own column.
   class GoogleAnalyticsAdapter < Base
     SERVICE = "google_analytics"
     BASE_URL = "https://analyticsdata.googleapis.com"

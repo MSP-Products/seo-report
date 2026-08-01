@@ -19,19 +19,27 @@ module Adapters
       stub_request(:get, @entity_url).with(query: hash_including("api_key" => "yext-key")).to_return(status: 500, body: "error")
     end
 
-    test "maps citations from two separate impressions/engagements report calls" do
+    def stub_citations(impressions:, engagements:)
       stub_request(:post, @reports_url)
         .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_IMPRESSIONS" ]))
-        .to_return(status: 200, body: { response: { data: [ { "LOCATION_IDS" => "entity-123", "Total Listings Impressions" => 652 } ] } }.to_json)
+        .to_return(status: 200, body: { response: { data: [ { "LOCATION_IDS" => "entity-123", "Total Listings Impressions" => impressions } ] } }.to_json)
       stub_request(:post, @reports_url)
         .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_ACTIONS" ]))
-        .to_return(status: 200, body: { response: { data: [ { "ENTITY_IDS" => "entity-123", "TOTAL_LISTINGS_ACTIONS" => 129 } ] } }.to_json)
+        .to_return(status: 200, body: { response: { data: [ { "ENTITY_IDS" => "entity-123", "TOTAL_LISTINGS_ACTIONS" => engagements } ] } }.to_json)
+    end
+
+    def stub_ai_visibility_forbidden
       stub_request(:post, @reports_url)
         .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [
           "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE", "SCOUT_GOOGLE_RANK", "SCOUT_AI_RANK_SCORE",
           "SCOUT_NEGATIVE_SENTIMENT_SCORE", "SCOUT_NEUTRAL_SENTIMENT_SCORE"
         ]))
         .to_return(status: 403, body: "forbidden")
+    end
+
+    test "maps citations from two separate impressions/engagements report calls" do
+      stub_citations(impressions: 652, engagements: 129)
+      stub_ai_visibility_forbidden
       stub_gbp_failure
 
       result = YextAdapter.new(@client, report_month: @report_month).call
@@ -44,12 +52,7 @@ module Adapters
     end
 
     test "maps AI visibility with sentiment converted from fractions to percentages and positive derived" do
-      stub_request(:post, @reports_url)
-        .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_IMPRESSIONS" ]))
-        .to_return(status: 200, body: { response: { data: [ { "LOCATION_IDS" => "entity-123", "Total Listings Impressions" => 10 } ] } }.to_json)
-      stub_request(:post, @reports_url)
-        .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_ACTIONS" ]))
-        .to_return(status: 200, body: { response: { data: [ { "ENTITY_IDS" => "entity-123", "TOTAL_LISTINGS_ACTIONS" => 2 } ] } }.to_json)
+      stub_citations(impressions: 10, engagements: 2)
       stub_request(:post, @reports_url)
         .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [
           "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE", "SCOUT_GOOGLE_RANK", "SCOUT_AI_RANK_SCORE",
@@ -85,18 +88,8 @@ module Adapters
     end
 
     test "still succeeds when AI visibility/GBP calls fail (citations alone is enough)" do
-      stub_request(:post, @reports_url)
-        .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_IMPRESSIONS" ]))
-        .to_return(status: 200, body: { response: { data: [ { "LOCATION_IDS" => "entity-123", "Total Listings Impressions" => 10 } ] } }.to_json)
-      stub_request(:post, @reports_url)
-        .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_ACTIONS" ]))
-        .to_return(status: 200, body: { response: { data: [ { "ENTITY_IDS" => "entity-123", "TOTAL_LISTINGS_ACTIONS" => 2 } ] } }.to_json)
-      stub_request(:post, @reports_url)
-        .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [
-          "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE", "SCOUT_GOOGLE_RANK", "SCOUT_AI_RANK_SCORE",
-          "SCOUT_NEGATIVE_SENTIMENT_SCORE", "SCOUT_NEUTRAL_SENTIMENT_SCORE"
-        ]))
-        .to_return(status: 403, body: "forbidden")
+      stub_citations(impressions: 10, engagements: 2)
+      stub_ai_visibility_forbidden
       stub_gbp_failure
 
       result = YextAdapter.new(@client, report_month: @report_month).call
@@ -136,18 +129,8 @@ module Adapters
         .to_return(status: 200, body: { response: { photoGallery: [
           { "image" => { "url" => "https://example.com/photo1.jpg" }, "description" => "Office front" }
         ] } }.to_json)
-      stub_request(:post, @reports_url)
-        .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_IMPRESSIONS" ]))
-        .to_return(status: 200, body: { response: { data: [ { "LOCATION_IDS" => "entity-123", "Total Listings Impressions" => 10 } ] } }.to_json)
-      stub_request(:post, @reports_url)
-        .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_ACTIONS" ]))
-        .to_return(status: 200, body: { response: { data: [ { "ENTITY_IDS" => "entity-123", "TOTAL_LISTINGS_ACTIONS" => 2 } ] } }.to_json)
-      stub_request(:post, @reports_url)
-        .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [
-          "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE", "SCOUT_GOOGLE_RANK", "SCOUT_AI_RANK_SCORE",
-          "SCOUT_NEGATIVE_SENTIMENT_SCORE", "SCOUT_NEUTRAL_SENTIMENT_SCORE"
-        ]))
-        .to_return(status: 403, body: "forbidden")
+      stub_citations(impressions: 10, engagements: 2)
+      stub_ai_visibility_forbidden
 
       result = YextAdapter.new(@client, report_month: @report_month).call
 

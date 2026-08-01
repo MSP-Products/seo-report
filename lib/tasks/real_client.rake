@@ -21,8 +21,7 @@ namespace :reports do
       # agency-wide (see the AgencyConnection block below).
       "google_analytics" => { credentials: {}, external_id: ENV["GA4_PROPERTY_ID"] }
     }.each do |service, creds|
-      credentials_missing = creds[:credentials].present? && creds[:credentials].values.all?(&:blank?)
-      if creds[:external_id].blank? || credentials_missing
+      if creds[:external_id].blank? || creds[:credentials].values.any?(&:blank?)
         puts "  #{service}: skipped (no ENV credentials given)"
         next
       end
