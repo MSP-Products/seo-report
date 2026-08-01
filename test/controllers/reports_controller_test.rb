@@ -14,6 +14,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_select "span", text: "First report — baseline month"
     assert_select "strong", text: "?" # GHL appointments/revenue placeholder
     assert_select "h2", text: "Google & AI Search Performance", count: 0
+    assert_select "p", text: "No reviews posted this month."
   end
 
   test "renders an ongoing report with revenue, no AI SEO, and a flagged negative review" do

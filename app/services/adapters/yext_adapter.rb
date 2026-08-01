@@ -1,23 +1,25 @@
 module Adapters
-  # Yext covers three distinct parts of the report (SOW #4): Citation &
-  # Directory Performance (Analytics API), AI Visibility (the "Scout" product),
-  # and Google Business Profile activity — GBP is listed in the SOW as
-  # "Yext or GBP directly — TBD", and since GBP isn't one of the four named
-  # APIs for this pass, it's sourced through Yext here.
+  # Yext covers three report sections (SOW #4): Citation & Directory
+  # Performance, AI Visibility (Scout), and Google Business Profile activity
+  # (SOW lists GBP as "Yext or GBP directly — TBD"; resolved in favor of
+  # Yext, via its Reviews/Social/Knowledge-Graph APIs rather than Google's own).
   #
-  # Credentials shape: {"api_key" => "..."}.
-  # external_id: the Yext entity/location ID for this client.
-  #
-  # LOWER CONFIDENCE: Scout is a newer Yext product with thin public API docs
-  # at the time this was written. `fetch_ai_visibility`'s endpoint/response
-  # shape is a best-effort placeholder — confirm against Yext's actual Scout
-  # API reference once available and adjust the mapping in that one method.
+  # Credentials shape: {"api_key" => "..."}. external_id: the Yext entity ID.
   class YextAdapter < Base
     SERVICE = "yext"
     BASE_URL = "https://api.yextapis.com"
     API_VERSION = "20240101"
+    REPORTS_PATH = "/v2/accounts/me/analytics/reports".freeze
+    REVIEWS_PATH = "/v2/accounts/me/reviews".freeze
+    POSTS_PATH = "/v2/accounts/me/posts".freeze
 
-    PLATFORM_KEYS = %w[chatgpt google_ai_overview ai_mode gemini].freeze
+    AI_VISIBILITY_METRICS = {
+      overall_score: "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE",
+      google_rank: "SCOUT_GOOGLE_RANK",
+      ai_rank: "SCOUT_AI_RANK_SCORE",
+      sentiment_negative_pct: "SCOUT_NEGATIVE_SENTIMENT_SCORE",
+      sentiment_neutral_pct: "SCOUT_NEUTRAL_SENTIMENT_SCORE"
+    }.freeze
 
     private
 
@@ -33,20 +35,24 @@ module Adapters
     end
 
     def fetch_citations
-      response = api_connection.get("/v2/accounts/me/analytics/listings", {
-        locationId: external_id,
-        startDate: month_range.begin.iso8601,
-        endDate: month_range.end.iso8601
-      })
-      body = JSON.parse(response.body).fetch("response", {})
+      impressions = run_report(
+        metrics: [ "TOTAL_LISTINGS_IMPRESSIONS" ], dimensions: [ "LOCATION_IDS" ],
+        filters: { locationIds: [ external_id ] }
+      )
+      engagements = run_report(
+        metrics: [ "TOTAL_LISTINGS_ACTIONS" ], dimensions: [ "ENTITY_IDS" ],
+        filters: { entityIds: [ external_id ] }
+      )
 
       {
         ok: true,
         data: {
-          total_impressions: body["impressions"],
-          total_engagements: body["engagements"],
-          driving_directions_count: body.dig("engagementBreakdown", "drivingDirections"),
-          website_clicks_count: body.dig("engagementBreakdown", "websiteClicks")
+          total_impressions: metric_value(impressions, %w[LOCATION_IDS]),
+          total_engagements: metric_value(engagements, %w[ENTITY_IDS]),
+          # Not available: Yext only exposes a combined actions total, no
+          # per-type (driving directions vs. website clicks) breakdown.
+          driving_directions_count: nil,
+          website_clicks_count: nil
         }
       }
     rescue Faraday::Error => e
@@ -54,50 +60,156 @@ module Adapters
     end
 
     def fetch_ai_visibility
-      response = api_connection.get("/v2/accounts/me/scout/ai-visibility", { locationId: external_id })
-      body = JSON.parse(response.body).fetch("response", {})
+      degrade(nil) do
+        row = run_report(
+          metrics: AI_VISIBILITY_METRICS.values, dimensions: [ "ENTITY_IDS" ],
+          filters: { entityIds: [ external_id ] }
+        )
+        next nil if row.nil?
 
-      {
-        overall_score: body["overallScore"],
-        previous_score: body["previousScore"],
-        google_rank: body["googleRank"],
-        ai_rank: body["aiRank"],
-        sentiment_positive_pct: body.dig("sentiment", "positive"),
-        sentiment_neutral_pct: body.dig("sentiment", "neutral"),
-        sentiment_negative_pct: body.dig("sentiment", "negative"),
-        citation_own_site_pct: body.dig("citationSources", "ownSite"),
-        citation_listings_pct: body.dig("citationSources", "listings"),
-        citation_reputation_pct: body.dig("citationSources", "reputation"),
-        citation_third_party_pct: body.dig("citationSources", "thirdParty"),
-        platform_scores: PLATFORM_KEYS.filter_map { |key| [ key, body.dig("platformScores", key) ] if body.dig("platformScores", key) }.to_h
-      }
-    rescue Faraday::Error
-      nil
+        negative = (row[AI_VISIBILITY_METRICS[:sentiment_negative_pct]].to_f * 100).round
+        neutral = (row[AI_VISIBILITY_METRICS[:sentiment_neutral_pct]].to_f * 100).round
+
+        {
+          overall_score: row[AI_VISIBILITY_METRICS[:overall_score]],
+          google_rank: row[AI_VISIBILITY_METRICS[:google_rank]],
+          ai_rank: row[AI_VISIBILITY_METRICS[:ai_rank]],
+          sentiment_negative_pct: negative,
+          sentiment_neutral_pct: neutral,
+          sentiment_positive_pct: [ 100 - negative - neutral, 0 ].max,
+          # Not available: no citation-source-breakdown metric found in Yext's
+          # analytics catalog for this account.
+          citation_own_site_pct: nil,
+          citation_listings_pct: nil,
+          citation_reputation_pct: nil,
+          citation_third_party_pct: nil,
+          platform_scores: fetch_platform_scores
+        }
+      end
+    end
+
+    def fetch_platform_scores
+      degrade({}) do
+        rows = run_report_rows(
+          metrics: [ AI_VISIBILITY_METRICS[:ai_rank] ], dimensions: [ "AI_MODEL", "ENTITY_IDS" ],
+          filters: { entityIds: [ external_id ] }
+        )
+
+        rows.to_a.filter_map do |row|
+          platform = row["AI_MODEL"]
+          next if platform.blank?
+
+          [ platform.downcase, metric_value(row, %w[AI_MODEL ENTITY_IDS]) ]
+        end.to_h
+      end
     end
 
     def fetch_gbp_activity
-      response = api_connection.get("/v2/accounts/me/locations/#{external_id}/gbp-activity", {
-        startDate: month_range.begin.iso8601,
-        endDate: month_range.end.iso8601
-      })
-      body = JSON.parse(response.body).fetch("response", {})
+      summary = fetch_review_summary
 
       {
-        # Lifetime aggregates across the whole GBP listing — distinct from
-        # `reviews` below, which is just this month's new reviews.
-        total_reviews: body["totalReviewCount"],
-        average_rating: body["averageRating"],
-        posts: Array(body["posts"]).map { |p| { title: p["title"], description: p["description"], published_at: p["publishedAt"] } },
-        reviews: Array(body["reviews"]).map { |r|
+        total_reviews: summary[:total_reviews],
+        average_rating: summary[:average_rating],
+        reviews: fetch_reviews_this_month,
+        posts: fetch_posts_this_month,
+        photos: fetch_photos
+      }
+    end
+
+    # Lifetime totals, from an unfiltered call — a date-filtered call's own
+    # "count"/"averageRating" reflect only that filtered subset, not the
+    # account's true lifetime totals.
+    def fetch_review_summary
+      degrade({ total_reviews: nil, average_rating: nil }) do
+        response = api_connection.get(REVIEWS_PATH, { entityIds: external_id, limit: 1 })
+        body = response_data(response) || {}
+
+        { total_reviews: body["count"], average_rating: body["averageRating"] }
+      end
+    end
+
+    def fetch_reviews_this_month
+      degrade([]) do
+        response = api_connection.get(REVIEWS_PATH, {
+          entityIds: external_id, limit: 100,
+          minPublisherDate: month_range.begin.iso8601, maxPublisherDate: month_range.end.iso8601
+        })
+        reviews = response_data(response, "reviews") || []
+
+        reviews.map do |r|
+          owner_reply = Array(r["comments"]).find { |c| c["authorRole"] == "BUSINESS_OWNER" }
+
           {
             external_id: r["id"], author_name: r["authorName"], rating: r["rating"],
-            body: r["comment"], posted_at: r["postedAt"]
+            body: r["content"], posted_at: epoch_millis_to_time(r["publisherDate"]),
+            owner_reply_text: owner_reply&.fetch("content", nil),
+            owner_replied_at: owner_reply && epoch_millis_to_time(owner_reply["publisherDate"])
           }
-        },
-        photos: Array(body["photos"]).map { |p| { image_url: p["url"], caption: p["caption"] } }
-      }
-    rescue Faraday::Error
-      nil
+        end
+      end
+    end
+
+    # No documented server-side date filter for this endpoint (unlike
+    # reviews), so this filters client-side instead.
+    def fetch_posts_this_month
+      degrade([]) do
+        response = api_connection.get(POSTS_PATH, { entityIds: external_id, limit: 50 })
+        posts = response_data(response, "posts") || []
+
+        posts.filter_map do |p|
+          published_at = p["postDate"].presence && Time.zone.parse(p["postDate"])
+          next unless published_at && month_range.cover?(published_at.to_date)
+
+          { title: p["postTitle"], description: p["text"], published_at: published_at }
+        end
+      end
+    end
+
+    # Not a GBP-specific endpoint at all — the Knowledge Graph entity's own
+    # photoGallery field, covered by the same permission Citations already use.
+    def fetch_photos
+      degrade([]) do
+        response = api_connection.get("/v2/accounts/me/entities/#{external_id}")
+        gallery = response_data(response, "photoGallery") || []
+
+        gallery.map { |photo| { image_url: photo.dig("image", "url"), caption: photo["description"] } }
+      end
+    end
+
+    def epoch_millis_to_time(millis)
+      millis && Time.at(millis / 1000.0)
+    end
+
+    # Runs an analytics report and returns the single data row (a Hash), or
+    # nil if the report came back empty.
+    def run_report(metrics:, dimensions:, filters:)
+      run_report_rows(metrics: metrics, dimensions: dimensions, filters: filters).first
+    end
+
+    def run_report_rows(metrics:, dimensions:, filters:)
+      response = api_connection.post(REPORTS_PATH) do |req|
+        req.body = {
+          metrics: metrics,
+          dimensions: dimensions,
+          filters: filters.merge(startDate: month_range.begin.iso8601, endDate: month_range.end.iso8601)
+        }.to_json
+      end
+
+      response_data(response, "data")
+    end
+
+    def response_data(response, *keys)
+      JSON.parse(response.body).dig("response", *keys)
+    end
+
+    # Yext sometimes keys a report row by the metric's raw ID and sometimes by
+    # its human-friendly display name (observed both, even within the same
+    # account) — rather than guess the label, take whichever value remains
+    # after excluding the known dimension keys.
+    def metric_value(row, dimension_keys)
+      return nil if row.nil?
+
+      row.reject { |key, _| dimension_keys.include?(key) }.values.first
     end
 
     def api_connection

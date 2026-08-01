@@ -10,6 +10,8 @@
 # an unexpected exception (a bug, not an API being down) marks the attempt
 # "failed".
 class ReportGenerator
+  include MonthlyRange
+
   class MonthNotCompleteError < StandardError; end
 
   def initialize(client:, month:)
@@ -29,6 +31,7 @@ class ReportGenerator
     sync_traffic(report)
     sync_yext(report)
     sync_keywords(report)
+    sync_pages_published(report)
     sync_highlights(report) unless report.is_first_report?
 
     report.update!(generated_at: Time.current)
@@ -166,7 +169,8 @@ class ReportGenerator
       report.gbp_reviews.create!(
         external_id: review[:external_id], author_name: review[:author_name], rating: review[:rating],
         body: review[:body], posted_at: review[:posted_at], sentiment: sentiment,
-        needs_action: review[:rating].to_i <= 2
+        needs_action: review[:rating].to_i <= 2 && review[:owner_reply_text].blank?,
+        owner_reply_text: review[:owner_reply_text], owner_replied_at: review[:owner_replied_at]
       )
     end
 
@@ -188,6 +192,23 @@ class ReportGenerator
         previous_position: previous_position
       )
     end
+  end
+
+  # Only reads pages SitemapScanner has already discovered — this doesn't
+  # trigger a scan itself, since site scanning runs on its own recurring
+  # schedule (config/recurring.yml), independent of report generation.
+  def sync_pages_published(report)
+    report.report_pages_published.destroy_all
+
+    client.sitemap_pages.where(first_seen_at: month_range).find_each do |page|
+      report.report_pages_published.create!(
+        sitemap_page: page, url: page.url, title: page.title, description: page.meta_description
+      )
+    end
+  end
+
+  def month_range
+    month_range_for(month)
   end
 
   def sync_highlights(report)

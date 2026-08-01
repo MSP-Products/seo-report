@@ -26,26 +26,50 @@ class ReportGeneratorTest < ActiveSupport::TestCase
       .with(query: hash_including("location_id"))
       .to_return(status: 200, body: { opportunities: [ { monetaryValue: 500 } ] }.to_json)
 
-    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/analytics/listings")
-      .with(query: hash_including("locationId"))
-      .to_return(status: 200, body: { response: { impressions: 900, engagements: 253 } }.to_json)
-    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/scout/ai-visibility")
-      .with(query: hash_including("locationId"))
-      .to_return(status: 200, body: { response: { overallScore: 26, googleRank: 1, aiRank: 6 } }.to_json)
-    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/locations/entity-1/gbp-activity")
-      .with(query: hash_including("api_key"))
-      .to_return(status: 200, body: {
-        response: {
-          totalReviewCount: 312, averageRating: 4.7,
-          posts: [ { title: "Hi", description: "Hello", publishedAt: "2026-06-01" } ],
-          reviews: [ { id: "r1", authorName: "Jess", rating: 5, comment: "Great!", postedAt: "2026-06-02" } ],
-          photos: []
-        }
-      }.to_json)
+    yext_reports_url = "https://api.yextapis.com/v2/accounts/me/analytics/reports"
+    stub_request(:post, yext_reports_url)
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_IMPRESSIONS" ]))
+      .to_return(status: 200, body: { response: { data: [ { "LOCATION_IDS" => "entity-1", "Total Listings Impressions" => 900 } ] } }.to_json)
+    stub_request(:post, yext_reports_url)
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_ACTIONS" ]))
+      .to_return(status: 200, body: { response: { data: [ { "ENTITY_IDS" => "entity-1", "TOTAL_LISTINGS_ACTIONS" => 253 } ] } }.to_json)
+    stub_request(:post, yext_reports_url)
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [
+        "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE", "SCOUT_GOOGLE_RANK", "SCOUT_AI_RANK_SCORE",
+        "SCOUT_NEGATIVE_SENTIMENT_SCORE", "SCOUT_NEUTRAL_SENTIMENT_SCORE"
+      ]))
+      .to_return(status: 200, body: { response: { data: [ {
+        "ENTITY_IDS" => "entity-1", "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE" => 26, "SCOUT_GOOGLE_RANK" => 1,
+        "SCOUT_AI_RANK_SCORE" => 6, "SCOUT_NEGATIVE_SENTIMENT_SCORE" => 0.03, "SCOUT_NEUTRAL_SENTIMENT_SCORE" => 0.33
+      } ] } }.to_json)
+    stub_request(:post, yext_reports_url)
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("dimensions" => [ "AI_MODEL", "ENTITY_IDS" ]))
+      .to_return(status: 200, body: { response: { data: [ { "AI_MODEL" => "GEMINI", "ENTITY_IDS" => "entity-1", "SCOUT_AI_RANK_SCORE" => 6 } ] } }.to_json)
+    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/reviews")
+      .with(query: hash_including("limit" => "1"))
+      .to_return(status: 200, body: { response: { count: 312, averageRating: 4.7 } }.to_json)
+    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/reviews")
+      .with(query: hash_including("limit" => "100"))
+      .to_return(status: 200, body: { response: { reviews: [
+        { "id" => 1, "authorName" => "Jess", "rating" => 5, "content" => "Great!",
+          "publisherDate" => Time.current.to_i * 1000, "comments" => [] }
+      ] } }.to_json)
+    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/posts")
+      .with(query: hash_including("entityIds" => "entity-1"))
+      .to_return(status: 200, body: { response: { posts: [
+        { "postTitle" => "Hi", "text" => "Hello", "postDate" => (@month + 1.day).strftime("%Y-%m-%d %H:%M:%S") }
+      ] } }.to_json)
+    stub_request(:get, "https://api.yextapis.com/v2/accounts/me/entities/entity-1")
+      .with(query: hash_including("api_key" => "yext-key"))
+      .to_return(status: 200, body: { response: { photoGallery: [] } }.to_json)
 
-    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/rankings")
-      .with(query: hash_including("key"))
-      .to_return(status: 200, body: "Ph;Po;Pp\ndentist near me;7;0.81\n")
+    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/")
+      .with(query: hash_including("key" => "semrush-key", "type" => "tracking_position_organic",
+        "action" => "report", "url" => "*.example.com/*"))
+      .to_return(status: 200, body: {
+        data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 7 },
+          "Tr" => { "20260630" => { "*.example.com/*" => 0.81 } } } }
+      }.to_json)
   end
 
   test "generates a full report from all adapters" do
@@ -76,6 +100,21 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     assert_equal "success", report.report_generation_logs.last.status
   end
 
+  test "snapshots only pages first seen within the report month" do
+    in_month = @client.sitemap_pages.create!(url: "https://example.com/new-page/", title: "New Page",
+      meta_description: "Fresh content", first_seen_at: @month.beginning_of_month + 3.days)
+    @client.sitemap_pages.create!(url: "https://example.com/old-page/", title: "Old Page",
+      first_seen_at: @month - 2.months)
+
+    report = ReportGenerator.new(client: @client, month: @month).call
+
+    published = report.report_pages_published
+    assert_equal 1, published.count
+    assert_equal in_month.id, published.first.sitemap_page_id
+    assert_equal "New Page", published.first.title
+    assert_equal "Fresh content", published.first.description
+  end
+
   test "is idempotent — re-running updates rather than duplicating" do
     ReportGenerator.new(client: @client, month: @month).call
     report = ReportGenerator.new(client: @client, month: @month).call
@@ -87,10 +126,15 @@ class ReportGeneratorTest < ActiveSupport::TestCase
 
   test "carries the previous month's position forward as previous_position" do
     earlier_month = @month - 1.month
-    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/rankings")
-      .with(query: hash_including("key"))
-      .to_return({ status: 200, body: "Ph;Po;Pp\ndentist near me;12;0.50\n" },
-                 { status: 200, body: "Ph;Po;Pp\ndentist near me;7;0.81\n" })
+    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/")
+      .with(query: hash_including("key" => "semrush-key", "type" => "tracking_position_organic",
+        "action" => "report", "url" => "*.example.com/*"))
+      .to_return(
+        { status: 200, body: { data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 12 },
+          "Tr" => { "20260530" => { "*.example.com/*" => 0.50 } } } } }.to_json },
+        { status: 200, body: { data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 7 },
+          "Tr" => { "20260630" => { "*.example.com/*" => 0.81 } } } } }.to_json }
+      )
 
     ReportGenerator.new(client: @client, month: earlier_month).call
     report = ReportGenerator.new(client: @client, month: @month).call

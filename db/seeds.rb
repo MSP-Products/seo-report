@@ -2,6 +2,12 @@
 # development, test). The code here should be idempotent so that it can be executed at any point in every environment.
 # The data can then be loaded with the bin/rails db:seed command (or created alongside the database with db:setup).
 #
+# The services lookup table is also seeded by its own migration
+# (CreateServices), but a database built via db:schema:load rather than a
+# full migration replay never gets that data — repeating it here (idempotent)
+# guarantees it either way.
+Service::KEYS.each { |key| Service.find_or_create_by!(key: key) }
+
 # Demo data for the public report page, replicating the 3 reference Lovable prototypes
 # (seoreport1/2/3.lovable.app) so /reports/:access_token can be visually checked against
 # them. Re-running this file replaces the 3 demo clients (idempotent by name).

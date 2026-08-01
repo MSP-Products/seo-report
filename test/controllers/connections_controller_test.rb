@@ -69,14 +69,30 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to connections_path
   end
 
-  test "google_analytics has no editable fields since it isn't live yet" do
+  test "google_analytics is editable, with a textarea for the multi-line private key" do
     sign_in_as(role: "admin")
 
     get connections_path
-    assert_select "a", text: "Edit", count: 4 # every service except google_analytics
+    assert_select "a", text: "Edit", count: 5 # every service, including google_analytics
 
     get edit_connection_path("google_analytics")
-    assert_redirected_to connections_path
+
+    assert_response :success
+    assert_select "label", text: "Client Email"
+    assert_select "textarea[name=?]", "agency_connection[private_key]"
+  end
+
+  test "google_analytics edit never echoes back the stored private key" do
+    sign_in_as(role: "admin")
+    AgencyConnection.create!(service: "google_analytics", encrypted_credentials: {
+      client_email: "msp-909@focus-hulling-504115-d8.iam.gserviceaccount.com",
+      private_key: "-----BEGIN PRIVATE KEY-----\nsecret-key-material\n-----END PRIVATE KEY-----\n"
+    }.to_json)
+
+    get edit_connection_path("google_analytics")
+
+    assert_response :success
+    assert_no_match(/secret-key-material/, response.body)
   end
 
   private

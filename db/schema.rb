@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_31_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -227,6 +227,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.string "status", null: false
   end
 
+  create_table "services", primary_key: "key", id: :string, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "sitemap_pages", force: :cascade do |t|
     t.string "client_id", limit: 36, null: false
     t.datetime "first_seen_at"
@@ -237,8 +242,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_160021) do
     t.index ["client_id", "url"], name: "index_sitemap_pages_on_client_id_and_url", unique: true
   end
 
+  add_foreign_key "agency_connections", "services", column: "service", primary_key: "key"
   add_foreign_key "client_keywords", "clients"
   add_foreign_key "client_service_links", "clients"
+  add_foreign_key "client_service_links", "services", column: "service", primary_key: "key"
   add_foreign_key "gbp_photos", "monthly_reports", column: "report_id"
   add_foreign_key "gbp_posts", "monthly_reports", column: "report_id"
   add_foreign_key "gbp_reviews", "monthly_reports", column: "report_id"

@@ -6,6 +6,8 @@ module Adapters
   # store the same JSON-blob shape (documented per adapter), decrypted transparently
   # via ActiveRecord::Encryption.
   class Base
+    include MonthlyRange
+
     # Subclasses set: SERVICE = "hubspot" (must match the `service` enum on
     # AgencyConnection/ClientServiceLink).
     SERVICE = nil
@@ -56,17 +58,21 @@ module Adapters
     end
 
     def month_range
-      start_of_month = report_month.beginning_of_month
-      start_of_month..start_of_month.end_of_month
+      month_range_for(report_month)
     end
 
     def connection(base_url, headers: {})
-      Faraday.new(url: base_url, headers: headers) do |f|
-        f.request :retry, max: 2, interval: 0.5, backoff_factor: 2,
-          exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed ]
-        f.response :raise_error
-        f.adapter Faraday.default_adapter
-      end
+      ConnectionBuilder.build(base_url, headers: headers)
+    end
+
+    # Runs the block and returns `default` if it raises Faraday::Error — for a
+    # sub-fetch that's allowed to degrade independently (e.g. one product
+    # area of a multi-endpoint service being down shouldn't blank out data
+    # that's otherwise available).
+    def degrade(default)
+      yield
+    rescue Faraday::Error
+      default
     end
   end
 end

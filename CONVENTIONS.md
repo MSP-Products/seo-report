@@ -60,6 +60,25 @@ Migrations are Ruby classes that modify the database schema over time. They are 
 - Use `null: false` for columns that must always have a value.
 - Use `index: true` or `add_index` for columns you query by frequently.
 - Use `add_index :table, [:col1, :col2], unique: true` for composite uniqueness constraints.
+- Back a string-backed `enum`'s allowed values at the DB level too, not just the model's
+  `validate: true` — a Ruby validation doesn't stop a raw SQL script, console `update_column`, or
+  a future migration from writing an invalid value. Two ways to do it, pick by whether the values
+  carry any real behavior of their own:
+  - **A fixed handful of literal values, no associated data** — `add_check_constraint :table,
+    "column IN ('a', 'b', 'c')", name: "..."`. Simple, but the allowed-values list is baked into
+    the migration itself, so adding a value means a new migration that edits the constraint.
+  - **Values that have their own metadata or are referenced from more than one table** (this is
+    the `service` enum's shape — see `Service` / `db/migrate/*_create_services.rb`) — a small
+    lookup table with a natural string primary key (`id: false do |t| t.string :key,
+    primary_key: true end`), and `add_foreign_key :table, :lookup_table, column: :enum_column,
+    primary_key: :key` from every table that has the enum column. One place to add a new value
+    (a row) instead of editing a constraint in N places.
+  - Either way: a database built via `db:schema:load` (what test-suite prep and some fresh
+    deploys use) replays *structure* only — any rows a migration inserted via `reversible`/`create`
+    are gone. If something else (a FK, a feature) depends on those rows always existing, seed them
+    from a real constant AND from a place that actually runs for every DB-build path (this
+    project's test suite bootstraps `Service::KEYS` in `test_helper.rb` for exactly this reason —
+    see that file's comment).
 - Use `decimal` (not `float`) for monetary values: `t.decimal :estimated_revenue, precision: 10, scale: 2`.
 - Use `text` for long-form content, `string` (varchar) for short fields.
 - Use `t.references :client, type: :uuid, foreign_key: true` for associations with UUID PKs.
@@ -73,7 +92,7 @@ Migrations are Ruby classes that modify the database schema over time. They are 
 - Don't add database-level default values for complex logic — handle defaults in the model.
 - Don't forget to add `foreign_key: true` on reference columns.
 - Don't delete or rename old migration files — they are a historical record.
-- Don't put data manipulation (`update_all`, `create`) in schema migrations — use `bin/rails db:seed` or a separate data migration.
+- Don't put data manipulation (`update_all`, `create`) in schema migrations — use `bin/rails db:seed` or a separate data migration. The one exception is seeding a lookup table's rows in the same migration that creates it, when a FK constraint added in that migration depends on those rows existing (see the `services` table) — that's schema-adjacent reference data, not business data. Even then, also seed it from `db/seeds.rb` (or equivalent), since `db:schema:load` won't replay the migration's insert.
 
 ---
 
@@ -123,6 +142,9 @@ Models are the core of Rails applications. They represent business entities and 
   ```ruby
   enum :status, { active: "active", expired: "expired" }, validate: true
   ```
+  Pair it with a DB check constraint on the same column (§3) — the model validation and the
+  constraint enforce the same invariant at two layers, which is the point: the validation gives a
+  friendly error in normal app code, the constraint is what actually holds under a bypass.
 
 ### Don'ts
 - Don't use `default_scope` — it silently applies to every query and causes bugs. Use named scopes.
