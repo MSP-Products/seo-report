@@ -59,9 +59,21 @@ So:
 - **Unmerged branches change the answer.** If another branch is rewriting what you are about to
   document, say so and ask whether to wait for it to merge. Documenting against three unmerged
   branches is how a document becomes stale before it is reviewed.
-- **Keep it a separate commit**, and usually a separate branch, from the code it describes. A
-  documentation branch should contain no code changes, so a green CI run means the same thing it
-  always did.
+
+**Which branch the documentation goes on depends on what it is:**
+
+- **Documenting a change you are making → the same branch and the same PR as the code.** This is
+  the normal case, and the default. The document and the behaviour it describes must land
+  together or they are immediately inconsistent, and a reviewer needs to see both to judge
+  either. Do not open a follow-up PR "to document it" — that is the punt this rule exists to
+  prevent.
+- **A documentation-only effort → its own branch.** Retrofitting documentation onto code that
+  was never documented, restructuring the document set, or changing the convention itself
+  belongs to no single code change and has nothing to be atomic with. Such a branch should
+  contain no code beyond documentation tooling.
+
+The distinction is whether there is a code change for the documentation to be consistent *with*.
+If there is, they travel together.
 
 ### What to update
 
