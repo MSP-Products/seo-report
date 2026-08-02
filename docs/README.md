@@ -9,8 +9,15 @@ Documentation for **My Social Practice — SEO Reports**.
 | **[../CLAUDE.md](../CLAUDE.md)** | Developers | How to *write* code here — craft, structure, testing |
 | **[../CONVENTIONS.md](../CONVENTIONS.md)** | Developers | The Rails rulebook — framework mechanics |
 
-`docs/features/` is where per-feature documents live. **It is empty right now.** This
-branch establishes the convention; the feature documents get written against it next.
+### Feature documents
+
+| Document | Covers | Status | Last verified |
+|---|---|---|---|
+| [monthly-report](features/monthly-report.md) | The public report page — the deliverable | shipped | 2026-08-02 |
+| [report-generation](features/report-generation.md) | The monthly process that produces a report | partial | 2026-08-02 |
+| [integrations](features/integrations.md) | The five external services and the adapter layer | partial | 2026-08-02 |
+| [page-scan](features/page-scan.md) | The nightly site scan behind "Pages published" | shipped | 2026-08-02 |
+| [admin-panel](features/admin-panel.md) | Login, roles, and the Connections page | partial | 2026-08-02 |
 
 ---
 
@@ -21,6 +28,19 @@ with. It pulls each practice's data from five external services, stores a frozen
 snapshot per month, and publishes it as a private web page the practice opens from a
 link.
 
+```
+HubSpot ─┐                                            ┌─ practice details, AI SEO enrolment
+GHL ─────┤                                            ├─ appointments, revenue
+Yext ────┼──▶  ReportGenerator  ──▶  frozen snapshot  ┼─ citations, AI visibility, GBP
+SEMrush ─┤       (one practice,       (Report* rows)  ├─ keyword rankings
+GA4 ─────┘        one month)                          └─ traffic
+
+           SitemapScanner  ──▶  SitemapPage  ─────────── pages published
+            (nightly, per practice)                              │
+                                                                 ▼
+                                        ReportPresenter ──▶ /reports/<token>
+```
+
 Two surfaces, and only two:
 
 - **The public report** — `/reports/<token>`, no login, one page per practice per month.
@@ -28,6 +48,30 @@ Two surfaces, and only two:
 - **The admin panel** — login required, currently one working page (Connections).
   Everything else MSP needs to do is a console or rake command today; see
   [MSP-GUIDE.md](MSP-GUIDE.md).
+
+### Where the project actually stands
+
+Honest status, so nobody assumes a gap is a bug:
+
+**Working end to end:** report rendering with every degraded state, report generation
+(idempotent and re-runnable), the nightly page scan, agency-wide credential management,
+and login with two roles.
+
+**Verified against live APIs:** Yext, SEMrush, Google Analytics.
+**Not yet verified:** HubSpot and GoHighLevel — HubSpot's custom property names are still
+a placeholder convention.
+
+**The significant gaps**, each documented in the relevant feature doc under *Not built
+yet*:
+
+- **Nothing schedules report generation**, and nothing alerts when one fails or is never
+  run.
+- **No Clients page** — adding a practice, linking it to a service, and managing keywords
+  are console or rake tasks.
+- **No Dashboard page** — generation health is recorded in the database but surfaced
+  nowhere.
+- **No emailing.** `SendLog` and `emailed_at` exist; no mailer does.
+- **Credential health labels are never set automatically.**
 
 ---
 
