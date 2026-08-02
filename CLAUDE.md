@@ -28,6 +28,55 @@ document follows, and `docs/MSP-GUIDE.md` how MSP staff operate the system.
 **A change that alters behaviour is not finished until its document is updated.** This is part of
 Done, not a follow-up. A document that lies is worse than none, because the next person trusts it.
 
+### When to write it — wait for the scope to close, then ask
+
+**Documentation is part of Done for the *branch*, not for each commit.** Write it once the
+branch's scope is complete and the code has stopped moving.
+
+**Then ask the user before starting.** Do not begin a documentation pass unprompted — confirm the
+scope is actually closed and that they want it written now. They may have another change coming,
+may want it in a separate branch, or may not want it yet at all.
+
+Why this rule exists, concretely: documentation was once written for an adapter that was being
+rebuilt on another branch at the same time. The result described endpoints that no longer existed
+by the time it was committed, and had to be researched and rewritten twice. **Documenting code
+that is still in flux produces documentation that is wrong on arrival** — and wrong documentation
+is worse than none.
+
+**Capture immediately, write at the end.** These are different things and only one of them
+waits. The moment you learn something a document doesn't say — an API behaving unlike its
+documentation, a constraint you had to dig out of git history, the root cause of a bug — write
+the *note* down straight away, in the branch, wherever it will not be lost. What waits is the
+prose describing behaviour that is still changing. Losing hard-won knowledge is a worse failure
+than documenting slightly late; the trigger list is in
+[docs/README.md](docs/README.md#write-it-down-when-you-learn-it).
+
+So:
+
+- **Mid-branch:** capture facts as you learn them; don't write the narrative sections yet.
+- **Scope complete:** ask whether to document now, then read the *current* code — not what you
+  remember writing earlier in the session — and write it.
+- **Unmerged branches change the answer.** If another branch is rewriting what you are about to
+  document, say so and ask whether to wait for it to merge. Documenting against three unmerged
+  branches is how a document becomes stale before it is reviewed.
+
+**Which branch the documentation goes on depends on what it is:**
+
+- **Documenting a change you are making → the same branch and the same PR as the code.** This is
+  the normal case, and the default. The document and the behaviour it describes must land
+  together or they are immediately inconsistent, and a reviewer needs to see both to judge
+  either. Do not open a follow-up PR "to document it" — that is the punt this rule exists to
+  prevent.
+- **A documentation-only effort → its own branch.** Retrofitting documentation onto code that
+  was never documented, restructuring the document set, or changing the convention itself
+  belongs to no single code change and has nothing to be atomic with. Such a branch should
+  contain no code beyond documentation tooling.
+
+The distinction is whether there is a code change for the documentation to be consistent *with*.
+If there is, they travel together.
+
+### What to update
+
 **Find the affected document by grepping for the file you changed** — every feature document
 carries a Key files table naming its paths:
 
@@ -50,6 +99,12 @@ Key files table is missing a row — add it.
 
 Then bump `last_verified` — but **only** if you re-read the document against the code. It is a
 claim the document was true that day, not a timestamp of your edit.
+
+**Merge conflicts in documentation resolve differently from code:** default to keeping both
+sides, then read the merged section for duplication or contradiction, then re-verify against the
+code and set `last_verified` to today — because once two edits are merged, neither original date
+describes the text anyone has actually read. Full rules in
+[docs/README.md](docs/README.md#resolving-conflicts).
 
 Two rules that keep these usable: **describe behaviour, not implementation, above the developer
 line** in a feature doc; and **`MSP-GUIDE.md` must stay honest about what needs a developer.**
@@ -759,6 +814,13 @@ Two runners, and they must agree:
   same way they do on GitHub.
 - **[.github/workflows/ci.yml](.github/workflows/ci.yml)** — the PR gate. Five parallel jobs
   (`scan_ruby`, `scan_js`, `lint`, `test`, `system-test`) against a `postgres` service container.
+
+**`bin/rails docs:check` runs in both**, as a step of the `lint` job on GitHub. It verifies every
+source file is named in a document, every link resolves, and every Key files table entry points
+at a path that exists — the last of which is what keeps the "grep `docs/` for the file you
+changed" rule true. It needs no database, which is why it sits in `lint` rather than `test`.
+**A rename that leaves a document behind now fails the build**, which is the whole point:
+documentation rots silently otherwise.
 
 **Run `bin/ci` before pushing.** Job-level parallelism is a legitimate difference between the two;
 differences in *what passes* are bugs. There are three right now:

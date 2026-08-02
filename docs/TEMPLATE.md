@@ -1,5 +1,9 @@
 ---
 # Copy this file to docs/features/<slug>.md and fill it in. Delete these comments.
+#
+# Relative links below are written for that destination, not for this file's own
+# location — so ../README.md and ../../CLAUDE.md resolve correctly once copied, and
+# appear broken while sitting here. Don't "fix" them.
 title: Human readable name
 slug: kebab-case-matching-the-filename
 status: shipped          # shipped | partial | planned
