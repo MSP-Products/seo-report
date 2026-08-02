@@ -815,6 +815,13 @@ Two runners, and they must agree:
 - **[.github/workflows/ci.yml](.github/workflows/ci.yml)** — the PR gate. Five parallel jobs
   (`scan_ruby`, `scan_js`, `lint`, `test`, `system-test`) against a `postgres` service container.
 
+**`bin/rails docs:check` runs in both**, as a step of the `lint` job on GitHub. It verifies every
+source file is named in a document, every link resolves, and every Key files table entry points
+at a path that exists — the last of which is what keeps the "grep `docs/` for the file you
+changed" rule true. It needs no database, which is why it sits in `lint` rather than `test`.
+**A rename that leaves a document behind now fails the build**, which is the whole point:
+documentation rots silently otherwise.
+
 **Run `bin/ci` before pushing.** Job-level parallelism is a legitimate difference between the two;
 differences in *what passes* are bugs. There are three right now:
 

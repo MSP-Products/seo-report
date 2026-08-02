@@ -65,6 +65,14 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+      # Verifies the documentation convention still holds: every source file is
+      # named in a document, every link resolves, and every Key files table entry
+      # points at a path that exists. That last check is what keeps "grep docs/ for
+      # the file you changed" true — a rename otherwise breaks the lookup silently.
+      # Pure file checks, no database, so it belongs in this job rather than test.
+      - name: Check documentation
+        run: bin/rails docs:check
+
   test:
     runs-on: ubuntu-latest
 
