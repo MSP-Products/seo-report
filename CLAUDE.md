@@ -28,6 +28,35 @@ document follows, and `docs/MSP-GUIDE.md` how MSP staff operate the system.
 **A change that alters behaviour is not finished until its document is updated.** This is part of
 Done, not a follow-up. A document that lies is worse than none, because the next person trusts it.
 
+### When to write it — wait for the scope to close, then ask
+
+**Documentation is part of Done for the *branch*, not for each commit.** Write it once the
+branch's scope is complete and the code has stopped moving.
+
+**Then ask the user before starting.** Do not begin a documentation pass unprompted — confirm the
+scope is actually closed and that they want it written now. They may have another change coming,
+may want it in a separate branch, or may not want it yet at all.
+
+Why this rule exists, concretely: documentation was once written for an adapter that was being
+rebuilt on another branch at the same time. The result described endpoints that no longer existed
+by the time it was committed, and had to be researched and rewritten twice. **Documenting code
+that is still in flux produces documentation that is wrong on arrival** — and wrong documentation
+is worse than none.
+
+So:
+
+- **Mid-branch:** note what will need documenting; don't write it yet.
+- **Scope complete:** ask whether to document now, then read the *current* code — not what you
+  remember writing earlier in the session — and write it.
+- **Unmerged branches change the answer.** If another branch is rewriting what you are about to
+  document, say so and ask whether to wait for it to merge. Documenting against three unmerged
+  branches is how a document becomes stale before it is reviewed.
+- **Keep it a separate commit**, and usually a separate branch, from the code it describes. A
+  documentation branch should contain no code changes, so a green CI run means the same thing it
+  always did.
+
+### What to update
+
 **Find the affected document by grepping for the file you changed** — every feature document
 carries a Key files table naming its paths:
 
