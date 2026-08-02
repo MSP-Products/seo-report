@@ -107,9 +107,9 @@ exception.
 
 | File | What it does |
 |---|---|
-| `active_record_encryption.rb` | The above. The only substantially custom initializer |
-| `filter_parameter_logging.rb` | Redacts `passw`, `email`, `secret`, `token`, `_key`, `crypt`, `salt`, and card fields |
-| `content_security_policy.rb`, `assets.rb`, `inflections.rb` | Rails defaults, unmodified |
+| `config/initializers/active_record_encryption.rb` | The above. The only substantially custom initializer |
+| `config/initializers/filter_parameter_logging.rb` | Redacts `passw`, `email`, `secret`, `token`, `_key`, `crypt`, `salt`, and card fields |
+| `config/initializers/content_security_policy.rb`, `assets.rb`, `inflections.rb` | Rails defaults, unmodified |
 
 **`filter_parameters` does not protect report links.** The access token is a **path
 segment**, not a parameter, so `Started GET "/reports/<token>"` is written verbatim to the

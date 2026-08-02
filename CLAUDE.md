@@ -43,9 +43,17 @@ by the time it was committed, and had to be researched and rewritten twice. **Do
 that is still in flux produces documentation that is wrong on arrival** — and wrong documentation
 is worse than none.
 
+**Capture immediately, write at the end.** These are different things and only one of them
+waits. The moment you learn something a document doesn't say — an API behaving unlike its
+documentation, a constraint you had to dig out of git history, the root cause of a bug — write
+the *note* down straight away, in the branch, wherever it will not be lost. What waits is the
+prose describing behaviour that is still changing. Losing hard-won knowledge is a worse failure
+than documenting slightly late; the trigger list is in
+[docs/README.md](docs/README.md#write-it-down-when-you-learn-it).
+
 So:
 
-- **Mid-branch:** note what will need documenting; don't write it yet.
+- **Mid-branch:** capture facts as you learn them; don't write the narrative sections yet.
 - **Scope complete:** ask whether to document now, then read the *current* code — not what you
   remember writing earlier in the session — and write it.
 - **Unmerged branches change the answer.** If another branch is rewriting what you are about to
@@ -79,6 +87,12 @@ Key files table is missing a row — add it.
 
 Then bump `last_verified` — but **only** if you re-read the document against the code. It is a
 claim the document was true that day, not a timestamp of your edit.
+
+**Merge conflicts in documentation resolve differently from code:** default to keeping both
+sides, then read the merged section for duplication or contradiction, then re-verify against the
+code and set `last_verified` to today — because once two edits are merged, neither original date
+describes the text anyone has actually read. Full rules in
+[docs/README.md](docs/README.md#resolving-conflicts).
 
 Two rules that keep these usable: **describe behaviour, not implementation, above the developer
 line** in a feature doc; and **`MSP-GUIDE.md` must stay honest about what needs a developer.**

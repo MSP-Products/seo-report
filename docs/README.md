@@ -13,19 +13,23 @@ Documentation for **My Social Practice — SEO Reports**.
 
 What the system does, one document per capability.
 
-| Document | Covers | Status | Last verified |
-|---|---|---|---|
-| [monthly-report](features/monthly-report.md) | The public report page — the deliverable | shipped | 2026-08-02 |
-| [report-generation](features/report-generation.md) | The monthly process that produces a report | partial | 2026-08-02 |
-| [page-scan](features/page-scan.md) | The nightly site scan behind "Pages published" | shipped | 2026-08-02 |
-| [admin-panel](features/admin-panel.md) | Login, roles, and the Connections page | partial | 2026-08-02 |
-| [integrations](features/integrations.md) | **The adapter layer** — shared contract, credentials, retries | shipped | 2026-08-02 |
-| [integration-yext](features/integration-yext.md) | Citations, AI visibility, Google Business Profile | shipped | 2026-08-02 |
-| [integration-semrush](features/integration-semrush.md) | Keyword rankings | shipped | 2026-08-02 |
-| [integration-google-analytics](features/integration-google-analytics.md) | Website traffic | shipped | 2026-08-02 |
-| [integration-hubspot](features/integration-hubspot.md) | Practice details, AI SEO enrolment | partial | 2026-08-02 |
-| [integration-ghl](features/integration-ghl.md) | Appointments and revenue | partial | 2026-08-02 |
-| [integration-anthropic](features/integration-anthropic.md) | The written highlight banners | partial | 2026-08-02 |
+| Document | Covers |
+|---|---|
+| [monthly-report](features/monthly-report.md) | The public report page — the deliverable |
+| [report-generation](features/report-generation.md) | The monthly process that produces a report |
+| [page-scan](features/page-scan.md) | The nightly site scan behind "Pages published" |
+| [admin-panel](features/admin-panel.md) | Login, roles, and the Connections page |
+| [integrations](features/integrations.md) | **The adapter layer** — shared contract, credentials, retries |
+| [integration-yext](features/integration-yext.md) | Citations, AI visibility, Google Business Profile |
+| [integration-semrush](features/integration-semrush.md) | Keyword rankings |
+| [integration-google-analytics](features/integration-google-analytics.md) | Website traffic |
+| [integration-hubspot](features/integration-hubspot.md) | Practice details, AI SEO enrolment |
+| [integration-ghl](features/integration-ghl.md) | Appointments and revenue |
+| [integration-anthropic](features/integration-anthropic.md) | The written highlight banners |
+
+**Status and `last_verified` live in each document's frontmatter, deliberately not here.**
+Duplicating them would mean every branch that documents anything rewrites this table — see
+[resolving conflicts](#resolving-conflicts).
 
 Integration documents are **prefix-grouped, not nested**, so they sort together in any file
 listing — the same reasoning that keeps `report_*` models flat (see
@@ -36,11 +40,11 @@ listing — the same reasoning that keeps `report_*` models flat (see
 Cross-cutting facts that belong to no single feature. These do **not** follow
 `TEMPLATE.md` — there is no user-facing half to a schema.
 
-| Document | Covers | Last verified |
-|---|---|---|
-| [data-model](reference/data-model.md) | All 22 tables, columns, constraints, and which columns are never written | 2026-08-02 |
-| [configuration](reference/configuration.md) | Environment variables, credentials, initializers, deployment | 2026-08-02 |
-| [jobs-and-schedules](reference/jobs-and-schedules.md) | What runs in the background, when, and what happens when it doesn't | 2026-08-02 |
+| Document | Covers |
+|---|---|
+| [data-model](reference/data-model.md) | All 22 tables, columns, constraints, and which columns are never written |
+| [configuration](reference/configuration.md) | Environment variables, credentials, initializers, deployment |
+| [jobs-and-schedules](reference/jobs-and-schedules.md) | What runs in the background, when, and what happens when it doesn't |
 
 ---
 
@@ -195,6 +199,98 @@ timestamp of your last edit.
    — an empty section reads as an oversight, a stated "not applicable" reads as a
    decision.
 3. Add a row to the index in this file.
+
+### Checking the documentation
+
+`lib/tasks/docs.rake` verifies the three promises this convention makes. No Rails
+environment, no database — it runs in a second.
+
+```bash
+bin/rails docs:check        # all three
+bin/rails docs:coverage     # source files not named in any document
+bin/rails docs:links        # links and anchors that point nowhere
+bin/rails docs:paths        # Key files entries whose path no longer exists
+```
+
+`docs:paths` is the one that matters most: the "grep `docs/` for the file you changed" rule
+is only true while those tables are accurate, so a renamed file silently breaks the lookup
+until this catches it.
+
+`docs:coverage` carries an allow-list of stock Rails files. **Add to it only for genuinely
+untouched framework scaffolding** — if you find yourself exempting something you wrote,
+write the document instead.
+
+### Write it down when you learn it
+
+Behaviour changes are the obvious trigger. The less obvious one is **learning something the
+document doesn't already say** — and that is where documentation actually compounds. Add it
+before you finish, not later:
+
+- **Someone corrects you** on how something should work. Capture the rule *and the why* —
+  the why is what stops it being re-litigated.
+- **You dig through code or git history** to work out how something behaves. Record the
+  answer so the next person skips the hunt.
+- **You fix a bug whose root cause was a missing rule.** That belongs in **Gotchas** — it is
+  the highest-value section in any document.
+- **An external API behaves differently from its documentation.** Write what it *actually*
+  does. Every quirk in the integration documents was discovered this way and would otherwise
+  be rediscovered at the same cost.
+
+**The bar:** would this note save the next person from making the same wrong choice? If yes,
+write it. Exact endpoints, field names, file paths and constraints are gold. Vague
+observations ("this is a bit confusing") are not.
+
+### Resolving conflicts
+
+Living documentation conflicts differently from code, and more often — because two branches
+can legitimately need to change the same paragraph. Three things keep it manageable.
+
+**1. The structure already limits the blast radius.**
+
+- **One document per feature** means two branches only collide when they touch the same
+  feature. Splitting per-service integration documents out of one shared file was partly
+  for this reason.
+- **Status and `last_verified` are not in the index.** They live in each document's
+  frontmatter, so a branch documenting one feature never touches a shared table. This is the
+  single biggest source of avoidable conflict, and it is designed out rather than resolved.
+- **Append to tables; never reorder them.** Reordering rewrites every line and turns a
+  one-row addition into a whole-table conflict.
+
+**2. Default to keeping both sides.**
+
+Unlike code, a documentation conflict is usually two people describing two different true
+things — not two competing implementations. **Union is the right first move**, then read the
+merged section as a whole.
+
+Naive union has two failure modes, so check for both:
+
+- **Duplication** — the same fact stated twice in different words. Merge them into one.
+- **Contradiction** — two branches describing the same behaviour differently. That means the
+  behaviour changed under one of them. **Go read the code**; do not pick the more
+  confident-sounding sentence.
+
+**3. After resolving, re-verify and re-date.**
+
+`last_verified` is a claim that the document was true on that date. Once you have merged two
+edits, **neither original date describes the merged text** — nobody has ever read it in that
+form. So:
+
+- Re-read the merged sections against the current code.
+- Set `last_verified` to today.
+- If you cannot verify it now, **lower `status`** rather than leaving a date you cannot
+  stand behind.
+
+Merging two `last_verified` values by taking the later one is the wrong instinct: it claims
+verification that never happened.
+
+**Conflicts that mean something is wrong**
+
+- **Two branches editing the same feature's "How it behaves"** — usually a sign the two
+  changes should have been one, or that they conflict in the product as well as the text.
+  Resolve the product question first.
+- **Repeated conflicts in `data-model.md` or `configuration.md`** — reference documents are
+  shared by everything, so they collide most. If it becomes constant, that is a signal the
+  document is doing too much and should be split, not that the process is broken.
 
 ### House rules
 
