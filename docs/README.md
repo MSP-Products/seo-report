@@ -11,13 +11,36 @@ Documentation for **My Social Practice — SEO Reports**.
 
 ### Feature documents
 
+What the system does, one document per capability.
+
 | Document | Covers | Status | Last verified |
 |---|---|---|---|
 | [monthly-report](features/monthly-report.md) | The public report page — the deliverable | shipped | 2026-08-02 |
 | [report-generation](features/report-generation.md) | The monthly process that produces a report | partial | 2026-08-02 |
-| [integrations](features/integrations.md) | The five external services and the adapter layer | partial | 2026-08-02 |
 | [page-scan](features/page-scan.md) | The nightly site scan behind "Pages published" | shipped | 2026-08-02 |
 | [admin-panel](features/admin-panel.md) | Login, roles, and the Connections page | partial | 2026-08-02 |
+| [integrations](features/integrations.md) | **The adapter layer** — shared contract, credentials, retries | shipped | 2026-08-02 |
+| [integration-yext](features/integration-yext.md) | Citations, AI visibility, Google Business Profile | shipped | 2026-08-02 |
+| [integration-semrush](features/integration-semrush.md) | Keyword rankings | shipped | 2026-08-02 |
+| [integration-google-analytics](features/integration-google-analytics.md) | Website traffic | shipped | 2026-08-02 |
+| [integration-hubspot](features/integration-hubspot.md) | Practice details, AI SEO enrolment | partial | 2026-08-02 |
+| [integration-ghl](features/integration-ghl.md) | Appointments and revenue | partial | 2026-08-02 |
+| [integration-anthropic](features/integration-anthropic.md) | The written highlight banners | partial | 2026-08-02 |
+
+Integration documents are **prefix-grouped, not nested**, so they sort together in any file
+listing — the same reasoning that keeps `report_*` models flat (see
+[CLAUDE.md](../CLAUDE.md#project-structure)).
+
+### Reference documents
+
+Cross-cutting facts that belong to no single feature. These do **not** follow
+`TEMPLATE.md` — there is no user-facing half to a schema.
+
+| Document | Covers | Last verified |
+|---|---|---|
+| [data-model](reference/data-model.md) | All 22 tables, columns, constraints, and which columns are never written | 2026-08-02 |
+| [configuration](reference/configuration.md) | Environment variables, credentials, initializers, deployment | 2026-08-02 |
+| [jobs-and-schedules](reference/jobs-and-schedules.md) | What runs in the background, when, and what happens when it doesn't | 2026-08-02 |
 
 ---
 
@@ -95,19 +118,42 @@ them guarantees the two drift apart; writing one document with a hard line does 
 absent and the report still has to render. That degraded behaviour is the single thing
 clients ask about most, so it gets a table, not a footnote.
 
+### Two genres
+
+Not everything is a feature. A database schema has no user-facing half, and forcing one
+produces padding.
+
+| Genre | For | Follows the template? |
+|---|---|---|
+| `features/` | A user-visible capability or an external integration | **Yes** |
+| `reference/` | Cross-cutting facts — schema, configuration, scheduling | No |
+
+**A feature earns a document** when it is a user-visible capability or an external
+integration. Internal refactors do not get one.
+
+**A reference document earns its place** when a fact is needed by several features and
+belongs to none — the data model, the environment variables, what runs on a schedule. If
+it only matters to one feature, it goes in that feature's document instead.
+
 ### File layout
 
 ```
 docs/
-├── README.md           this file — the convention and the index
-├── TEMPLATE.md         the shape to copy
+├── README.md           this file — the convention, the index, the glossary
+├── TEMPLATE.md         the shape every feature document copies
 ├── MSP-GUIDE.md        task-based guide for MSP staff
-└── features/
-    └── <slug>.md       one per feature
+├── features/
+│   ├── <slug>.md               one per capability
+│   └── integration-<service>.md  one per external service, prefix-grouped
+└── reference/
+    └── <slug>.md       cross-cutting facts; no template
 ```
 
-A feature earns a document when it is **a user-visible capability or an external
-integration**. Internal refactors do not get one.
+**Integrations get one document each**, prefix-grouped rather than nested in a
+subdirectory, so they sort together in a flat listing. `features/integrations.md` covers
+only what they share — the adapter contract, credential resolution, the HTTP policy.
+Per-service detail (endpoints, request shapes, field-to-column mappings, response quirks)
+belongs in that service's own document.
 
 ### Keeping documents current
 

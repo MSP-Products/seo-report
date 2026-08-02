@@ -114,6 +114,10 @@ is what implements "blank means unchanged".
 | `app/models/agency_connection.rb` | `CREDENTIAL_FIELDS`, `DISPLAY`, `status_label`, `status_dot_class` |
 | `app/views/layouts/application.html.erb` | Authenticated shell |
 | `app/views/layouts/auth.html.erb` | Login layout |
+| `app/views/sessions/new.html.erb` | The login form |
+| `app/views/shared/_login_header.html.erb` | Logo and heading above the login form |
+| `app/views/shared/_alert.html.erb` | Flash notice and error banner |
+| `app/javascript/controllers/password_visibility_controller.js` | Show/hide toggle on password fields |
 | `app/views/shared/_admin_sidebar.html.erb` | Nav, incl. the Dashboard/Clients stubs |
 | `app/views/connections/index.html.erb` | The five service cards |
 | `app/views/connections/_connection_card.html.erb` | One service's status and Edit link |

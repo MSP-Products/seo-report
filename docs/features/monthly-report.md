@@ -159,6 +159,7 @@ Views contain no queries and no arithmetic. Anything computed is a presenter met
 | `app/views/reports/_gbp_activity.html.erb` | Reviews, posts, photos |
 | `app/views/reports/_pages_published.html.erb` | New website pages |
 | `app/views/reports/_partnership_cta.html.erb` | First-report closing note |
+| `app/views/reports/_footer.html.erb` | MSP contact details at the page foot |
 | `app/views/reports/_stat_card.html.erb` | Shared figure tile, incl. the `hero` treatment |
 | `app/views/reports/_section_card.html.erb` | Shared section heading block |
 | `app/views/reports/not_found.html.erb` | 404 page |
