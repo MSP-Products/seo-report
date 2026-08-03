@@ -223,7 +223,9 @@ Invariants that matter here:
 
 - **Emailing the report.** `SendLog` and `MonthlyReport#emailed_at` exist, and `emailed_at`
   is intended as the duplicate-send guard, but there is no mailer. Note
-  `config.action_mailer.default_url_options` is still `example.com`.
+  `config.action_mailer.default_url_options` is still `example.com`. `SendLog#status` already
+  has a `held` value (distinct from `failed`) for a recoverable block — e.g. the destination
+  credential being rejected — ready for whichever job ends up writing these rows.
 - **Accessibility gaps**: subsection titles are styled `<p>` rather than `<h3>`, and GBP
   photo `alt` falls back to empty when a caption is absent.
 - **No direct tests for `ReportPresenter`.** It is covered incidentally by controller tests

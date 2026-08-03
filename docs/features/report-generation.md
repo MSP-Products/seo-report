@@ -96,25 +96,31 @@ must be checked. See [MSP-GUIDE](../MSP-GUIDE.md#check-whether-a-report-worked).
 with `#call`. Its body is a table of contents:
 
 1. **Guard** — raises `MonthNotCompleteError` if `month >= Date.current.beginning_of_month`.
-2. **`find_or_create_report`** — `find_or_create_by!(report_month:)`, setting
-   `is_first_report` when no earlier report exists for that client.
-3. **`sync_hubspot`** — updates the `Client` record itself from HubSpot (name, address,
+2. **`find_or_create_report`** — delegates to `Client#find_or_create_monthly_report`, which
+   sets `is_first_report` when no earlier report exists. Shared with
+   `EnqueueMonthlyReportsJob`, which calls the same method to create the row **queued**
+   before this job ever runs — see [jobs-and-schedules](../reference/jobs-and-schedules.md).
+3. **`mark_generating`** — sets `generation_status: "generating"` and bumps `attempt_count`.
+4. **`sync_hubspot`** — updates the `Client` record itself from HubSpot (name, address,
    website, onboarding status, AI SEO enrolment). HubSpot is the source of truth for these.
-4. **`sync_traffic`** — GA4 for visits, then GHL for appointments/revenue **only if a GHL
+5. **`sync_traffic`** — GA4 for visits, then GHL for appointments/revenue **only if a GHL
    `ClientServiceLink` exists**; otherwise sets `ghl_data_status: "not_connected"` without
    an API call.
-5. **`sync_yext`** — one Yext call fanning into three writes: citations, AI visibility, GBP
+6. **`sync_yext`** — one Yext call fanning into three writes: citations, AI visibility, GBP
    activity.
-6. **`sync_keywords`** — SEMrush rankings, carrying last month's `position` forward into
+7. **`sync_keywords`** — SEMrush rankings, carrying last month's `position` forward into
    this month's `previous_position`.
-7. **`sync_pages_published`** — reads `SitemapPage` rows whose `first_seen_at` falls in the
+8. **`sync_pages_published`** — reads `SitemapPage` rows whose `first_seen_at` falls in the
    month. Does **not** trigger a scan; see [page-scan](page-scan.md).
-8. **`sync_highlights`** — skipped for first reports; calls `HighlightGenerator`.
-9. **`report.update!(generated_at:)`** then `log_attempt(status: "success")`.
+9. **`sync_highlights`** — skipped for first reports; calls `HighlightGenerator`.
+10. **`mark_ready`** — stamps `generated_at`, sets `generation_status: "ready"`, then
+    `log_attempt(status: "success")` — which both writes a `ReportGenerationLog` row and
+    logs a line to `Rails.logger.info`.
 
 Every adapter returns an `Adapters::Result` rather than raising, so a failure appends to
-`warnings` and the run continues. The single top-level `rescue StandardError` logs the
-attempt as `failed` and **re-raises** — it never swallows.
+`warnings` and the run continues. The single top-level `rescue StandardError` sets
+`generation_status: "failed"`, logs the attempt (`Rails.logger.error` + a
+`ReportGenerationLog` row), and **re-raises** — it never swallows.
 
 Idempotency is achieved by replace-then-create per child collection
 (`report.gbp_posts.destroy_all` then recreate) and `find_or_initialize_by` for keyword
@@ -138,7 +144,7 @@ rankings.
 
 | Model / table | What it holds here |
 |---|---|
-| `MonthlyReport` | Created or found; `generated_at` stamped at the end |
+| `MonthlyReport` | Created queued (often by `EnqueueMonthlyReportsJob`, ahead of this running); `generation_status` moves queued → generating → ready/failed; `attempt_count` bumped every attempt; `generated_at` stamped on success |
 | `Client` | **Written** by `sync_hubspot` — this is the one place client fields are updated |
 | `ReportTraffic` | Built or updated in place, then saved once |
 | `ReportCitation`, `ReportAiVisibility`, `ReportGbpSummary` | Destroyed and recreated |

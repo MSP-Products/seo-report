@@ -78,6 +78,8 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     assert report.generated_at.present?
     assert_equal @month, report.report_month
     assert report.is_first_report?
+    assert report.ready?
+    assert_equal 1, report.attempt_count
 
     assert_equal "connected", report.report_traffic.ghl_data_status
     assert_equal 1, report.report_traffic.appointments_booked
@@ -98,6 +100,14 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     assert_nil ranking.previous_position # no prior month's report exists yet
 
     assert_equal "success", report.report_generation_logs.last.status
+  end
+
+  test "logs a success message to Rails.logger, naming the practice and month" do
+    output = with_rails_logger_capture do
+      ReportGenerator.new(client: @client, month: @month).call
+    end
+
+    assert_match(/generated #{Regexp.escape(@client.name)}'s #{Regexp.escape(@month.strftime("%B %Y"))} report/, output)
   end
 
   test "snapshots only pages first seen within the report month" do
@@ -122,6 +132,8 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     assert_equal 1, @client.monthly_reports.where(report_month: @month).count
     assert_equal 1, report.report_keyword_rankings.count
     assert_equal 2, report.report_generation_logs.count
+    assert_equal 2, report.attempt_count
+    assert report.ready?
   end
 
   test "carries the previous month's position forward as previous_position" do
@@ -184,5 +196,33 @@ class ReportGeneratorTest < ActiveSupport::TestCase
 
     report = @client.monthly_reports.find_by(report_month: @month)
     assert_equal "failed", report.report_generation_logs.last.status
+    assert report.failed?
+    assert_equal 1, report.attempt_count
+  end
+
+  test "logs a failure message to Rails.logger.error, naming the practice and month" do
+    stub_request(:get, "https://api.hubapi.com/crm/v3/objects/companies/company-1")
+      .with(query: hash_including("properties"))
+      .to_return(status: 200, body: "not json")
+
+    output = with_rails_logger_capture do
+      assert_raises(JSON::ParserError) do
+        ReportGenerator.new(client: @client, month: @month).call
+      end
+    end
+
+    assert_match(/failed to generate #{Regexp.escape(@client.name)}'s #{Regexp.escape(@month.strftime("%B %Y"))} report/, output)
+  end
+
+  private
+
+  def with_rails_logger_capture
+    previous_logger = Rails.logger
+    io = StringIO.new
+    Rails.logger = Logger.new(io)
+    yield
+    io.string
+  ensure
+    Rails.logger = previous_logger
   end
 end
