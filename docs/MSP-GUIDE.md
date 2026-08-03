@@ -302,7 +302,12 @@ Attempting the current month is refused — reports cover completed months only.
 
 ## Get a practice's report link
 
-**Needs a developer.** The generate command prints it. Otherwise:
+**Open the Report Log page** — find the practice and month, and click **View** on its
+row (only `ready` reports have one). That opens the actual report; copy its URL from the
+browser to send it.
+
+The generate command also prints the link at generation time. For anything else — needs a
+developer:
 
 ```ruby
 report = Client.kept.find_by!(name: "Woodside Dental Care").monthly_reports.generated.order(report_month: :desc).first
@@ -320,10 +325,18 @@ report header, so you only need to send the newest one.
 
 ## Check whether a report worked
 
-**The Dashboard shows this at a glance** — reports generated this cycle, failed count, and
-a per-client table naming anyone not yet started, still generating, or held on send (with
-the real reason, e.g. "HubSpot token rejected"). For the underlying detail — per-service
-warnings on an otherwise-successful report — **needs a developer.**
+**For this cycle, the Dashboard shows it at a glance** — reports generated, failed count,
+and a per-client table naming anyone not yet started, still generating, or held on send
+(with the real reason, e.g. "HubSpot token rejected").
+
+**For any practice, any month, use the Report Log page.** It lists every generated report
+ever, filterable by month and by status — Queued, Generating, Ready, Sent, Held, or Failed
+(each chip shows a real, live count). This is the tool for "did last March's report for
+this specific practice ever send?", which the Dashboard can't answer since it only covers
+the current cycle.
+
+For the underlying detail — per-service warnings on an otherwise-successful report —
+**needs a developer.**
 
 ```ruby
 report = Client.kept.find_by!(name: "Woodside Dental Care").monthly_reports.order(report_month: :desc).first
