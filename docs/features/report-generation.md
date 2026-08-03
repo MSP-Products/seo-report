@@ -2,14 +2,14 @@
 title: Report generation
 slug: report-generation
 status: partial
-last_verified: 2026-08-02
+last_verified: 2026-08-03
 related: [monthly-report, integrations, page-scan, admin-panel]
 ---
 
 # Report generation
 
-> **Status:** partial — generation works and is safe to re-run, but nothing schedules it
-> and nothing alerts on failure · **Last verified:** 2026-08-02
+> **Status:** partial — generation is scheduled and safe to re-run, but nothing emails
+> the result and nothing alerts on failure · **Last verified:** 2026-08-03
 >
 > The monthly process that collects a practice's data from every external service and
 > freezes it into that month's report.
@@ -71,7 +71,9 @@ loudly.**
 ### FAQ
 
 **Q: How often does this run?**
-A: It does not run on a schedule yet. Someone starts it. See "Not built yet".
+A: `EnqueueMonthlyReportsJob` runs on the 1st of every month at 4am and starts generation
+for every active practice's last completed month. See
+[jobs-and-schedules](../reference/jobs-and-schedules.md).
 
 **Q: What if we run it twice for the same month?**
 A: Nothing bad. The second run replaces the first month's data.
@@ -126,9 +128,11 @@ rankings.
 | `app/services/highlight_generator.rb` | Writes the two summary banners via Anthropic's API |
 | `app/services/concerns/monthly_range.rb` | Shared "calendar month as a Range" helper |
 | `app/jobs/generate_monthly_report_job.rb` | Solid Queue wrapper; takes IDs, not records |
+| `app/jobs/enqueue_monthly_reports_job.rb` | Monthly fan-out — one `GenerateMonthlyReportJob` per active client |
 | `app/models/report_generation_log.rb` | One row per attempt, success or failure |
 | `lib/tasks/real_client.rake` | `reports:generate_real` — how generation is actually invoked today |
 | `test/services/report_generator_test.rb` | The reference test: happy path, idempotency, each degraded state |
+| `test/jobs/enqueue_monthly_reports_job_test.rb` | Covers the active/pending/offboarded/already-generated fan-out rules |
 
 ### Data
 
@@ -183,11 +187,11 @@ That last row is the biggest operational gap in the system.
 
 ### Not built yet
 
-- **No schedule.** `config/recurring.yml` runs Solid Queue cleanup and the daily sitemap
-  scan, but **not** report generation. The send date was left undecided in the SOW.
+- **No send schedule.** Generation now runs automatically every 1st of the month via
+  `EnqueueMonthlyReportsJob`, but nothing emails the result — the send date was left
+  undecided in the SOW.
 - **No alerting.** Nothing surfaces a failed or missing report to a human. The natural home
   is the stubbed Dashboard page.
-- **No bulk run.** Generation is one practice at a time.
 - **No emailing.** See [monthly-report](monthly-report.md).
 
 ---

@@ -2,7 +2,7 @@
 title: Jobs and schedules
 slug: jobs-and-schedules
 kind: reference
-last_verified: 2026-08-02
+last_verified: 2026-08-03
 ---
 
 # Jobs and schedules
@@ -19,10 +19,13 @@ Everything that runs in the background, when, and what happens when it doesn't.
 |---|---|---|
 | `clear_solid_queue_finished_jobs` | Every hour at minute 12 | Solid Queue housekeeping |
 | `scan_client_sitemaps` | Every day at 3am | `Client.kept.active.find_each { ScanClientSitemapJob.perform_later(_1.id) }` |
+| `enqueue_monthly_reports` | The 1st of every month at 4am | `EnqueueMonthlyReportsJob` |
 
-**Report generation is not scheduled.** Nothing produces a monthly report automatically —
-it is a command someone runs. The scope of work left the send date undecided, and that
-decision is still open. See [report-generation](../features/report-generation.md).
+**Report generation is now scheduled; sending it is not.** `EnqueueMonthlyReportsJob` fans
+out one `GenerateMonthlyReportJob` per active client for the last completed month, every
+1st of the month. The scope of work left the send date undecided, and that decision is
+still open — nothing emails the result yet. See
+[report-generation](../features/report-generation.md).
 
 ---
 
@@ -49,7 +52,23 @@ Wraps `ReportGenerator` for one practice and month.
 - Safe to retry because `ReportGenerator` is idempotent: re-running replaces that month's
   data rather than duplicating it.
 
-**Not wired into `recurring.yml`.** It is enqueued manually today.
+Enqueued automatically by `EnqueueMonthlyReportsJob`, or manually for one client at a time
+(see "Running things by hand" below).
+
+### `EnqueueMonthlyReportsJob`
+
+The fan-out: one `GenerateMonthlyReportJob` per active client, for the last completed month.
+
+- `queue_as :default`
+- No `retry_on`/`discard_on` of its own — each client's `GenerateMonthlyReportJob` carries
+  its own retry policy, so a single client failing doesn't affect the fan-out itself.
+- **Scope is `Client.kept.active`** — a `pending` client (not yet onboarded) or an
+  `offboarded` one is skipped, same as a discarded (soft-deleted) one.
+- **Skips a client whose report for that month is already `generated`**, so re-running the
+  fan-out (e.g. a retried scheduler tick) never duplicates work or re-pulls external APIs
+  for a client that's already done.
+- **No guard against a client onboarded partway through the target month** — it will still
+  get a full month's report. Accepted as a known gap for now.
 
 ---
 
@@ -72,8 +91,8 @@ Three things to know before relying on any of this:
 1. **The worker may not be running.** `config/puma.rb` starts Solid Queue inside Puma only
    if `SOLID_QUEUE_IN_PUMA` is set, and the Dockerfile's `CMD` runs only the web server. If
    that variable is unset in the deploy environment, **every enqueued job sits in the queue
-   forever with no error** — including the nightly scan. Verify it, or run `bin/jobs` as a
-   separate process.
+   forever with no error** — including the nightly scan and the monthly generation fan-out.
+   Verify it, or run `bin/jobs` as a separate process.
 2. **Nothing alerts on failure.** There is no error-tracking service. A failed scan is
    recorded on the practice (`last_page_scan_status`); a failed generation is recorded in
    `report_generation_logs`. **Neither is surfaced anywhere a human looks.**
@@ -96,6 +115,9 @@ REPORT_MONTH="2026-07" bin/rails reports:generate_real["Woodside Dental Care"]
 ```ruby
 # enqueue a report instead of running it inline
 GenerateMonthlyReportJob.perform_later(client.id, 2026, 7)
+
+# run the monthly fan-out now instead of waiting for the 1st
+EnqueueMonthlyReportsJob.perform_later
 
 # rescan one practice's website now
 ScanClientSitemapJob.perform_later(client.id)
