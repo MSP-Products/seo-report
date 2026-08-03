@@ -11,7 +11,8 @@ related: [integrations, monthly-report, report-generation]
 > **Status:** shipped — both endpoints confirmed live · **Last verified:** 2026-08-04
 >
 > SEMrush supplies the report's keyword performance section: where each tracked search term
-> currently ranks, and how difficult it is to rank for.
+> currently ranks, how difficult it is to rank for, its search intent, and its SERP feature
+> count.
 
 ---
 
@@ -25,8 +26,9 @@ report's keyword table.
 
 ### What it provides
 
-Current position per tracked keyword, and an approximation of the traffic that keyword
-could bring.
+Current position per tracked keyword, an approximation of the traffic that keyword could
+bring, how difficult it is to rank for (KD%), its search intent, and how many SERP features
+appear alongside it.
 
 **It does not provide last month's position.** Month-over-month movement in the report is
 MSP's own record: last month's report's position is carried forward as this month's
@@ -72,8 +74,11 @@ alone produces a row in the report with no ranking against it.
   both as indicative, not exact.
 - **Growth is nil for a practice's first month or two.** It needs two distinct tracked
   dates in the Position Tracking response, which a newly-added project doesn't have yet.
-- **Keyword Difficulty comes from a second, genuinely separate SEMrush call** (not part of
-  Position Tracking) and can fail independently — see Failure modes.
+- **Keyword Difficulty, Intent, and SERP Feature count all come from a second, genuinely
+  separate SEMrush call** (not part of Position Tracking) and can fail independently — see
+  Failure modes.
+- **The SF column is a count, not a list of feature names.** SEMrush returns which SERP
+  features are present as numeric codes; the report shows how many, not which ones.
 - **Only the practice's own domain is measured**, matched by a wildcard pattern built from
   their website address. If the tracking project was set up against a different domain
   form, positions come back empty.
@@ -112,25 +117,41 @@ keywords do not pollute the gained/dropped counts.
 | `url` | the wildcard mask, e.g. `*.example.com/*` |
 | `display_limit` | `500` |
 
-#### Keyword Difficulty — `GET /` (classic Analytics API, bulk)
+#### Keyword Overview — `GET /` (classic Analytics API, bulk)
 
 | Parameter | Value |
 |---|---|
 | `key` | API key |
-| `type` | `phrase_kdi` |
+| `type` | `phrase_this` |
 | `database` | `us` — MSP's practices are all US-based |
 | `phrase` | semicolon-joined keyword phrases, up to 100 per request |
-| `export_columns` | `Ph,Kd` |
+| `export_columns` | `Ph,Kd,In,Fk` |
 
 **Response is semicolon-delimited CSV** (the classic Analytics API shape), not JSON:
 
 ```
-Keyword;Keyword Difficulty Index
-cosmetic dentistry;81
+Keyword;Keyword Difficulty Index;Intent;Keywords SERP Features
+cosmetic dentistry;81;0;3,6,9,13,21,36,43
 ```
 
 Confirmed live against MSP's real account (see Field mapping) — a request without
 `database` fails with `ERROR 46 :: MANDATORY PARAMETER database NOT SET OR EMPTY`.
+
+**`type=phrase_this` is documented by SEMrush as a single-keyword "Keyword Overview"
+report, but confirmed live to accept the same semicolon-joined bulk `phrase` list as the
+KD-only endpoint** — one call returns Kd, Intent, and SERP Features together for up to 100
+keywords, so there's no separate bulk-KD-only call to maintain.
+
+| `In` code | Meaning | Confirmed how |
+|---|---|---|
+| `0` | Commercial | Live: "cosmetic dentistry" → `0` |
+| `1` | Informational | Live: "root canal", "dental implants" → `1` |
+| `2` | Navigational | **Not confirmed against a real example** — no tracked keyword returned it live. Documented by SEMrush alongside the other three; treat with lower confidence until seen |
+| `3` | Transactional | Live: "dentist near me" → `3` |
+
+`Fk` is a comma-separated list of SERP feature type codes (e.g. `3,6,9,13,21,36,43`) — SEMrush's
+numeric-to-name mapping for these codes was not looked up, since the report only needs a
+count (see Field mapping).
 
 Three things confirmed live that contradict the obvious assumptions about Position Tracking:
 
@@ -169,14 +190,17 @@ Rows are matched to `ClientKeyword` records **by downcased phrase**, then writte
 | `Fi[url_mask]` | `position` | Non-numeric (`"-"`) becomes `nil` |
 | `Tr[latest_date][url_mask]` | `potential_traffic` | Latest date, not earliest. Approximation |
 | `Tr[latest] - Tr[earliest]` (same response) | `growth` | Nil if only one tracked date exists |
-| `Kd` from the bulk KD response | `keyword_difficulty` | Matched by downcased phrase; nil if the KD call fails — see Failure modes |
+| `Kd` from the bulk overview response | `keyword_difficulty` | Matched by downcased phrase; nil if the overview call fails — see Failure modes |
+| `In` from the bulk overview response | `intent` | Mapped `0/1/2/3` → `C/I/N/T`; nil if unrecognized or the call fails |
+| `Fk` from the bulk overview response | `serp_features` | Count of comma-separated feature codes, not the decoded names; nil if the call fails |
 | *from last month's report* | `previous_position` | Written by `ReportGenerator`, not this adapter |
 
-**Both `growth` and `keyword_difficulty` are written to `ReportKeywordRanking`, not
-`ClientKeyword`** — they're per-report-month snapshots like `position`, not a fact about the
-keyword that holds forever. `ClientKeyword#keyword_difficulty` still exists in the schema
-but is no longer read anywhere; it's seed-data-only legacy from before this adapter fetched
-KD live, and is a candidate for removal in a future migration (see Gotchas).
+**`growth`, `keyword_difficulty`, `intent`, and `serp_features` are all written to
+`ReportKeywordRanking`, not `ClientKeyword`** — they're per-report-month snapshots like
+`position`, not a fact about the keyword that holds forever. `ClientKeyword#keyword_difficulty`,
+`#intent`, and `#serp_features` still exist in the schema but are no longer read anywhere;
+they're seed-data-only legacy from before this adapter fetched them live, and are candidates
+for removal in a future migration (see Gotchas).
 
 The URL mask is derived from `client.website_url` by stripping scheme, `www.` and any
 trailing slash, then wrapping: `*.{domain}/*`.
@@ -194,14 +218,16 @@ position. The report needs the full tracked set, not only the ranking subset.
 | `app/services/report_generator.rb` | `sync_keywords` — carries `previous_position` forward |
 | `app/presenters/report_presenter.rb` | `keyword_movement`, and the gained/held/dropped folds |
 | `db/migrate/20260803221106_add_keyword_difficulty_to_report_keyword_rankings.rb` | Adds the per-report KD% column |
-| `test/services/adapters/semrush_adapter_test.rb` | Live-shaped JSON, the `"-"` case, the empty-keywords case, growth derivation, KD success/degrade |
+| `db/migrate/20260803222447_add_intent_and_serp_features_to_report_keyword_rankings.rb` | Adds the per-report Intent + SF columns |
+| `app/helpers/reports_helper.rb` | `intent_badge_class`, `keyword_difficulty_class` |
+| `test/services/adapters/semrush_adapter_test.rb` | Live-shaped JSON, the `"-"` case, the empty-keywords case, growth derivation, overview success/degrade |
 
 ### Data
 
 | Model / table | Role |
 |---|---|
-| `ClientKeyword` | `keyword`, `intent`, `keyword_difficulty` (legacy, unread — see Gotchas), `serp_features`, `active` |
-| `ReportKeywordRanking` | `position`, `previous_position`, `potential_traffic`, `growth`, `keyword_difficulty` |
+| `ClientKeyword` | `keyword`, `intent`/`keyword_difficulty`/`serp_features` (all legacy, unread — see Gotchas), `active` |
+| `ReportKeywordRanking` | `position`, `previous_position`, `potential_traffic`, `growth`, `keyword_difficulty`, `intent`, `serp_features` |
 
 `report_keyword_rankings` is unique on `(report_id, keyword_id)` at the database level.
 
@@ -212,12 +238,12 @@ position. The report needs the full tracked set, not only the ranking subset.
 | Missing `external_id` | `Result.failure("semrush: no project id configured…")` | `error_log` |
 | No active keywords | `Result.success(rankings: [])` — **not** a failure | Nothing |
 | Position Tracking HTTP error after retries | `Result.failure` — the whole call fails | `error_log` |
-| Keyword Difficulty HTTP error | **Degrades independently** — rankings still succeed, `keyword_difficulty` is `nil` for every keyword this run | **Nowhere** |
+| Keyword Overview HTTP error | **Degrades independently** — rankings still succeed, `keyword_difficulty`/`intent`/`serp_features` are all `nil` for every keyword this run | **Nowhere** |
 | Wrong ID form (project only) | SEMrush returns "campaign not found" | `error_log` |
 
-The KD row is worth knowing: unlike Position Tracking, a failed KD call never fails the
-report — it's supplementary, not load-bearing, so it silently leaves KD% blank rather than
-losing the whole keyword section.
+The overview row is worth knowing: unlike Position Tracking, a failed overview call never
+fails the report — it's supplementary, not load-bearing, so it silently leaves KD%/Intent/SF
+blank rather than losing the whole keyword section.
 
 ### Gotchas
 
@@ -234,23 +260,30 @@ losing the whole keyword section.
   approximation of a metric SEMrush does not actually expose.
 - **A keyword with no previous position is neither gained nor dropped** — see
   `ReportPresenter#keyword_movement`. New keywords must not skew the summary counts.
-- **The Keyword Difficulty call is a different base path (`/`) and a different response
+- **The Keyword Overview call is a different base path (`/`) and a different response
   format (semicolon CSV) from Position Tracking (`/reports/v1/...`, JSON).** Don't assume
   the two share a parser.
-- **`KD_BATCH_SIZE` (100) exists to keep one request under SEMrush's phrase-count cap** —
-  a practice tracking more than 100 keywords issues multiple bulk KD requests, not a
-  pagination request.
-- **`ClientKeyword#keyword_difficulty` is legacy and unread.** The live value is on
-  `ReportKeywordRanking` now; don't reintroduce a read from the old column.
+- **`OVERVIEW_BATCH_SIZE` (100) exists to keep one request under SEMrush's phrase-count
+  cap** — a practice tracking more than 100 keywords issues multiple bulk overview
+  requests, not a pagination request.
+- **`ClientKeyword#keyword_difficulty`/`#intent`/`#serp_features` are all legacy and
+  unread.** The live values are on `ReportKeywordRanking` now; don't reintroduce a read
+  from the old columns.
+- **SEMrush's Intent code `2` (Navigational) is unconfirmed against a real keyword.** The
+  mapping is documented by SEMrush, not observed live — if a report ever shows an
+  unexpected blank Intent badge, check whether the raw code is something outside `0`-`3`.
+- **SF is a count, not a decoded list.** If a future report needs to show *which* SERP
+  features are present (not just how many), the numeric-to-name mapping for `Fk` codes
+  still needs to be looked up from SEMrush's docs — it wasn't needed for this pass.
 
 ### Not built yet
 
 - No pagination beyond `display_limit: 500` for Position Tracking.
-- **`ClientKeyword#serp_features` is still stored and rendered but never populated live** —
-  it's seed-data only. SERP feature and intent classification would need a different
-  SEMrush endpoint (not researched yet); flag before building against it.
-- Dropping the now-unused `client_keywords.keyword_difficulty` column — additive-then-remove
-  per CLAUDE.md, not done in the same change that stopped reading it.
+- Dropping the now-unused `client_keywords.keyword_difficulty`/`intent`/`serp_features`
+  columns — additive-then-remove per CLAUDE.md, not done in the same change that stopped
+  reading them.
+- Decoding `Fk`'s numeric SERP feature codes into named features, if MSP ever wants more
+  than a count.
 
 ---
 
@@ -260,8 +293,11 @@ losing the whole keyword section.
 - **Keep `previous_position` sourced from our own prior report.**
 - **Keep the not-ranked case as `nil`, never `0`** — position 0 would sort as the best
   possible rank.
-- **Keep `keyword_difficulty` and `growth` on `ReportKeywordRanking`, not `ClientKeyword`.**
-  Both are per-report snapshots — writing them back onto the keyword definition would let a
-  later month's value silently rewrite what an earlier report showed.
-- **A failed Keyword Difficulty call must keep degrading independently**, never fail the
+- **Keep `keyword_difficulty`, `intent`, `serp_features`, and `growth` on
+  `ReportKeywordRanking`, not `ClientKeyword`.** All four are per-report snapshots — writing
+  them back onto the keyword definition would let a later month's value silently rewrite
+  what an earlier report showed.
+- **A failed Keyword Overview call must keep degrading independently**, never fail the
   whole adapter — it's supplementary, unlike Position Tracking.
+- **Keep `serp_features` a count.** If MSP later wants named features, that's an addition
+  (a new column or a decoded list), not a change to the existing integer.

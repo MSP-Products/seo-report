@@ -204,6 +204,8 @@ class ReportGenerator
         potential_traffic: ranking[:potential_traffic],
         growth: ranking[:growth],
         keyword_difficulty: ranking[:keyword_difficulty],
+        intent: ranking[:intent],
+        serp_features: ranking[:serp_features],
         previous_position: previous_position
       )
     end

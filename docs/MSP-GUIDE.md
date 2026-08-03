@@ -261,11 +261,14 @@ change.
 
 ```ruby
 client = Client.kept.find_by!(name: "Woodside Dental Care")
-client.client_keywords.create!(keyword: "dentist ventura", intent: "C")
+client.client_keywords.create!(keyword: "dentist ventura")
 ```
 
-`intent` is why someone searched: `C` commercial, `T` transactional, `I` informational,
-`N` navigational. A keyword can carry more than one (`"I C"`).
+That's the only thing to set by hand. **Ranking, Keyword Difficulty (KD%), search intent
+(`C` commercial, `T` transactional, `I` informational, `N` navigational), and SERP feature
+count are all pulled live from SEMrush on every report** — nothing to enter manually, and
+whatever was true when that month generated is what stays on that report forever, even if
+the keyword's difficulty or intent shifts later.
 
 New keywords are active automatically — nothing extra to set. To stop tracking one
 without losing its history, a developer marks it inactive rather than deleting it.
@@ -422,6 +425,7 @@ a specific, deliberate placeholder — worth knowing, because practices ask.
 | Not enrolled in AI SEO | The "Google & AI Search Performance" section is omitted entirely, not shown empty |
 | Yext unavailable that month | Citation figures blank; nothing else affected |
 | SEMrush unavailable, or keywords not tracked | Keyword table empty; nothing else affected |
+| SEMrush's Keyword Difficulty/Intent/SERP-feature call fails (rankings still succeed) | Rows still show position and movement; KD%, Intent, and SF show blank for that keyword only |
 | Nothing genuinely positive to summarise | The highlights paragraph is omitted rather than padded with filler |
 | Yext gives no directions/clicks split | That breakdown is omitted; the combined engagement total still shows |
 | It's the practice's first month | A "baseline month" introduction replaces the month-over-month summary |

@@ -58,7 +58,8 @@ module ReportsHelper
   INTENT_STYLES = {
     "C" => "bg-blue-100 text-blue-700",
     "T" => "bg-cyan-100 text-cyan-700",
-    "I" => "bg-violet-100 text-violet-700"
+    "I" => "bg-violet-100 text-violet-700",
+    "N" => "bg-amber-100 text-amber-700"
   }.freeze
 
   def intent_badge_class(intent)

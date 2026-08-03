@@ -64,11 +64,11 @@
               <tr class="hover:bg-slate-50/75">
                 <td class="px-4 py-3 font-medium text-slate-900"><%= row.keyword.keyword %></td>
                 <td class="px-3 py-3">
-                  <span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium <%= intent_badge_class(row.keyword.intent) %>">
-                    <%= row.keyword.intent %>
+                  <span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium <%= intent_badge_class(row.intent) %>">
+                    <%= row.intent %>
                   </span>
                 </td>
-                <td class="px-3 py-3 text-right tabular-nums text-slate-500"><%= row.keyword.serp_features %></td>
+                <td class="px-3 py-3 text-right tabular-nums text-slate-500"><%= row.serp_features %></td>
                 <td class="px-3 py-3 text-right font-medium tabular-nums <%= keyword_difficulty_class(row.keyword_difficulty) %>"><%= row.keyword_difficulty %></td>
                 <td class="px-3 py-3 text-right tabular-nums text-slate-500"><%= number_with_precision(row.potential_traffic, precision: 2) %></td>
                 <td class="px-3 py-3 text-right tabular-nums text-slate-500"><%= row.growth.to_f.positive? ? "+" : "" %><%= number_with_precision(row.growth, precision: 2) %></td>
@@ -101,6 +101,6 @@
         </table>
       </div>
     </div>
-    <p class="mt-2 text-xs text-slate-500">SF: SERP Features · KD: Keyword Difficulty · Intent — C: Commercial, T: Transactional, I: Informational</p>
+    <p class="mt-2 text-xs text-slate-500">SF: SERP Features · KD: Keyword Difficulty · Intent — C: Commercial, T: Transactional, I: Informational, N: Navigational</p>
   </div>
 <% end %>

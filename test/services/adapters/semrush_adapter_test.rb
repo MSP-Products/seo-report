@@ -17,9 +17,9 @@ module Adapters
         .to_return(status: 200, body: body)
     end
 
-    def stub_kd(csv_body)
+    def stub_overview(csv_body)
       stub_request(:get, "https://api.semrush.com/")
-        .with(query: hash_including("key" => "semrush-key", "type" => "phrase_kdi", "database" => "us"))
+        .with(query: hash_including("key" => "semrush-key", "type" => "phrase_this", "database" => "us"))
         .to_return(status: 200, body: csv_body)
     end
 
@@ -38,7 +38,7 @@ module Adapters
           }
         }
       }.to_json)
-      stub_kd("Keyword;Keyword Difficulty Index\ndentist near me;57")
+      stub_overview("Keyword;Keyword Difficulty Index;Intent;Keywords SERP Features\ndentist near me;57;3;3,9,21,36")
 
       result = SemrushAdapter.new(@client, report_month: @report_month).call
 
@@ -49,12 +49,14 @@ module Adapters
       assert_equal 0.81, ranking[:potential_traffic] # takes the latest date's Tr, not the earliest
       assert_equal 0.31, ranking[:growth].round(2) # latest Tr minus earliest Tr in the same response
       assert_equal 57, ranking[:keyword_difficulty]
+      assert_equal "T", ranking[:intent] # SEMrush's Intent code 3 => Transactional
+      assert_equal 4, ranking[:serp_features] # count of Fk codes, not the decoded feature names
     end
 
     test "growth is nil when only one tracked date is available" do
       stub_tracking({ data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 7 },
         "Tr" => { "20260630" => { "*.example.com/*" => 0.2 } } } } }.to_json)
-      stub_kd("Keyword;Keyword Difficulty Index\ndentist near me;57")
+      stub_overview("Keyword;Keyword Difficulty Index;Intent;Keywords SERP Features\ndentist near me;57;3;3,9")
 
       result = SemrushAdapter.new(@client, report_month: @report_month).call
 
@@ -63,7 +65,7 @@ module Adapters
 
     test "treats a \"-\" (not ranked) position as nil" do
       stub_tracking({ data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => "-" }, "Tr" => {} } } }.to_json)
-      stub_kd("Keyword;Keyword Difficulty Index\ndentist near me;57")
+      stub_overview("Keyword;Keyword Difficulty Index;Intent;Keywords SERP Features\ndentist near me;57;3;3,9")
 
       result = SemrushAdapter.new(@client, report_month: @report_month).call
 
@@ -71,14 +73,17 @@ module Adapters
       assert_nil result.data[:rankings].first[:position]
     end
 
-    test "keyword difficulty is nil, not a failure, when the KD call fails" do
+    test "keyword difficulty, intent, and SF are all nil, not a failure, when the overview call fails" do
       stub_tracking({ data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 7 }, "Tr" => {} } } }.to_json)
-      stub_request(:get, "https://api.semrush.com/").with(query: hash_including("type" => "phrase_kdi")).to_return(status: 500)
+      stub_request(:get, "https://api.semrush.com/").with(query: hash_including("type" => "phrase_this")).to_return(status: 500)
 
       result = SemrushAdapter.new(@client, report_month: @report_month).call
 
       assert result.success?
-      assert_nil result.data[:rankings].first[:keyword_difficulty]
+      ranking = result.data[:rankings].first
+      assert_nil ranking[:keyword_difficulty]
+      assert_nil ranking[:intent]
+      assert_nil ranking[:serp_features]
     end
 
     test "succeeds with an empty rankings list when the client has no tracked keywords" do
