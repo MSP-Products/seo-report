@@ -11,6 +11,7 @@
     <% [
       [:dashboard, "Dashboard", dashboard_path, "dashboard"],
       [:clients, "Clients", connections_path, "clients"],
+      [:report_log, "Report Log", report_log_path, "report_logs"],
       [:connections, "Connections", connections_path, "connections"]
     ].each do |key, label, path, controller| %>
       <% active = controller_name == controller %>

@@ -23,6 +23,8 @@ Rails.application.routes.draw do
 
   get "dashboard", to: "dashboard#index"
 
+  get "report-log", to: "report_logs#index", as: :report_log
+
   # Defines the root path route ("/")
   root "dashboard#index"
 end

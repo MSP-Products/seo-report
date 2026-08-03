@@ -46,6 +46,32 @@ class MonthlyReport < ApplicationRecord
     where(report_month: month).generating.first&.client
   end
 
+  # For the admin Report Log page — newest cycle first, then newest
+  # attempt within it. Scoped to one month when given, otherwise every month.
+  def self.for_report_log(month: nil)
+    scope = includes(:client, :send_logs).order(report_month: :desc, created_at: :desc)
+    month ? scope.where(report_month: month) : scope
+  end
+
+  def self.parse_month_param(value)
+    Date.strptime(value, "%Y-%m")
+  rescue ArgumentError, TypeError
+    nil
+  end
+
+  # One filterable status per report, folding send state into generation
+  # state — "sent"/"held" only mean anything once a report is ready, so a
+  # ready report is never double-counted under both "ready" and "sent".
+  EFFECTIVE_STATUSES = %w[queued generating ready sent held failed].freeze
+
+  def effective_status
+    return generation_status unless ready?
+    return "sent" if emailed_at.present?
+    return "held" if send_logs.any?(&:held?)
+
+    "ready"
+  end
+
   private
 
   def generate_access_token
