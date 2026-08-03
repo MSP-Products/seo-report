@@ -1,0 +1,154 @@
+<% content_for :page_stylesheets do %>
+  <%= stylesheet_link_tag "dashboard" %>
+  <%= stylesheet_link_tag "clients" %>
+<% end %>
+
+<div class="page-wrapper">
+  <%= render "shared/sidebar", active_nav: "clients" %>
+
+  <div class="client-main">
+    <p class="client-breadcrumb"><%= link_to "Clients", clients_path %> &gt; Add New Client</p>
+
+    <div class="client-header-row">
+      <h1>Add New Client</h1>
+      <div class="client-header-actions">
+        <%= link_to "Cancel", clients_path, class: "btn-outline" %>
+        <%= link_to "Save Client", "#", class: "btn-primary" %>
+      </div>
+    </div>
+
+    <%= form_with url: clients_path, method: :post do %>
+
+      <!-- Practice Information -->
+      <div class="client-card">
+        <div class="client-card-title">Practice Information</div>
+
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Practice Name</label>
+            <input type="text" placeholder="e.g. Bright Smiles Family Dentistry">
+          </div>
+          <div class="form-field">
+            <label>Phone <span class="optional">(optional)</span></label>
+            <input type="tel" placeholder="(555) 000-0000">
+          </div>
+
+          <div class="form-field">
+            <label>Address</label>
+            <input type="text" placeholder="1234 Main St, City, State, ZIP">
+          </div>
+          <div class="form-field">
+            <label>Website URL</label>
+            <input type="url" placeholder="https://example.com">
+          </div>
+
+          <div class="form-field">
+            <label>Sitemap URL</label>
+            <input type="url" placeholder="https://example.com/sitemap.xml">
+          </div>
+          <div class="form-field">
+            <label>Practice Logo <span class="optional">(optional)</span></label>
+            <div class="upload-box">⬆ Drag file here or upload</div>
+          </div>
+
+          <div class="form-field">
+            <label>Onboarding Status</label>
+            <div class="toggle-group">
+              <button type="button" class="toggle-option">Pending</button>
+              <button type="button" class="toggle-option active">Active</button>
+            </div>
+          </div>
+          <div class="form-field">
+            <label>Onboarded Date</label>
+            <div class="date-field">
+              <input type="text" placeholder="MM/DD/YYYY">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service Connections -->
+      <div class="client-card">
+        <div class="client-card-title">Service Connections</div>
+        <p class="client-card-subtitle">Each service is connected through this client's shared account for this client's website.</p>
+
+        <div class="service-row">
+          <div class="service-icon" style="background:#e2453c;">S</div>
+          <div class="service-info">
+            <div class="service-name">SEMrush</div>
+            <div class="service-verified">Last verified 2 hours ago</div>
+          </div>
+          <div class="service-field">
+            <label>Domain</label>
+            <input type="text" placeholder="e.g. brightsmiles.com">
+          </div>
+          <div class="service-status"><span class="status-badge status-active">Active</span></div>
+          <%= link_to "Verify", "#", class: "service-verify-link" %>
+        </div>
+
+        <div class="service-row">
+          <div class="service-icon" style="background:#1a73e8;">Y</div>
+          <div class="service-info">
+            <div class="service-name">Yext</div>
+            <div class="service-verified">Last verified 2 hours ago</div>
+          </div>
+          <div class="service-field">
+            <label>Entity ID</label>
+            <input type="text" placeholder="e.g. 723456891">
+          </div>
+          <div class="service-status"><span class="status-badge status-active">Active</span></div>
+          <%= link_to "Verify", "#", class: "service-verify-link" %>
+        </div>
+
+        <div class="service-row">
+          <div class="service-icon" style="background:#f4a11b;">G</div>
+          <div class="service-info">
+            <div class="service-name">Google Analytics</div>
+            <div class="service-verified">Last verified 2 days ago</div>
+          </div>
+          <div class="service-field">
+            <label>Property ID</label>
+            <input type="text" placeholder="e.g. GA4-9876543">
+          </div>
+          <div class="service-status"><span class="status-badge status-expiring">Expiring Soon</span></div>
+          <%= link_to "Verify", "#", class: "service-verify-link" %>
+        </div>
+
+        <div class="service-row">
+          <div class="service-icon" style="background:#8a63d2;">G</div>
+          <div class="service-info">
+            <div class="service-name">GoHighLevel</div>
+            <div class="service-verified">Last verified 3 days ago</div>
+          </div>
+          <div class="service-field">
+            <label>Location ID</label>
+            <input type="text" placeholder="e.g. LOC-4521">
+          </div>
+          <div class="service-status"><span class="status-badge status-expired">Expired</span></div>
+          <%= link_to "Verify", "#", class: "service-verify-link" %>
+        </div>
+
+        <div class="service-row">
+          <div class="service-icon" style="background:#e2453c;">H</div>
+          <div class="service-info">
+            <div class="service-name">HubSpot</div>
+            <div class="service-verified">Not connected</div>
+          </div>
+          <div class="service-field">
+            <label>Account ID</label>
+            <input type="text" placeholder="e.g. 88213456">
+          </div>
+          <div class="service-status"><span class="status-badge status-not-connected">Not Connected</span></div>
+          <%= link_to "Verify", "#", class: "service-verify-link" %>
+        </div>
+      </div>
+
+      <!-- Footer bar -->
+      <div class="client-footer-bar">
+        <%= link_to "Cancel", clients_path, class: "btn-outline" %>
+        <button type="submit" class="btn-primary">Save Client</button>
+      </div>
+
+    <% end %>
+  </div>
+</div>

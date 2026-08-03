@@ -1,0 +1,103 @@
+<% content_for :page_stylesheets do %>
+  <%= stylesheet_link_tag "dashboard" %>
+  <%= stylesheet_link_tag "clients" %>
+<% end %>
+
+<div class="page-wrapper">
+  <%= render "shared/sidebar", active_nav: "clients" %>
+
+  <div class="client-main">
+    <p class="client-breadcrumb"><%= link_to "Clients", clients_path %> &gt; <%= @client[:name] %></p>
+
+    <div class="client-detail-header">
+      <div>
+        <h1><%= @client[:name] %></h1>
+      </div>
+      <%= link_to "✎ Edit Client", "#", class: "btn-outline" %>
+    </div>
+
+    <div class="client-meta-row">
+      <span>📍 <%= @client[:address] %></span>
+      <span>🌐 <%= @client[:website] %></span>
+    </div>
+
+    <div class="client-tags-row">
+      <span class="tag-pill tag-green">● Active</span>
+      <span class="tag-pill tag-blue">● AI SEO Enrolled</span>
+      <span class="tag-pill tag-teal">● Scheduler Connected</span>
+    </div>
+
+    <div class="client-card">
+      <div class="report-history-header">
+        <span class="client-card-title">Report History</span>
+        <%= link_to "⭳ Export All", "#", class: "export-link" %>
+      </div>
+      <p class="report-count"><%= @reports.size %> reports total</p>
+
+      <table class="clients-table">
+        <thead>
+          <tr>
+            <th>Report Period</th>
+            <th>Sent Date</th>
+            <th>Generation</th>
+            <th>Send Status</th>
+            <th>Report Preview</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @reports.each do |report| %>
+            <tr>
+              <td class="report-period-cell"><%= report[:period] %><span class="period-sub">Monthly Report</span></td>
+              <td><%= report[:sent_date] || "—" %></td>
+              <td><span class="badge <%= badge_class(report[:generation]) %>"><%= report[:generation] %></span></td>
+              <td><span class="<%= send_status_class(report[:send_status]) %>"><%= report[:send_status] %></span></td>
+              <td>
+                <% if report[:has_preview] %>
+                  <div class="preview-placeholder"></div>
+                <% else %>
+                  —
+                <% end %>
+              </td>
+              <td>
+                <% case report[:action] %>
+                <% when :view %>
+                  <%= link_to "View Report", "#", class: "table-action-link" %>
+                  <%= link_to "⭳ Download", "#", class: "table-action-link" %>
+                <% when :retry %>
+                  <button class="btn-retry">↻ Retry</button>
+                <% when :in_progress %>
+                  <span class="muted-text">In progress...</span>
+                <% when :awaiting %>
+                  <span class="muted-text">Awaiting data...</span>
+                <% end %>
+              </td>
+            </tr>
+
+            <% if report[:error] %>
+              <tr class="report-alert-row">
+                <td colspan="6">
+                  <div class="report-alert-box">
+                    <strong>⚠ Failed to generate report</strong>
+                    <%= report[:error] %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer-row">
+      <span>Showing 1-<%= @reports.size %> of 18 reports</span>
+      <div class="pagination">
+        <%= link_to "Previous", "#" %>
+        <span class="active-page">1</span>
+        <%= link_to "2", "#" %>
+        <%= link_to "3", "#" %>
+        <%= link_to "Next", "#" %>
+      </div>
+    </div>
+  </div>
+</div>

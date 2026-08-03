@@ -1,0 +1,72 @@
+<% content_for :page_stylesheets do %>
+  <%= stylesheet_link_tag "dashboard" %>
+<% end %>
+
+<div class="dashboard-wrapper">
+  <!-- Sidebar -->
+  <%= render "shared/sidebar", active_nav: "dashboard" %>
+
+  <!-- Main content -->
+  <div class="dashboard-main">
+    <h1>Dashboard</h1>
+    <p class="dashboard-subtitle">A quick look at clients, connections, and this month's reports.</p>
+
+    <div class="dashboard-cards-row">
+      <!-- Clients card -->
+      <div class="dashboard-card">
+        <div class="dashboard-card-header">
+          <span class="dashboard-card-title">Clients</span>
+          <%= link_to "View all →", clients_path, class: "dashboard-card-link" %>
+        </div>
+        <p style="font-size:12px; color:#999; margin:-8px 0 12px 0;">47 total clients</p>
+
+        <% @clients.each do |client| %>
+          <div class="client-row <%= 'highlight' if client[:generation] == 'Failed' %>">
+            <span class="client-name"><%= client[:name] %></span>
+            <span>
+              <span class="badge <%= badge_class(client[:onboarding]) %>"><%= client[:onboarding] %></span>
+              <span class="badge <%= badge_class(client[:generation]) %>"><%= client[:generation] %></span>
+            </span>
+          </div>
+        <% end %>
+      </div>
+
+      <!-- Connections card -->
+      <div class="dashboard-card">
+        <div class="dashboard-card-header">
+          <span class="dashboard-card-title">Connections</span>
+          <%= link_to "View all →", "#", class: "dashboard-card-link" %>
+        </div>
+        <p style="font-size:12px; color:#999; margin:-8px 0 12px 0;">5 services · 1 needs attention</p>
+
+        <% @connections.each do |conn| %>
+          <div class="connection-row"><span class="connection-dot dot-<%= conn[:dot] %>"></span> <%= conn[:name] %></div>
+        <% end %>
+
+        <p class="connection-alert">⚠ GoHighLevel: 3 client connections expired</p>
+        <p class="connection-verified">Last verified 2 hours ago</p>
+      </div>
+    </div>
+
+    <!-- Progress card -->
+    <div class="progress-card">
+      <span class="dashboard-card-title">June 2026 Report Progress</span>
+
+      <div class="progress-bar-track">
+        <div class="progress-segment-green" style="width: <%= @progress_percents[:sent] %>%;"></div>
+        <div class="progress-segment-blue" style="width: <%= @progress_percents[:ready] %>%;"></div>
+        <div class="progress-segment-gray" style="width: <%= @progress_percents[:pending] %>%;"></div>
+        <div class="progress-segment-red" style="width: <%= @progress_percents[:failed] %>%;"></div>
+      </div>
+
+      <div class="progress-legend">
+        <span><span class="progress-legend-dot" style="background:#2ec47a;"></span><%= @progress_counts[:sent] %> Sent</span>
+        <span><span class="progress-legend-dot" style="background:#2e8fb0;"></span><%= @progress_counts[:ready] %> Ready</span>
+        <span><span class="progress-legend-dot" style="background:#dddddd;"></span><%= @progress_counts[:pending] %> Pending</span>
+        <span><span class="progress-legend-dot" style="background:#d9534f;"></span><%= @progress_counts[:failed] %> Failed</span>
+      </div>
+
+      <p class="progress-note">Reports generate monthly on the 1st business day. <%= @total_expected %> total expected this cycle.</p>
+    </div>
+  </div>
+</div>
