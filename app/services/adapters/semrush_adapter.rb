@@ -6,6 +6,16 @@ module Adapters
   # carries last month's `position` forward into this month's
   # `previous_position`).
   #
+  # The tracked keyword SET is discovered from SEMrush, not curated here. A
+  # client can have 80+ keywords tracked directly in their SEMrush Position
+  # Tracking project — requiring a developer to hand-add each one via
+  # ClientKeyword would never keep up. Every keyword phrase in a Position
+  # Tracking response gets `find_or_create_by!`'d onto ClientKeyword, then
+  # `ClientKeyword#active` (default true) becomes an opt-OUT: MSP can mark
+  # one inactive to hide an irrelevant SEMrush-tracked term (e.g. informational
+  # long-tail content) from the client-facing report without touching SEMrush
+  # itself, rather than an opt-in list someone has to build up front.
+  #
   # Credentials shape: {"api_key" => "..."}.
   # external_id: the SEMrush Position Tracking campaign ID for this client's
   # tracked domain (client.website_url) — note this is the FULL
@@ -39,8 +49,8 @@ module Adapters
   class SemrushAdapter < Base
     SERVICE = "semrush"
     BASE_URL = "https://api.semrush.com"
-    # Comfortably above any realistic per-client tracked-keyword count — the
-    # report defaults to 10 rows per page and doesn't paginate otherwise.
+    # Comfortably above MSP's current SEMrush plan's total Keywords quota
+    # (140) — bump this if the plan is ever upgraded to a higher tier.
     DISPLAY_LIMIT = 500
     OVERVIEW_DATABASE = "us"
     # SEMrush's bulk Keyword Overview endpoint accepts a semicolon-joined
@@ -58,20 +68,20 @@ module Adapters
     def perform
       return Result.failure("semrush: no project id configured for this client") if external_id.blank?
 
-      keywords = client.client_keywords.active
-      return Result.success(rankings: []) if keywords.empty?
-
       rows_by_keyword = parse_rankings(fetch_rankings.body)
+      return Result.success(rankings: []) if rows_by_keyword.empty?
+
+      keywords = rows_by_keyword.keys.map { |phrase| find_or_create_keyword(phrase) }.select(&:active?)
       overview_by_keyword = degrade({}) { fetch_keyword_overview(keywords) }
 
       rankings = keywords.map do |keyword|
-        row = rows_by_keyword[keyword.keyword.downcase]
-        overview = overview_by_keyword[keyword.keyword.downcase] || {}
+        row = rows_by_keyword[keyword.keyword]
+        overview = overview_by_keyword[keyword.keyword] || {}
         {
           client_keyword_id: keyword.id,
-          position: row && row[:position],
-          potential_traffic: row && row[:potential_traffic],
-          growth: row && row[:growth],
+          position: row[:position],
+          potential_traffic: row[:potential_traffic],
+          growth: row[:growth],
           keyword_difficulty: overview[:keyword_difficulty],
           intent: overview[:intent],
           serp_features: overview[:serp_features]
@@ -79,6 +89,28 @@ module Adapters
       end
 
       Result.success(rankings: rankings)
+    end
+
+    # Phrases from parse_rankings/parse_keyword_overview are already
+    # stripped+downcased, so the stored ClientKeyword#keyword and this
+    # method's argument always match exactly — no re-normalizing needed at
+    # the lookup sites below.
+    #
+    # create_or_find_by!, not find_or_create_by! — this runs every report
+    # generation for every tracked phrase, so it needs to be race-safe
+    # against a concurrent retry rather than assuming the SELECT-then-INSERT
+    # window never overlaps. Backed by the unique index on
+    # (client_id, keyword); a racing INSERT falls back to the existing row
+    # instead of raising or duplicating.
+    #
+    # IMPORTANT: create_or_find_by!'s race fallback is a plain find_by! on
+    # the attributes given here — it does NOT re-run ClientKeyword's
+    # normalize_keyword callback. That's only safe because `phrase` is
+    # already normalized before it gets here. Passing an un-normalized
+    # phrase to this method would silently fail to find an existing row on
+    # the race path (see test/models/client_keyword_test.rb).
+    def find_or_create_keyword(phrase)
+      client.client_keywords.create_or_find_by!(keyword: phrase)
     end
 
     def fetch_rankings
@@ -117,7 +149,7 @@ module Adapters
         phrase, kd, intent_code, features = line.split(";")
         next if phrase.blank?
 
-        memo[phrase.downcase] = {
+        memo[phrase.strip.downcase] = {
           keyword_difficulty: kd.to_i,
           intent: INTENT_CODES[intent_code],
           serp_features: features.to_s.split(",").size
@@ -147,7 +179,7 @@ module Adapters
         earliest_traffic = traffic_by_date.dig(dates.first, tracked_url_mask)
         latest_traffic = traffic_by_date.dig(dates.last, tracked_url_mask)
 
-        memo[keyword.downcase] = {
+        memo[keyword.strip.downcase] = {
           position: (position if position.is_a?(Numeric)),
           potential_traffic: latest_traffic,
           growth: (latest_traffic - earliest_traffic if dates.size > 1 && earliest_traffic && latest_traffic)

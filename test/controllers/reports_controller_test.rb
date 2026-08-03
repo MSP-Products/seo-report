@@ -58,6 +58,29 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_select "strong", text: "?"
   end
 
+  test "paginates the keyword table at 10 rows per page" do
+    report = build_monthly_report(
+      client_attrs: { ai_seo_enrolled: false },
+      report_attrs: { is_first_report: false },
+      ghl_data_status: "not_connected"
+    )
+    12.times do |n|
+      keyword = report.client.client_keywords.create!(keyword: format("keyword %02d", n)) # zero-padded so alphabetical == numeric order
+      report.report_keyword_rankings.create!(keyword: keyword, position: n + 1)
+    end
+
+    get public_report_path(report.access_token)
+    assert_response :success
+    assert_select "table tbody tr", count: 10
+    assert_select "td", text: "keyword 10", count: 0 # page 2 only
+    assert_select "span", text: /Page 1 of 2 \(12 keywords\)/
+
+    get public_report_path(report.access_token, keyword_page: 2)
+    assert_response :success
+    assert_select "table tbody tr", count: 2
+    assert_select "td", text: "keyword 10"
+  end
+
   test "404s for an unknown access token" do
     get public_report_path("does-not-exist")
 

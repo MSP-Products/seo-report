@@ -6,8 +6,13 @@ class ReportPresenter
 
   attr_reader :monthly_report
 
-  def initialize(monthly_report)
+  # A client can have 80+ tracked keywords (SEMrush plan dependent) — paginate
+  # rather than render them all in one table on a page read mostly on phones.
+  KEYWORDS_PER_PAGE = 10
+
+  def initialize(monthly_report, keyword_page: nil)
     @monthly_report = monthly_report
+    @requested_keyword_page = keyword_page
   end
 
   def month_label
@@ -123,6 +128,22 @@ class ReportPresenter
   def keyword_rows
     @keyword_rows ||= monthly_report.report_keyword_rankings
       .sort_by { |row| row.keyword.keyword }
+  end
+
+  # The full set backs the summary counts below (gained/held/dropped,
+  # top10/top3) regardless of which page is being viewed — only the table
+  # itself paginates.
+  def paginated_keyword_rows
+    offset = (keyword_page - 1) * KEYWORDS_PER_PAGE
+    keyword_rows[offset, KEYWORDS_PER_PAGE] || []
+  end
+
+  def keyword_page
+    @keyword_page ||= [ [ @requested_keyword_page.to_i, 1 ].max, keyword_total_pages ].min
+  end
+
+  def keyword_total_pages
+    @keyword_total_pages ||= [ (keyword_rows.size / KEYWORDS_PER_PAGE.to_f).ceil, 1 ].max
   end
 
   def keywords_tracked_count
