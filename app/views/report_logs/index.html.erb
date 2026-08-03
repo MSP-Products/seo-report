@@ -1,0 +1,76 @@
+<% content_for :title, "Report Log — My Social Practice" %>
+
+<div class="mb-6 flex items-start justify-between gap-6">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Report Log</h1>
+    <p class="mt-1 text-sm text-slate-500">Every generated report, across every practice and month.</p>
+  </div>
+
+  <% if @months.any? %>
+    <select
+      data-controller="month-switcher"
+      data-action="month-switcher#navigate"
+      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-2 focus:ring-teal-primary"
+    >
+      <option value="<%= report_log_path %>" <%= "selected" if @month.nil? %>>All months</option>
+      <% @months.each do |month| %>
+        <option value="<%= report_log_path(month: month.strftime("%Y-%m")) %>" <%= "selected" if @month == month %>>
+          <%= month.strftime("%B %Y") %>
+        </option>
+      <% end %>
+    </select>
+  <% end %>
+</div>
+
+<div class="mb-4 flex flex-wrap gap-1.5">
+  <% [ [ nil, "All" ], [ "queued", "Queued" ], [ "generating", "Generating" ], [ "ready", "Ready" ],
+       [ "sent", "Sent" ], [ "held", "Held" ], [ "failed", "Failed" ] ].each do |value, label| %>
+    <% count = value.nil? ? @status_counts.values.sum : @status_counts.fetch(value, 0) %>
+    <%= link_to report_log_path(month: @month&.strftime("%Y-%m"), status: value),
+          class: "rounded-full border px-3 py-1 text-xs font-medium #{@status == value ? "border-teal-primary bg-teal-primary/10 text-teal-dark" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}" do %>
+      <%= label %> <%= count %>
+    <% end %>
+  <% end %>
+</div>
+
+<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div class="grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr_90px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+    <span>Practice</span>
+    <span>Month</span>
+    <span>Generated</span>
+    <span>Send status</span>
+    <span>Status</span>
+    <span></span>
+  </div>
+
+  <% if @reports.any? %>
+    <div class="divide-y divide-slate-100">
+      <% @reports.each do |report| %>
+        <div class="grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr_90px] items-center gap-4 px-5 py-3.5">
+          <p class="truncate text-sm font-medium text-slate-900"><%= report.client.name %></p>
+          <span class="text-sm text-slate-600"><%= report.report_month.strftime("%B %Y") %></span>
+          <div>
+            <span class="text-sm text-slate-600">
+              <%= report.generated_at? ? report.generated_at.strftime("%b %-d, %H:%M") : "—" %>
+            </span>
+            <% if held_reason(report).present? %>
+              <p class="text-xs text-amber-700">Held — <%= held_reason(report) %></p>
+            <% end %>
+          </div>
+          <span class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium <%= send_status_badge_class(report) %>">
+            <%= send_status_label(report) %>
+          </span>
+          <span class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium <%= generation_status_badge_class(report) %>">
+            <%= generation_status_label(report) %>
+          </span>
+          <% if report.ready? %>
+            <%= link_to "View", public_report_path(report.access_token), target: "_blank", rel: "noopener",
+                  class: "justify-self-end text-sm font-medium text-teal-dark hover:underline" %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="px-5 py-6 text-sm text-slate-500">No reports generated yet.</p>
+  <% end %>
+</div>

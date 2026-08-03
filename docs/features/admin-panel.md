@@ -42,10 +42,12 @@ agency-wide credentials — every other operational task is still a command. See
 1. Go to `/login`, enter email and password.
 2. Landing page is **Dashboard** — this cycle's client counts, generation progress, and
    per-service connection health, all real data.
-3. **Connections** lists all five services with a status; an admin clicks **Edit**, enters
+3. **Report Log** lists every generated report across every practice and month, filterable
+   by month, with a link to view each ready report.
+4. **Connections** lists all five services with a status; an admin clicks **Edit**, enters
    the credential, and saves.
-4. A support user clicking Edit is redirected with a permission message.
-5. Log out from the sidebar.
+5. A support user clicking Edit is redirected with a permission message.
+6. Log out from the sidebar.
 
 **There is no sign-up page and no password reset.** Accounts are created by a developer.
 
@@ -60,6 +62,25 @@ time per report; a live "generating" card naming whichever client is currently b
 processed, with a progress bar and start time, while a run is in progress; a per-client
 table for the cycle, including any active client the run hasn't picked up yet; and the same
 per-service health already shown on Connections.
+
+**Report Log is read-only and unfiltered by default** — every report, every practice, newest
+month first, with an "All months" option and a per-month filter. Only a `ready` report gets
+a "View" link; a queued, generating, or failed one has nothing to click through to.
+
+**Status filtering uses `MonthlyReport#effective_status`, not the bare `generation_status`
+column.** It folds send state into generation state — `sent`/`held` only mean anything once
+a report is `ready` — into one set of six mutually exclusive values, so the filter chips show
+one clean count each instead of two overlapping dimensions (generation status and send
+status) double-counting the same report:
+
+| `effective_status` | True when |
+|---|---|
+| `queued` | `generation_status == "queued"` |
+| `generating` | `generation_status == "generating"` |
+| `failed` | `generation_status == "failed"` |
+| `sent` | `ready?` and `emailed_at` present |
+| `held` | `ready?`, not emailed, and a `send_logs` row has `status: "held"` |
+| `ready` | `ready?`, not emailed, not held |
 
 The sidebar also shows **Clients**, still a stub that routes back to Connections so nothing
 404s. It is not built.
@@ -144,10 +165,15 @@ is what implements "blank means unchanged".
 | `app/helpers/dashboard_helper.rb` | Status badge classes/labels, `held_reason`, `duration_in_words` |
 | `app/views/dashboard/index.html.erb` | The Dashboard page |
 | `app/views/shared/_stat_card.html.erb` | The metric-card pattern, shared with the public report |
+| `app/controllers/report_logs_controller.rb` | Single `index` action; month filter parsed and applied by the model |
+| `app/views/report_logs/index.html.erb` | The Report Log page; reuses `DashboardHelper`'s status badges |
+| `app/javascript/controllers/month_switcher_controller.js` | Also drives the Report Log's month filter, not just the public report |
 | `test/controllers/connections_controller_test.rb` | Role gating, blank-means-unchanged, secrets never echoed |
 | `test/controllers/sessions_controller_test.rb` | Login and logout |
 | `test/controllers/dashboard_controller_test.rb` | Renders real data, shows a not-started client, shows the real held reason |
 | `test/presenters/dashboard_presenter_test.rb` | Counts, progress percent, average generation time, elapsed |
+| `test/controllers/report_logs_controller_test.rb` | Lists a ready report with a view link, hides the link when not ready, month filter |
+| `test/models/monthly_report_test.rb` | `for_report_log` ordering/scoping, `parse_month_param` |
 
 ### Data
 
@@ -156,7 +182,7 @@ is what implements "blank means unchanged".
 | `AdminUser` | `email`, `password_digest`, `role` (`admin` / `support`) |
 | `AgencyConnection` | One row per service; `encrypted_credentials`, `credential_status` |
 | `Service` | Lookup table the service column keys against |
-| `MonthlyReport` | Read, not written, by the Dashboard: `generation_status`, `attempt_count`, `generation_started_at`. See [report-generation](report-generation.md) |
+| `MonthlyReport` | Read, not written, by the Dashboard and Report Log: `generation_status`, `attempt_count`, `generation_started_at`. See [report-generation](report-generation.md) |
 | `SendLog` | Read for the `held` status and its `error_message`. See [monthly-report](monthly-report.md) |
 
 Invariants:
