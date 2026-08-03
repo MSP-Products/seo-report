@@ -3,12 +3,12 @@ title: Admin panel
 slug: admin-panel
 status: partial
 last_verified: 2026-08-02
-related: [integrations, report-generation]
+related: [integrations, report-generation, dashboard-and-clients]
 ---
 
 # Admin panel
 
-> **Status:** partial — login and Connections work; Dashboard and Clients are stubs ·
+> **Status:** partial — login, Connections, Dashboard, and Clients all work ·
 > **Last verified:** 2026-08-02
 >
 > The internal, logged-in side of the system: who can get in, and the one page that
@@ -49,8 +49,8 @@ every other operational task is still a command. See [MSP-GUIDE](../MSP-GUIDE.md
 never be read back out of the page. **Leaving a field blank keeps the existing value**; you
 only type into it to replace one.
 
-The sidebar also shows **Dashboard** and **Clients**. Both are stubs that route back to
-Connections so nothing 404s. They are not built.
+The sidebar also shows **Dashboard** and **Clients**, which now lead to their own
+pages — see [Dashboard and clients](dashboard-and-clients.md).
 
 ### When data is missing
 
@@ -118,7 +118,7 @@ is what implements "blank means unchanged".
 | `app/views/shared/_login_header.html.erb` | Logo and heading above the login form |
 | `app/views/shared/_alert.html.erb` | Flash notice and error banner |
 | `app/javascript/controllers/password_visibility_controller.js` | Show/hide toggle on password fields |
-| `app/views/shared/_admin_sidebar.html.erb` | Nav, incl. the Dashboard/Clients stubs |
+| `app/views/shared/_admin_sidebar.html.erb` | Nav, incl. links to Dashboard and Clients — see [dashboard-and-clients.md](dashboard-and-clients.md) |
 | `app/views/connections/index.html.erb` | The five service cards |
 | `app/views/connections/_connection_card.html.erb` | One service's status and Edit link |
 | `app/views/connections/edit.html.erb` | The credential form |
@@ -157,8 +157,6 @@ Invariants:
 
 ### Gotchas
 
-- **Dashboard and Clients deliberately route to Connections.** They are placeholders, not
-  broken links — don't "fix" them, build them.
 - **`#update` merges rather than replaces.** A blank field preserves the stored value, so
   clearing a credential is not possible through the UI.
 - **`status_label` treats "no configurable fields" as "Not available yet"**, which is why
@@ -172,10 +170,6 @@ Invariants:
 
 ### Not built yet
 
-- **Dashboard** — the natural home for report-generation health, which currently has no
-  visibility anywhere.
-- **Clients** — no UI to add a practice, set per-service IDs, or manage keywords. All
-  console or rake today.
 - **Admin user management** — no UI to create, disable or reset an account.
 - **Credential verification** — nothing ever sets `credential_status`.
 - **No password reset, no MFA, no session expiry, no audit log.**
