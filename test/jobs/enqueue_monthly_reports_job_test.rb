@@ -16,25 +16,35 @@ class EnqueueMonthlyReportsJobTest < ActiveJob::TestCase
     month = Date.current.beginning_of_month - 1.month
     client.monthly_reports.create!(report_month: month, generated_at: Time.current)
 
-    assert_no_enqueued_jobs only: GenerateMonthlyReportJob do
-      EnqueueMonthlyReportsJob.perform_now
-    end
+    EnqueueMonthlyReportsJob.perform_now
+
+    assert_not_includes enqueued_client_ids, client.id
   end
 
   test "does not enqueue for a discarded client" do
     client = Client.create!(name: "Gone Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
     client.discard
 
-    assert_no_enqueued_jobs only: GenerateMonthlyReportJob do
-      EnqueueMonthlyReportsJob.perform_now
-    end
+    EnqueueMonthlyReportsJob.perform_now
+
+    assert_not_includes enqueued_client_ids, client.id
   end
 
   test "does not enqueue for a pending client" do
-    Client.create!(name: "Pending Only Practice #{SecureRandom.hex(4)}", onboarding_status: "pending")
+    client = Client.create!(name: "Pending Only Practice #{SecureRandom.hex(4)}", onboarding_status: "pending")
 
-    assert_no_enqueued_jobs only: GenerateMonthlyReportJob do
-      EnqueueMonthlyReportsJob.perform_now
-    end
+    EnqueueMonthlyReportsJob.perform_now
+
+    assert_not_includes enqueued_client_ids, client.id
+  end
+
+  private
+
+  # Real onboarded clients from db/seeds.rb are present in the test DB alongside
+  # whatever this test creates, so "does not enqueue" must check for this specific
+  # client's id rather than assert the queue is empty.
+  def enqueued_client_ids
+    enqueued_jobs.select { |job| job["job_class"] == "GenerateMonthlyReportJob" }
+      .map { |job| job["arguments"].first }
   end
 end
