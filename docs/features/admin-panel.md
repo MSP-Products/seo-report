@@ -67,6 +67,21 @@ per-service health already shown on Connections.
 month first, with an "All months" option and a per-month filter. Only a `ready` report gets
 a "View" link; a queued, generating, or failed one has nothing to click through to.
 
+**Status filtering uses `MonthlyReport#effective_status`, not the bare `generation_status`
+column.** It folds send state into generation state — `sent`/`held` only mean anything once
+a report is `ready` — into one set of six mutually exclusive values, so the filter chips show
+one clean count each instead of two overlapping dimensions (generation status and send
+status) double-counting the same report:
+
+| `effective_status` | True when |
+|---|---|
+| `queued` | `generation_status == "queued"` |
+| `generating` | `generation_status == "generating"` |
+| `failed` | `generation_status == "failed"` |
+| `sent` | `ready?` and `emailed_at` present |
+| `held` | `ready?`, not emailed, and a `send_logs` row has `status: "held"` |
+| `ready` | `ready?`, not emailed, not held |
+
 The sidebar also shows **Clients**, still a stub that routes back to Connections so nothing
 404s. It is not built.
 

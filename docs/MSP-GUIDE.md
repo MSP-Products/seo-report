@@ -330,10 +330,23 @@ and a per-client table naming anyone not yet started, still generating, or held 
 (with the real reason, e.g. "HubSpot token rejected").
 
 **For any practice, any month, use the Report Log page.** It lists every generated report
-ever, filterable by month and by status — Queued, Generating, Ready, Sent, Held, or Failed
-(each chip shows a real, live count). This is the tool for "did last March's report for
-this specific practice ever send?", which the Dashboard can't answer since it only covers
-the current cycle.
+ever, filterable by month and by status (each chip shows a real, live count). This is the
+tool for "did last March's report for this specific practice ever send?", which the
+Dashboard can't answer since it only covers the current cycle.
+
+**What each status means:**
+
+| Status | Meaning |
+|---|---|
+| Queued | The report's row exists but generation hasn't started yet — waiting its turn |
+| Generating | Being generated right now — pulling data from all five services |
+| Ready | Generated successfully, but not yet sent and nothing is holding it |
+| Sent | Ready, and actually emailed to the practice |
+| Held | Ready, but a send was attempted and blocked on something recoverable (e.g. a rejected credential) |
+| Failed | Generation itself failed — a bug, not a degraded section |
+
+**Sent and Held only apply once a report is Ready** — they describe the send step, which is
+separate from generation. A queued, generating, or failed report can never be Sent or Held.
 
 For the underlying detail — per-service warnings on an otherwise-successful report —
 **needs a developer.**
