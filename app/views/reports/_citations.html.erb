@@ -7,13 +7,13 @@
 
     <% show_breakdown = citation.driving_directions_count.present? || citation.website_clicks_count.present? %>
     <div class="grid gap-4 <%= show_breakdown ? "lg:grid-cols-3" : "sm:grid-cols-2" %>">
-      <%= render "reports/stat_card", icon: :eye, icon_bg: "bg-cyan-100", icon_text: "text-cyan-700",
+      <%= render "shared/stat_card", icon: :eye, icon_bg: "bg-cyan-100", icon_text: "text-cyan-700",
             value: citation.total_impressions,
             label: "Total Listing Impressions",
             sublabel: report.first_report? ? "Baseline — how people are finding you" : "How people are finding you",
             badge: (report.citation_impressions_change_pct.present? ? "#{report.citation_impressions_change_pct}%" : nil),
             badge_class: "bg-red-50 text-red-600", badge_icon: :trending_down %>
-      <%= render "reports/stat_card", icon: :cursor_click, icon_bg: "bg-violet-100", icon_text: "text-violet-700",
+      <%= render "shared/stat_card", icon: :cursor_click, icon_bg: "bg-violet-100", icon_text: "text-violet-700",
             value: citation.total_engagements,
             label: "Total Engagements",
             sublabel: report.first_report? ? "Baseline — how many people engage" : "How many people engage",

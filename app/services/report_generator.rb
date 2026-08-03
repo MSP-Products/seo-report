@@ -53,7 +53,8 @@ class ReportGenerator
   end
 
   def mark_generating(report)
-    report.update!(generation_status: "generating", attempt_count: report.attempt_count + 1)
+    report.update!(generation_status: "generating", attempt_count: report.attempt_count + 1,
+      generation_started_at: Time.current)
   end
 
   def mark_ready(report)

@@ -3,11 +3,11 @@
 How to run the SEO reporting system. Written for MSP staff, organised by the task you're
 trying to do.
 
-> **Read this first.** The admin panel has **one working page** today: Connections.
-> Adding a practice, connecting it to a data source, getting a report's link, and checking
-> whether generation worked are all commands a developer runs. Where that's the case, this
-> guide says so and gives the exact command. It is not a permanent state, but it is
-> today's state, and pretending otherwise would waste your time.
+> **Read this first.** The admin panel has **two working pages** today: Dashboard and
+> Connections. Adding a practice, connecting it to a data source, getting a report's link,
+> and troubleshooting one client's history are all commands a developer runs. Where that's
+> the case, this guide says so and gives the exact command. It is not a permanent state, but
+> it is today's state, and pretending otherwise would waste your time.
 >
 > **Generating a report is the one exception** — it now runs automatically every 1st of
 > the month. A developer is only needed to generate one on demand (a backfill, a retry
@@ -23,6 +23,7 @@ trying to do.
 - **In the admin panel**
   - [Add or update an API credential](#add-or-update-an-api-credential)
   - [Check whether a connection is healthy](#check-whether-a-connection-is-healthy)
+  - [Check this cycle's status](#check-this-cycles-status)
 - **Needs a developer**
   - [Add a new practice](#add-a-new-practice)
   - [Connect a practice to the data sources](#connect-a-practice-to-the-data-sources)
@@ -134,6 +135,28 @@ The Connections page shows a coloured dot and a label per service:
 testing the credential, so treat them as a note rather than live monitoring. The reliable
 way to know a service is working is to [generate a report and read the
 warnings](#check-whether-a-report-worked).
+
+---
+
+## Check this cycle's status
+
+The Dashboard — the page you land on after logging in — shows the last completed month's
+reporting cycle at a glance:
+
+- **Active clients**, and how many are still pending onboarding.
+- **Reports generated** this cycle against the total number of active clients, with a
+  Running/Completed badge and a failed count when there is one.
+- **Reports sent** against reports held, with the real reason a hold happened (e.g.
+  "HubSpot token rejected") shown next to the client it affects.
+- **Average generation time** per report, for this cycle.
+- While generation is running: which client is currently being processed, a progress bar,
+  and when the run started.
+- **A per-client table** for the cycle — including any active client the run hasn't picked
+  up yet, shown as "Not started" rather than left off the list.
+- **Per-service connection health**, the same data as the Connections page.
+
+This is real data, not a summary someone maintains — if a client is missing a report, or a
+send is held, the Dashboard is showing what's actually in the database right now.
 
 ---
 
@@ -291,7 +314,10 @@ report header, so you only need to send the newest one.
 
 ## Check whether a report worked
 
-**Needs a developer.** Every attempt is recorded, successful or not.
+**The Dashboard shows this at a glance** — reports generated this cycle, failed count, and
+a per-client table naming anyone not yet started, still generating, or held on send (with
+the real reason, e.g. "HubSpot token rejected"). For the underlying detail — per-service
+warnings on an otherwise-successful report — **needs a developer.**
 
 ```ruby
 report = Client.kept.find_by!(name: "Woodside Dental Care").monthly_reports.order(report_month: :desc).first
@@ -307,11 +333,12 @@ log.error_log    # per-service warnings, even on success
 was produced — individual services that failed are recorded as warnings, and those are
 exactly the sections that will show placeholders to the practice.
 
-**Nothing alerts anyone when generation fails.** There is no email, no dashboard, no
-monitoring. `ReportGenerator` writes a line to `Rails.logger` on both success and failure
-(naming the practice, month, and — on failure — the error), so it's visible to anyone
-tailing production logs, but nothing pushes it to a person. Checking is a manual step until
-a Dashboard page exists.
+**Nothing pushes an alert when generation fails.** There is no email, no monitoring
+service. The Dashboard will show it next time someone looks, and `ReportGenerator` writes a
+line to `Rails.logger` on both success and failure (naming the practice, month, and — on
+failure — the error), so it's visible to anyone tailing production logs — but nobody is
+paged. Checking is still a once-a-day habit, not something that comes to you — that would
+need a real notification, which doesn't exist yet.
 
 ---
 

@@ -80,6 +80,8 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     assert report.is_first_report?
     assert report.ready?
     assert_equal 1, report.attempt_count
+    assert report.generation_started_at.present?
+    assert report.generation_started_at <= report.generated_at
 
     assert_equal "connected", report.report_traffic.ghl_data_status
     assert_equal 1, report.report_traffic.appointments_booked

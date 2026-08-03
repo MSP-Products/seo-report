@@ -2,17 +2,17 @@
 title: Admin panel
 slug: admin-panel
 status: partial
-last_verified: 2026-08-02
+last_verified: 2026-08-03
 related: [integrations, report-generation]
 ---
 
 # Admin panel
 
-> **Status:** partial — login and Connections work; Dashboard and Clients are stubs ·
-> **Last verified:** 2026-08-02
+> **Status:** partial — login, Dashboard, and Connections work; Clients is still a stub ·
+> **Last verified:** 2026-08-03
 >
-> The internal, logged-in side of the system: who can get in, and the one page that
-> currently does anything.
+> The internal, logged-in side of the system: who can get in, and what they see once
+> they're in.
 
 ---
 
@@ -20,11 +20,13 @@ related: [integrations, report-generation]
 
 ### Purpose
 
-MSP staff need somewhere to manage the API credentials the reports are built from, without
-a developer editing a config file. The admin panel is that place.
+MSP staff need somewhere to see whether this cycle's reports are generating, and to manage
+the API credentials reports are built from, without a developer editing a config file or
+running a console command. The admin panel is that place.
 
-It is deliberately small. Today it manages agency-wide credentials and nothing else —
-every other operational task is still a command. See [MSP-GUIDE](../MSP-GUIDE.md).
+It is deliberately small. Today it shows the current reporting cycle's status and manages
+agency-wide credentials — every other operational task is still a command. See
+[MSP-GUIDE](../MSP-GUIDE.md).
 
 ### Who uses it
 
@@ -38,8 +40,10 @@ every other operational task is still a command. See [MSP-GUIDE](../MSP-GUIDE.md
 ### How it behaves
 
 1. Go to `/login`, enter email and password.
-2. Landing page is **Connections**, listing all five services with a status.
-3. An admin clicks **Edit** on a service, enters the credential, and saves.
+2. Landing page is **Dashboard** — this cycle's client counts, generation progress, and
+   per-service connection health, all real data.
+3. **Connections** lists all five services with a status; an admin clicks **Edit**, enters
+   the credential, and saves.
 4. A support user clicking Edit is redirected with a permission message.
 5. Log out from the sidebar.
 
@@ -49,8 +53,16 @@ every other operational task is still a command. See [MSP-GUIDE](../MSP-GUIDE.md
 never be read back out of the page. **Leaving a field blank keeps the existing value**; you
 only type into it to replace one.
 
-The sidebar also shows **Dashboard** and **Clients**. Both are stubs that route back to
-Connections so nothing 404s. They are not built.
+**The Dashboard shows, for the last completed month:** active/pending client counts;
+reports generated vs. total active clients, with a Running/Completed badge; reports sent
+vs. held (with the real hold reason, e.g. "HubSpot token rejected"); average generation
+time per report; a live "generating" card naming whichever client is currently being
+processed, with a progress bar and start time, while a run is in progress; a per-client
+table for the cycle, including any active client the run hasn't picked up yet; and the same
+per-service health already shown on Connections.
+
+The sidebar also shows **Clients**, still a stub that routes back to Connections so nothing
+404s. It is not built.
 
 ### When data is missing
 
@@ -59,6 +71,8 @@ Connections so nothing 404s. They are not built.
 | A service has no credential saved | "Not configured", grey dot |
 | A credential is saved but never verified | "Unverified" |
 | A service has no configurable fields | "Not available yet", and Edit is hidden |
+| An active client has no report row for the cycle yet | Shown on the Dashboard as "Not started", never omitted |
+| A report is ready but hasn't been emailed | "Not sent" — there is no mailer yet, so this is the default, not a failure |
 
 **The health labels — Active, Expiring soon, Expired, Needs attention — are never set
 automatically.** Nothing tests a credential and records its state, so they are decorative
@@ -118,14 +132,21 @@ is what implements "blank means unchanged".
 | `app/views/shared/_login_header.html.erb` | Logo and heading above the login form |
 | `app/views/shared/_alert.html.erb` | Flash notice and error banner |
 | `app/javascript/controllers/password_visibility_controller.js` | Show/hide toggle on password fields |
-| `app/views/shared/_admin_sidebar.html.erb` | Nav, incl. the Dashboard/Clients stubs |
+| `app/views/shared/_admin_sidebar.html.erb` | Nav, incl. the Clients stub |
 | `app/views/connections/index.html.erb` | The five service cards |
 | `app/views/connections/_connection_card.html.erb` | One service's status and Edit link |
 | `app/views/connections/edit.html.erb` | The credential form |
 | `app/views/shared/_form_group.html.erb` | Shared field wrapper, incl. multiline support |
 | `app/helpers/application_helper.rb` | `admin_nav_icon` |
+| `app/controllers/dashboard_controller.rb` | Single `index` action; all computation lives in the presenter |
+| `app/presenters/dashboard_presenter.rb` | Client counts, the cycle's report rows, elapsed/average timing, connection health |
+| `app/helpers/dashboard_helper.rb` | Status badge classes/labels, `held_reason`, `duration_in_words` |
+| `app/views/dashboard/index.html.erb` | The Dashboard page |
+| `app/views/shared/_stat_card.html.erb` | The metric-card pattern, shared with the public report |
 | `test/controllers/connections_controller_test.rb` | Role gating, blank-means-unchanged, secrets never echoed |
 | `test/controllers/sessions_controller_test.rb` | Login and logout |
+| `test/controllers/dashboard_controller_test.rb` | Renders real data, shows a not-started client, shows the real held reason |
+| `test/presenters/dashboard_presenter_test.rb` | Counts, progress percent, average generation time, elapsed |
 
 ### Data
 
@@ -134,6 +155,8 @@ is what implements "blank means unchanged".
 | `AdminUser` | `email`, `password_digest`, `role` (`admin` / `support`) |
 | `AgencyConnection` | One row per service; `encrypted_credentials`, `credential_status` |
 | `Service` | Lookup table the service column keys against |
+| `MonthlyReport` | Read, not written, by the Dashboard: `generation_status`, `attempt_count`, `generation_started_at`. See [report-generation](report-generation.md) |
+| `SendLog` | Read for the `held` status and its `error_message`. See [monthly-report](monthly-report.md) |
 
 Invariants:
 
@@ -157,8 +180,18 @@ Invariants:
 
 ### Gotchas
 
-- **Dashboard and Clients deliberately route to Connections.** They are placeholders, not
-  broken links — don't "fix" them, build them.
+- **Clients deliberately routes to Connections.** It is a placeholder, not a broken link —
+  don't "fix" it, build it.
+- **The Dashboard never queries adapters or triggers generation** — it only reads
+  `MonthlyReport`/`SendLog`/`AgencyConnection` state that other code already wrote.
+  "Generating" is real process state a run is in, not something the Dashboard causes.
+- **A client with no report row for the cycle is still shown**, as "Not started" —
+  `DashboardPresenter#report_rows` pairs every active client with its report, nil when
+  there isn't one yet, specifically so a client the run hasn't picked up doesn't silently
+  vanish from the table.
+- **`elapsed`/`progress_percent`/`average_generation_time` assume one coherent run** — every
+  report for the cycle created at roughly the same time by `EnqueueMonthlyReportsJob`. A
+  manually-backfilled report from a different time will skew `elapsed` for the whole cycle.
 - **`#update` merges rather than replaces.** A blank field preserves the stored value, so
   clearing a credential is not possible through the UI.
 - **`status_label` treats "no configurable fields" as "Not available yet"**, which is why
@@ -172,8 +205,6 @@ Invariants:
 
 ### Not built yet
 
-- **Dashboard** — the natural home for report-generation health, which currently has no
-  visibility anywhere.
 - **Clients** — no UI to add a practice, set per-service IDs, or manage keywords. All
   console or rake today.
 - **Admin user management** — no UI to create, disable or reset an account.
