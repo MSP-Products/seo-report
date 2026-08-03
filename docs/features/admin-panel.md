@@ -125,6 +125,7 @@ is what implements "blank means unchanged".
 | `app/controllers/sessions_controller.rb` | Login and logout |
 | `app/controllers/connections_controller.rb` | The credentials list and form |
 | `app/models/admin_user.rb` | `has_secure_password`, role enum, email normalisation |
+| `lib/tasks/admin_users.rake` | `admin_users:create` — the supported way to create an account, ENV-driven so nothing sensitive is committed |
 | `app/models/agency_connection.rb` | `CREDENTIAL_FIELDS`, `DISPLAY`, `status_label`, `status_dot_class` |
 | `app/views/layouts/application.html.erb` | Authenticated shell |
 | `app/views/layouts/auth.html.erb` | Login layout |

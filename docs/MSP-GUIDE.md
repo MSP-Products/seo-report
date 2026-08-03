@@ -68,14 +68,20 @@ Three things worth knowing before anything else:
 Go to `/login` and enter your email and password.
 
 **There is no sign-up page and no "forgot password" link.** Admin accounts are created by
-a developer:
+a developer, via a rake task rather than a raw console command — nothing sensitive is ever
+committed, since the values come from `ENV`:
 
-```ruby
-AdminUser.create!(email: "someone@mysocialpractice.com", password: "a-long-password", role: "admin")
+```bash
+ADMIN_EMAIL="someone@mysocialpractice.com" ADMIN_PASSWORD="a-long-unique-password" ADMIN_ROLE=admin bin/rails admin_users:create
 ```
 
+On Railway: prefix the same command with `railway run`, or run it from the service's Shell
+tab in the dashboard. `ADMIN_ROLE` defaults to `admin` if omitted (the other option is
+`support`, view-only).
+
 Password must be at least 8 characters. To reset one, a developer sets a new password on
-the account the same way.
+the account via the Rails console the same way as before:
+`AdminUser.find_by!(email: "...").update!(password: "...")`.
 
 ---
 
