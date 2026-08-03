@@ -26,6 +26,7 @@ class ReportGenerator
 
     @warnings = []
     report = find_or_create_report
+    mark_generating(report)
 
     sync_hubspot(report)
     sync_traffic(report)
@@ -34,10 +35,11 @@ class ReportGenerator
     sync_pages_published(report)
     sync_highlights(report) unless report.is_first_report?
 
-    report.update!(generated_at: Time.current)
+    mark_ready(report)
     log_attempt(report, status: "success")
     report
   rescue StandardError => e
+    mark_failed(report) if report
     log_attempt(report, status: "failed", fatal_error: e) if report
     raise
   end
@@ -47,9 +49,19 @@ class ReportGenerator
   attr_reader :client, :month, :warnings
 
   def find_or_create_report
-    client.monthly_reports.find_or_create_by!(report_month: month) do |r|
-      r.is_first_report = client.monthly_reports.where("report_month < ?", month).none?
-    end
+    client.find_or_create_monthly_report(month)
+  end
+
+  def mark_generating(report)
+    report.update!(generation_status: "generating", attempt_count: report.attempt_count + 1)
+  end
+
+  def mark_ready(report)
+    report.update!(generated_at: Time.current, generation_status: "ready")
+  end
+
+  def mark_failed(report)
+    report.update!(generation_status: "failed")
   end
 
   def previous_report
@@ -225,6 +237,11 @@ class ReportGenerator
   end
 
   def log_attempt(report, status:, fatal_error: nil)
+    record_generation_log(report, status: status, fatal_error: fatal_error)
+    log_to_rails_logger(status: status, fatal_error: fatal_error)
+  end
+
+  def record_generation_log(report, status:, fatal_error: nil)
     error_log = fatal_error ? ([ fatal_error.message ] + warnings).join("\n") : warnings.join("\n")
 
     report.report_generation_logs.create!(
@@ -233,5 +250,16 @@ class ReportGenerator
       error_summary: fatal_error&.message || warnings.first,
       error_log: error_log.presence
     )
+  end
+
+  def log_to_rails_logger(status:, fatal_error: nil)
+    practice_month = "#{client.name}'s #{month.strftime("%B %Y")} report"
+
+    if status == "success"
+      warning_note = " (#{warnings.size} warning#{"s" unless warnings.size == 1})" if warnings.any?
+      Rails.logger.info("ReportGenerator: generated #{practice_month}#{warning_note}")
+    else
+      Rails.logger.error("ReportGenerator: failed to generate #{practice_month} — #{fatal_error&.message}")
+    end
   end
 end

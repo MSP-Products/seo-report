@@ -18,6 +18,10 @@ class MonthlyReport < ApplicationRecord
   has_many :gbp_photos, foreign_key: :report_id, dependent: :destroy
   has_many :report_pages_published, class_name: "ReportPagePublished", foreign_key: :report_id, dependent: :destroy
 
+  # Enums
+  enum :generation_status, { queued: "queued", generating: "generating", ready: "ready", failed: "failed" },
+    validate: true
+
   # Validations
   validates :report_month, presence: true
   validates :report_month, uniqueness: { scope: :client_id }
@@ -30,6 +34,17 @@ class MonthlyReport < ApplicationRecord
 
   # Callbacks
   before_validation :generate_access_token, on: :create
+
+  # Wall-clock start of this month's run — every report for the month is
+  # created "queued" at once by EnqueueMonthlyReportsJob, so the earliest
+  # created_at is the run's start time.
+  def self.run_started_at(month)
+    where(report_month: month).minimum(:created_at)
+  end
+
+  def self.currently_generating_client(month)
+    where(report_month: month).generating.first&.client
+  end
 
   private
 

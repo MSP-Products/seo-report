@@ -10,13 +10,15 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_31_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_03_160047) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "admin_users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", null: false
+    t.string "first_name"
+    t.string "last_name"
     t.string "password_digest"
     t.string "role"
     t.datetime "updated_at", null: false
@@ -105,10 +107,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_210000) do
 
   create_table "monthly_reports", id: { type: :string, limit: 36, default: -> { "gen_random_uuid()" } }, force: :cascade do |t|
     t.string "access_token", null: false
+    t.integer "attempt_count", default: 0, null: false
     t.string "client_id", limit: 36, null: false
     t.datetime "created_at", null: false
     t.datetime "emailed_at"
     t.datetime "generated_at"
+    t.string "generation_status", default: "queued", null: false
     t.boolean "is_first_report", default: false
     t.date "report_month", null: false
     t.datetime "updated_at", null: false

@@ -23,4 +23,13 @@ class Client < ApplicationRecord
 
   # Scopes
   scope :with_ai_seo, -> { where(ai_seo_enrolled: true) }
+
+  # Shared by EnqueueMonthlyReportsJob (creates it queued, ahead of actually
+  # running) and ReportGenerator (finds the same row when the job runs) —
+  # one place decides is_first_report so it's never computed twice.
+  def find_or_create_monthly_report(month)
+    monthly_reports.find_or_create_by!(report_month: month) do |r|
+      r.is_first_report = monthly_reports.where("report_month < ?", month).none?
+    end
+  end
 end

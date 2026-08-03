@@ -64,9 +64,13 @@ The fan-out: one `GenerateMonthlyReportJob` per active client, for the last comp
   its own retry policy, so a single client failing doesn't affect the fan-out itself.
 - **Scope is `Client.kept.active`** — a `pending` client (not yet onboarded) or an
   `offboarded` one is skipped, same as a discarded (soft-deleted) one.
-- **Skips a client whose report for that month is already `generated`**, so re-running the
+- **Creates each client's `MonthlyReport` row up front, `generation_status: "queued"`**,
+  via `Client#find_or_create_monthly_report` — before `GenerateMonthlyReportJob` ever runs.
+  This is what lets a dashboard show "34 of 42" the moment the run starts, not just once
+  jobs begin executing.
+- **Skips a client whose report for that month is already `ready`**, so re-running the
   fan-out (e.g. a retried scheduler tick) never duplicates work or re-pulls external APIs
-  for a client that's already done.
+  for a client that's already done. A `failed` report is **not** skipped — it's re-enqueued.
 - **No guard against a client onboarded partway through the target month** — it will still
   get a full month's report. Accepted as a known gap for now.
 

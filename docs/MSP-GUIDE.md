@@ -4,10 +4,14 @@ How to run the SEO reporting system. Written for MSP staff, organised by the tas
 trying to do.
 
 > **Read this first.** The admin panel has **one working page** today: Connections.
-> Everything else — adding a practice, connecting it to a data source, generating a
-> report, getting the link — is a command a developer runs. Where that's the case, this
+> Adding a practice, connecting it to a data source, getting a report's link, and checking
+> whether generation worked are all commands a developer runs. Where that's the case, this
 > guide says so and gives the exact command. It is not a permanent state, but it is
 > today's state, and pretending otherwise would waste your time.
+>
+> **Generating a report is the one exception** — it now runs automatically every 1st of
+> the month. A developer is only needed to generate one on demand (a backfill, a retry
+> outside the schedule).
 
 ---
 
@@ -244,8 +248,12 @@ Adding it here alone gets you a row in the report with no ranking against it.
 
 ## Generate a report
 
-**Needs a developer.** Reports are **not yet scheduled** — nothing generates them
-automatically, so this is a deliberate action every month.
+**Reports now generate automatically.** `EnqueueMonthlyReportsJob` runs every 1st of the
+month at 4am, creating every active practice's report for the last completed month and
+enqueueing generation for it. You don't need to do anything for the normal monthly cycle.
+
+**Needs a developer** only to generate one on demand — a backfill, a retry outside the
+schedule, or testing:
 
 ```bash
 REPORT_MONTH="2026-07" bin/rails reports:generate_real["Woodside Dental Care"]
@@ -256,7 +264,8 @@ succeeded, and any warnings.
 
 Generating is **safe to repeat**. Re-running for the same practice and month replaces that
 month's data rather than duplicating it, so a re-run after fixing a credential is always
-fine.
+fine. The scheduled run itself follows the same rule — it skips a practice whose report is
+already `ready`, but retries one that previously `failed`.
 
 Attempting the current month is refused — reports cover completed months only.
 
@@ -286,6 +295,9 @@ report header, so you only need to send the newest one.
 
 ```ruby
 report = Client.kept.find_by!(name: "Woodside Dental Care").monthly_reports.order(report_month: :desc).first
+report.generation_status  # "queued", "generating", "ready", or "failed"
+report.attempt_count      # how many times generation has been attempted this month
+
 log = report.report_generation_logs.latest_first.first
 log.status       # "success" or "failed"
 log.error_log    # per-service warnings, even on success
@@ -296,7 +308,10 @@ was produced — individual services that failed are recorded as warnings, and t
 exactly the sections that will show placeholders to the practice.
 
 **Nothing alerts anyone when generation fails.** There is no email, no dashboard, no
-monitoring. Checking is a manual step until a Dashboard page exists.
+monitoring. `ReportGenerator` writes a line to `Rails.logger` on both success and failure
+(naming the practice, month, and — on failure — the error), so it's visible to anyone
+tailing production logs, but nothing pushes it to a person. Checking is a manual step until
+a Dashboard page exists.
 
 ---
 
