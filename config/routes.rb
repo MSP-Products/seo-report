@@ -21,6 +21,10 @@ Rails.application.routes.draw do
   # Agency-wide API credentials for the external data-source adapters
   resources :connections, only: [ :index, :edit, :update ], param: :service
 
+  # Dashboard overview and client roster (frontend, backed by static data for now)
+  get "dashboard", to: "dashboard#index", as: :dashboard
+  resources :clients, only: [ :index, :show, :new, :create ]
+
   # Defines the root path route ("/")
   root "connections#index"
 end
