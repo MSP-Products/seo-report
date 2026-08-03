@@ -1,0 +1,137 @@
+<% content_for :title, "Dashboard — My Social Practice" %>
+
+<div class="mb-6 flex items-start justify-between gap-6">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Dashboard</h1>
+    <p class="mt-1 text-sm text-slate-500"><%= @dashboard.month_label %> reporting cycle.</p>
+  </div>
+  <% if @dashboard.run_in_progress? %>
+    <span class="inline-flex items-center gap-1.5 rounded-full bg-teal-primary/10 px-3 py-1 text-xs font-medium text-teal-dark">
+      <span class="size-1.5 rounded-full bg-teal-primary"></span>
+      Run in progress
+    </span>
+  <% end %>
+</div>
+
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <%= render "shared/stat_card", icon: :building,
+        value: @dashboard.active_client_count,
+        label: "Active clients",
+        sublabel: "#{@dashboard.pending_client_count} pending onboarding" %>
+
+  <%= render "shared/stat_card", icon: :file_text,
+        value: "#{@dashboard.ready_count}/#{@dashboard.total_expected}",
+        label: "Reports generated",
+        sublabel: (@dashboard.failed_count.positive? ? "#{@dashboard.failed_count} failed — retry available" : @dashboard.month_label),
+        badge: (@dashboard.run_in_progress? ? "Running" : "Completed"),
+        badge_class: (@dashboard.run_in_progress? ? "bg-teal-primary/10 text-teal-dark" : "bg-emerald-50 text-emerald-700") %>
+
+  <%= render "shared/stat_card", icon: :check,
+        value: @dashboard.sent_count,
+        label: "Reports sent",
+        sublabel: (@dashboard.held_count.positive? ? "#{@dashboard.held_count} held" : "of #{@dashboard.total_expected} expected") %>
+
+  <%= render "shared/stat_card", icon: :calendar_check,
+        value: (@dashboard.average_generation_time ? duration_in_words(@dashboard.average_generation_time) : "—"),
+        label: "Avg. generation time",
+        sublabel: "Per report, #{@dashboard.month_label}" %>
+</div>
+
+<div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div class="rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wider text-teal-dark/70">This month</p>
+        <h2 class="mt-0.5 text-sm font-semibold text-slate-900">Generation run — <%= @dashboard.month_label %></h2>
+      </div>
+    </div>
+
+    <% if @dashboard.report_rows.any? %>
+      <div class="divide-y divide-slate-100">
+        <% @dashboard.report_rows.each do |row| %>
+          <% client = row[:client]
+             report = row[:report] %>
+          <div class="px-5 py-3.5">
+            <div class="flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-slate-900"><%= client.name %></p>
+                <p class="text-xs text-slate-500">
+                  <% if report&.generated_at? %>
+                    Generated <%= report.generated_at.strftime("%b %-d, %H:%M") %>
+                  <% elsif report %>
+                    Not generated yet
+                  <% else %>
+                    Not picked up by a run yet
+                  <% end %>
+                </p>
+              </div>
+              <div class="flex shrink-0 items-center gap-2">
+                <% if report %>
+                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= send_status_badge_class(report) %>">
+                    <%= send_status_label(report) %>
+                  </span>
+                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= generation_status_badge_class(report) %>">
+                    <%= generation_status_label(report) %>
+                  </span>
+                <% else %>
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                    Not started
+                  </span>
+                <% end %>
+              </div>
+            </div>
+            <% if report && held_reason(report).present? %>
+              <p class="mt-1.5 text-xs text-amber-700">Held — <%= held_reason(report) %></p>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="px-5 py-6 text-sm text-slate-500">No active clients yet.</p>
+    <% end %>
+  </div>
+
+  <div class="flex flex-col gap-6">
+    <% if @dashboard.run_in_progress? %>
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center gap-2">
+          <span class="size-4 shrink-0 animate-spin rounded-full border-2 border-teal-primary/25 border-t-teal-primary" aria-hidden="true"></span>
+          <p class="text-xs font-semibold uppercase tracking-wider text-teal-dark/70">Generating</p>
+        </div>
+        <p class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
+          <%= @dashboard.ready_count %> <span class="text-lg font-normal text-slate-500">of <%= @dashboard.total_expected %></span>
+        </p>
+        <% if @dashboard.currently_generating_client %>
+          <p class="mt-2 text-sm text-slate-600">Currently generating report for <%= @dashboard.currently_generating_client.name %>.</p>
+        <% end %>
+        <div class="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div class="h-full rounded-full bg-teal-primary" style="width: <%= @dashboard.progress_percent %>%"></div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">Started <%= @dashboard.run_started_at.strftime("%b %-d, %Y %H:%M") %></p>
+      </div>
+    <% elsif @dashboard.run_started? %>
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-wider text-teal-dark/70">This cycle</p>
+        <p class="mt-2 text-sm font-medium text-slate-900">Run completed</p>
+        <p class="mt-1 text-xs text-slate-500">Took <%= duration_in_words(@dashboard.elapsed) %>, started <%= @dashboard.run_started_at.strftime("%b %-d, %Y %H:%M") %></p>
+      </div>
+    <% end %>
+
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-wider text-teal-dark/70">Data freshness</p>
+      <h2 class="mt-0.5 text-sm font-semibold text-slate-900">Service health</h2>
+      <div class="mt-4 space-y-3">
+        <% @dashboard.connections.each do |connection| %>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-slate-600"><%= connection.display_name %></span>
+            <span class="flex items-center gap-1.5">
+              <span class="size-1.5 rounded-full <%= connection.status_dot_class %>"></span>
+              <span class="text-slate-500"><%= connection.status_label %></span>
+            </span>
+          </div>
+        <% end %>
+      </div>
+      <%= link_to "Manage connections", connections_path, class: "mt-4 inline-block text-sm font-medium text-teal-dark hover:underline" %>
+    </div>
+  </div>
+</div>

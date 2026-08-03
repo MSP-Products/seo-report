@@ -5,30 +5,30 @@
 
   <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
     <% if report.ga4_available? %>
-      <%= render "reports/stat_card", icon: :users,
+      <%= render "shared/stat_card", icon: :users,
             value: report.traffic.total_visits,
             label: "Total Website Visits",
             sublabel: "#{report.traffic.unique_visitors} unique visitors · #{report.traffic.pages_per_visit} pages / visit" %>
     <% else %>
-      <%= render "reports/stat_card", icon: :users,
+      <%= render "shared/stat_card", icon: :users,
             value: "—",
             label: "Total Website Visits",
             sublabel: "Google Analytics isn't connected yet for this practice" %>
     <% end %>
 
     <% if report.ghl_connected? %>
-      <%= render "reports/stat_card", icon: :calendar_check,
+      <%= render "shared/stat_card", icon: :calendar_check,
             value: report.traffic.appointments_booked,
             label: "Appointments Booked",
             sublabel: "New appointments this period" %>
-      <%= render "reports/stat_card", icon: :dollar, hero: true,
+      <%= render "shared/stat_card", icon: :dollar, hero: true,
             value: number_to_currency(report.traffic.estimated_revenue, precision: 0),
             label: "Estimated revenue generated",
             sublabel: "Attributed to booked appointments",
             badge: "Revenue" %>
     <% else %>
-      <%= render "reports/stat_card", icon: :calendar_check, value: "?", label: "Appointments Booked", sublabel: "New appointments this period" %>
-      <%= render "reports/stat_card", icon: :dollar, value: "?", label: "Estimated revenue generated",
+      <%= render "shared/stat_card", icon: :calendar_check, value: "?", label: "Appointments Booked", sublabel: "New appointments this period" %>
+      <%= render "shared/stat_card", icon: :dollar, value: "?", label: "Estimated revenue generated",
             sublabel: "Attributed to booked appointments", badge: "Revenue" %>
     <% end %>
   </div>

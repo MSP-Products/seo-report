@@ -21,6 +21,10 @@ class AgencyConnection < ApplicationRecord
     JSON.parse(encrypted_credentials.presence || "{}")
   end
 
+  def self.all_services
+    Service::KEYS.map { |service| find_or_initialize_by(service: service) }
+  end
+
   def configured?
     encrypted_credentials.present?
   end
