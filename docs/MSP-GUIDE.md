@@ -184,9 +184,10 @@ Client.create!(
 - **`ai_seo_enrolled`** decides whether the AI search section appears in their reports.
 - **`website_url`** is used to find their sitemap and to match their SEMrush rankings, so
   it must be the real site.
-- HubSpot is the source of truth for name, address, website, onboarding status and AI SEO
-  enrolment — **whatever HubSpot says overwrites what you type here** on the next report
-  run.
+- HubSpot is the source of truth for name, address, website, onboarding status, onboarding
+  date, and AI SEO enrolment — **once this client has a HubSpot Company ID linked** (see
+  "Connect a practice to the data sources" below), whatever HubSpot says overwrites what
+  you type here, within the hour. Until then, these values just sit as typed.
 
 ---
 

@@ -29,7 +29,23 @@ class Client < ApplicationRecord
   # one place decides is_first_report so it's never computed twice.
   def find_or_create_monthly_report(month)
     monthly_reports.find_or_create_by!(report_month: month) do |r|
-      r.is_first_report = monthly_reports.where("report_month < ?", month).none?
+      r.is_first_report = first_report_month?(month)
     end
+  end
+
+  private
+
+  # Per SOW #9, HubSpot's onboarding date (onboarded_at, synced from
+  # gmb_seo_start_date — confirmed with MSP) is the source of truth for which
+  # month is a client's first report, not "have we ever generated one
+  # before". That distinction matters for a backfilled client: onboarded_at
+  # correctly identifies their real first month even if generation only
+  # started running for them later. Falls back to the report-history
+  # heuristic when onboarded_at isn't known yet (e.g. not yet synced from
+  # HubSpot at all).
+  def first_report_month?(month)
+    return onboarded_at.beginning_of_month == month if onboarded_at.present?
+
+    monthly_reports.where("report_month < ?", month).none?
   end
 end

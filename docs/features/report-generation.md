@@ -97,9 +97,12 @@ with `#call`. Its body is a table of contents:
 
 1. **Guard** — raises `MonthNotCompleteError` if `month >= Date.current.beginning_of_month`.
 2. **`find_or_create_report`** — delegates to `Client#find_or_create_monthly_report`, which
-   sets `is_first_report` when no earlier report exists. Shared with
-   `EnqueueMonthlyReportsJob`, which calls the same method to create the row **queued**
-   before this job ever runs — see [jobs-and-schedules](../reference/jobs-and-schedules.md).
+   sets `is_first_report` by comparing this report's month against the client's
+   `onboarded_at` (synced from HubSpot's `gmb_seo_start_date` — see
+   [integration-hubspot](integration-hubspot.md)), falling back to "no earlier report
+   exists" only if `onboarded_at` isn't known yet. Shared with `EnqueueMonthlyReportsJob`,
+   which calls the same method to create the row **queued** before this job ever runs — see
+   [jobs-and-schedules](../reference/jobs-and-schedules.md).
 3. **`mark_generating`** — sets `generation_status: "generating"` and bumps `attempt_count`.
 4. **`sync_hubspot`** — updates the `Client` record itself from HubSpot (name, address,
    website, onboarding status, AI SEO enrolment). HubSpot is the source of truth for these.
@@ -136,9 +139,12 @@ rankings.
 | `app/jobs/generate_monthly_report_job.rb` | Solid Queue wrapper; takes IDs, not records |
 | `app/jobs/enqueue_monthly_reports_job.rb` | Monthly fan-out — one `GenerateMonthlyReportJob` per active client |
 | `app/models/report_generation_log.rb` | One row per attempt, success or failure |
+| `app/services/sync_client_from_hubspot.rb` | `sync_hubspot`'s real work — also used standalone by `EnqueueHubspotSyncJob`, see [integration-hubspot](integration-hubspot.md) |
+| `app/models/client.rb` | `find_or_create_monthly_report` — the one place `is_first_report` is decided |
 | `lib/tasks/real_client.rake` | `reports:generate_real` — how generation is actually invoked today |
 | `test/services/report_generator_test.rb` | The reference test: happy path, idempotency, each degraded state |
 | `test/jobs/enqueue_monthly_reports_job_test.rb` | Covers the active/pending/offboarded/already-generated fan-out rules |
+| `test/models/client_test.rb` | `is_first_report` from `onboarded_at`, including the backfill case that motivated it |
 
 ### Data
 
@@ -176,10 +182,16 @@ That last row is the biggest operational gap in the system.
 ### Gotchas
 
 - **`sync_hubspot` writes to `Client`.** Editing a practice's name or AI SEO enrolment
-  locally is pointless — the next run overwrites it from HubSpot.
+  locally is pointless — an hourly job and the next generation run both overwrite it from
+  HubSpot.
 - **AI visibility is frozen per report** deliberately. It is written only when
   `client.ai_seo_enrolled?` **at run time**, and afterwards the report renders based on the
   row existing — so an enrolment change never rewrites history.
+- **`is_first_report` is decided by `onboarded_at`, not report history, specifically to
+  survive a backfill.** A client onboarded in February but only backfilled starting in June
+  correctly gets `is_first_report: false` for June — there's no earlier report, but June
+  still isn't their onboarding month. Falls back to "no earlier report" only when
+  `onboarded_at` is unknown.
 - **`sync_gbp_activity` does four things** despite its name (summary, posts, reviews,
   photos) and derives review sentiment inline. It is a known violation of the unit-function
   rule in CLAUDE.md — split it when you next touch it, don't add to it.

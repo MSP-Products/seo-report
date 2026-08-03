@@ -72,10 +72,8 @@ class ReportGenerator
   end
 
   def sync_hubspot(report)
-    result = Adapters::HubspotAdapter.new(client).call
-    return warnings << "hubspot: #{result.error}" unless result.success?
-
-    client.update!(result.data.slice(:name, :address, :website_url, :onboarding_status, :onboarded_at, :ai_seo_enrolled).compact)
+    result = SyncClientFromHubspot.new(client).call
+    warnings << "hubspot: #{result.error}" unless result.success?
   end
 
   def sync_traffic(report)
