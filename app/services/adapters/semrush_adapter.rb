@@ -1,9 +1,10 @@
 module Adapters
-  # SEMrush Position Tracking + Trends APIs, per-client domain tracking
-  # (SOW #4). Returns current rankings only — month-over-month
-  # previous_position is our own historical record, not something SEMrush is
-  # asked for (see ReportGenerator, which carries last month's `position`
-  # forward into this month's `previous_position`).
+  # SEMrush Position Tracking + Keyword Difficulty bulk APIs, per-client
+  # domain tracking (SOW #4: "rankings, gained/held/dropped, KD%"). Returns
+  # current rankings only — month-over-month previous_position is our own
+  # historical record, not something SEMrush is asked for (see
+  # ReportGenerator, which carries last month's `position` forward into this
+  # month's `previous_position`).
   #
   # Credentials shape: {"api_key" => "..."}.
   # external_id: the SEMrush Position Tracking campaign ID for this client's
@@ -22,12 +23,28 @@ module Adapters
   #
   # LOWER CONFIDENCE: "Tr" (traffic share) is the closest stand-in for
   # potential_traffic — SEMrush has no dedicated "potential traffic" figure.
+  # `growth` is derived from that same "Tr" series (latest minus earliest
+  # date in the range) rather than a second call — SEMrush exposes no
+  # separate "growth" figure either. Nil until a project has 2+ tracked
+  # dates, which is expected for a first report.
+  #
+  # Keyword Difficulty is a genuinely separate bulk endpoint (type=phrase_kdi)
+  # confirmed live against MSP's account — it requires a `database` region
+  # ("us" — MSP's practices are all US-based) and is not part of the Position
+  # Tracking response. A failure here degrades to a nil KD% per keyword
+  # rather than failing the whole adapter call — it's supplementary to
+  # ranking data, not load-bearing.
   class SemrushAdapter < Base
     SERVICE = "semrush"
     BASE_URL = "https://api.semrush.com"
     # Comfortably above any realistic per-client tracked-keyword count — the
     # report defaults to 10 rows per page and doesn't paginate otherwise.
     DISPLAY_LIMIT = 500
+    KD_DATABASE = "us"
+    # SEMrush's bulk KD endpoint accepts a semicolon-joined phrase list per
+    # request; keep well under its documented cap so one client's keyword
+    # count never has to paginate.
+    KD_BATCH_SIZE = 100
 
     private
 
@@ -37,26 +54,55 @@ module Adapters
       keywords = client.client_keywords.active
       return Result.success(rankings: []) if keywords.empty?
 
-      response = connection(BASE_URL).get("/reports/v1/projects/#{external_id}/tracking/", {
-        key: credentials["api_key"],
-        type: "tracking_position_organic",
-        action: "report",
-        url: tracked_url_mask,
-        display_limit: DISPLAY_LIMIT
-      })
-
-      rows_by_keyword = parse_rankings(response.body)
+      rows_by_keyword = parse_rankings(fetch_rankings.body)
+      kd_by_keyword = degrade({}) { fetch_keyword_difficulties(keywords) }
 
       rankings = keywords.map do |keyword|
         row = rows_by_keyword[keyword.keyword.downcase]
         {
           client_keyword_id: keyword.id,
           position: row && row[:position],
-          potential_traffic: row && row[:potential_traffic]
+          potential_traffic: row && row[:potential_traffic],
+          growth: row && row[:growth],
+          keyword_difficulty: kd_by_keyword[keyword.keyword.downcase]
         }
       end
 
       Result.success(rankings: rankings)
+    end
+
+    def fetch_rankings
+      connection(BASE_URL).get("/reports/v1/projects/#{external_id}/tracking/", {
+        key: credentials["api_key"],
+        type: "tracking_position_organic",
+        action: "report",
+        url: tracked_url_mask,
+        display_limit: DISPLAY_LIMIT
+      })
+    end
+
+    def fetch_keyword_difficulties(keywords)
+      keywords.each_slice(KD_BATCH_SIZE).each_with_object({}) do |batch, memo|
+        response = connection(BASE_URL).get("/", {
+          key: credentials["api_key"],
+          type: "phrase_kdi",
+          database: KD_DATABASE,
+          phrase: batch.map(&:keyword).join(";"),
+          export_columns: "Ph,Kd"
+        })
+        memo.merge!(parse_keyword_difficulties(response.body))
+      end
+    end
+
+    # "Keyword;Keyword Difficulty Index\ncosmetic dentistry;81" — semicolon-
+    # delimited CSV, the classic SEMrush Analytics API's response shape
+    # (unlike Position Tracking, which is JSON).
+    def parse_keyword_difficulties(body)
+      lines = body.to_s.strip.lines.map(&:strip)
+      lines.drop(1).each_with_object({}) do |line, memo|
+        phrase, kd = line.split(";")
+        memo[phrase.to_s.downcase] = kd.to_i if phrase.present?
+      end
     end
 
     # A wildcard mask ("*.example.com/*") matching however the tracked URL was
@@ -77,11 +123,14 @@ module Adapters
 
         position = row.dig("Fi", tracked_url_mask)
         traffic_by_date = row["Tr"] || {}
-        latest_date = traffic_by_date.keys.max
+        dates = traffic_by_date.keys.sort
+        earliest_traffic = traffic_by_date.dig(dates.first, tracked_url_mask)
+        latest_traffic = traffic_by_date.dig(dates.last, tracked_url_mask)
 
         memo[keyword.downcase] = {
           position: (position if position.is_a?(Numeric)),
-          potential_traffic: traffic_by_date.dig(latest_date, tracked_url_mask)
+          potential_traffic: latest_traffic,
+          growth: (latest_traffic - earliest_traffic if dates.size > 1 && earliest_traffic && latest_traffic)
         }
       end
     end

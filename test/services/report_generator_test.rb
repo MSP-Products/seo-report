@@ -70,6 +70,9 @@ class ReportGeneratorTest < ActiveSupport::TestCase
         data: { "0" => { "Ph" => "dentist near me", "Fi" => { "*.example.com/*" => 7 },
           "Tr" => { "20260630" => { "*.example.com/*" => 0.81 } } } }
       }.to_json)
+    stub_request(:get, "https://api.semrush.com/")
+      .with(query: hash_including("key" => "semrush-key", "type" => "phrase_kdi"))
+      .to_return(status: 200, body: "Keyword;Keyword Difficulty Index\ndentist near me;57")
   end
 
   test "generates a full report from all adapters" do

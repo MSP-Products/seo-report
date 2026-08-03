@@ -69,7 +69,7 @@
                   </span>
                 </td>
                 <td class="px-3 py-3 text-right tabular-nums text-slate-500"><%= row.keyword.serp_features %></td>
-                <td class="px-3 py-3 text-right font-medium tabular-nums <%= keyword_difficulty_class(row.keyword.keyword_difficulty) %>"><%= row.keyword.keyword_difficulty %></td>
+                <td class="px-3 py-3 text-right font-medium tabular-nums <%= keyword_difficulty_class(row.keyword_difficulty) %>"><%= row.keyword_difficulty %></td>
                 <td class="px-3 py-3 text-right tabular-nums text-slate-500"><%= number_with_precision(row.potential_traffic, precision: 2) %></td>
                 <td class="px-3 py-3 text-right tabular-nums text-slate-500"><%= row.growth.to_f.positive? ? "+" : "" %><%= number_with_precision(row.growth, precision: 2) %></td>
                 <% if report.first_report? %>
