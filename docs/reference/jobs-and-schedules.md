@@ -19,6 +19,7 @@ Everything that runs in the background, when, and what happens when it doesn't.
 |---|---|---|
 | `clear_solid_queue_finished_jobs` | Every hour at minute 12 | Solid Queue housekeeping |
 | `scan_client_sitemaps` | Every day at 3am | `Client.kept.active.find_each { ScanClientSitemapJob.perform_later(_1.id) }` |
+| `enqueue_hubspot_sync` | Every day at 3:30am | `EnqueueHubspotSyncJob` |
 | `enqueue_monthly_reports` | The 1st of every month at 4am | `EnqueueMonthlyReportsJob` |
 
 **Report generation is now scheduled; sending it is not.** `EnqueueMonthlyReportsJob` fans
@@ -54,6 +55,32 @@ Wraps `ReportGenerator` for one practice and month.
 
 Enqueued automatically by `EnqueueMonthlyReportsJob`, or manually for one client at a time
 (see "Running things by hand" below).
+
+### `SyncHubspotClientJob`
+
+Wraps `SyncClientFromHubspot` for one client — pulls their HubSpot Company record and
+writes name/address/website/onboarding status/AI SEO enrolment onto `Client`.
+
+- `queue_as :default`
+- `retry_on Faraday::TimeoutError, Faraday::ConnectionFailed, wait: :polynomially_longer, attempts: 3`
+- `discard_on ActiveRecord::RecordNotFound`
+- Idempotent — a retry just re-fetches and overwrites the same fields.
+
+### `EnqueueHubspotSyncJob`
+
+The fan-out: one `SyncHubspotClientJob` per kept client with a HubSpot `ClientServiceLink`.
+
+- `queue_as :default`
+- **Scope is every kept client with a HubSpot link — including `pending` ones.** This is
+  deliberate: it exists specifically to catch a client whose HubSpot `active` flag just
+  turned on, before `EnqueueMonthlyReportsJob`'s `Client.kept.active` targeting runs. See
+  [integration-hubspot](../features/integration-hubspot.md) for why the ordering matters.
+- **Runs hourly.** Its original purpose (staleness ahead of the monthly enqueue) only ever
+  needed a daily run — the 1st-of-the-month targeting decision doesn't get any more correct
+  from checking more often than once between report cycles. It runs hourly because it's also
+  the general mechanism keeping practice name/address/website/AI SEO enrollment in sync with
+  HubSpot everywhere in the app (Dashboard, Report Log, eventually the Clients page), not
+  only ahead of generation.
 
 ### `EnqueueMonthlyReportsJob`
 
@@ -95,15 +122,14 @@ Three things to know before relying on any of this:
 1. **The worker may not be running.** `config/puma.rb` starts Solid Queue inside Puma only
    if `SOLID_QUEUE_IN_PUMA` is set, and the Dockerfile's `CMD` runs only the web server. If
    that variable is unset in the deploy environment, **every enqueued job sits in the queue
-   forever with no error** — including the nightly scan and the monthly generation fan-out.
-   Verify it, or run `bin/jobs` as a separate process.
+   forever with no error** — including the nightly scan, the HubSpot sync, and the monthly
+   generation fan-out. Verify it, or run `bin/jobs` as a separate process.
 2. **Nothing alerts on failure.** There is no error-tracking service. A failed scan is
    recorded on the practice (`last_page_scan_status`); a failed generation is recorded in
-   `report_generation_logs`. **Neither is surfaced anywhere a human looks.**
+   `report_generation_logs`. **Neither is pushed to a person** — the Dashboard shows both,
+   but only if someone looks.
 3. **Nothing detects work that never ran.** A missing report and a scan that stopped firing
    both look exactly like silence.
-
-The stubbed Dashboard page is the natural home for all three.
 
 ---
 
@@ -122,6 +148,12 @@ GenerateMonthlyReportJob.perform_later(client.id, 2026, 7)
 
 # run the monthly fan-out now instead of waiting for the 1st
 EnqueueMonthlyReportsJob.perform_later
+
+# sync one client from HubSpot now instead of waiting for the daily job
+SyncHubspotClientJob.perform_later(client.id)
+
+# run the HubSpot sync fan-out now instead of waiting for 3:30am
+EnqueueHubspotSyncJob.perform_later
 
 # rescan one practice's website now
 ScanClientSitemapJob.perform_later(client.id)

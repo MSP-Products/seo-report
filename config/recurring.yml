@@ -16,6 +16,9 @@ production:
   scan_client_sitemaps:
     command: "Client.kept.active.find_each { |client| ScanClientSitemapJob.perform_later(client.id) }"
     schedule: every day at 3am
+  enqueue_hubspot_sync:
+    class: EnqueueHubspotSyncJob
+    schedule: every hour at minute 45
   enqueue_monthly_reports:
     class: EnqueueMonthlyReportsJob
     schedule: every 1st of the month at 4am

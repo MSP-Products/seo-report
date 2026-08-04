@@ -17,7 +17,7 @@ class ReportGeneratorTest < ActiveSupport::TestCase
 
     stub_request(:get, "https://api.hubapi.com/crm/v3/objects/companies/company-1")
       .with(query: hash_including("properties"))
-      .to_return(status: 200, body: { properties: { name: "Test Practice", ai_seo_enrolled: "true" } }.to_json)
+      .to_return(status: 200, body: { properties: { name: "Test Practice", active: "true", service_purchased: "AI SEO" } }.to_json)
 
     stub_request(:get, "https://services.leadconnectorhq.com/calendars/events")
       .with(query: hash_including("locationId"))
@@ -171,7 +171,7 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     # generator reads *this run's* HubSpot data, not a locally-set flag.
     stub_request(:get, "https://api.hubapi.com/crm/v3/objects/companies/company-1")
       .with(query: hash_including("properties"))
-      .to_return(status: 200, body: { properties: { name: "Test Practice", ai_seo_enrolled: "false" } }.to_json)
+      .to_return(status: 200, body: { properties: { name: "Test Practice", active: "true", service_purchased: "Premium Hosting" } }.to_json)
 
     report = ReportGenerator.new(client: @client, month: @month).call
 

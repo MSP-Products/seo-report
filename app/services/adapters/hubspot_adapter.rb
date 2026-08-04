@@ -1,17 +1,23 @@
 module Adapters
-  # HubSpot is the source of truth for onboarding status and AI SEO enrollment
-  # (SOW #9), and a fallback source for practice header fields alongside Yext.
+  # HubSpot is the source of truth for onboarding status, onboarding date, and
+  # AI SEO enrollment (SOW #9), and a fallback source for practice header
+  # fields alongside Yext.
   #
   # Credentials shape: {"access_token" => "..."} (HubSpot private-app token).
   # external_id: the HubSpot Company record ID for this client.
   #
-  # NOTE: onboarding_status/ai_seo_enrolled are read from custom Company
-  # properties. The exact property names below are a placeholder convention —
-  # confirm against MSP's actual HubSpot property setup before going live.
+  # Verified against a real MSP HubSpot portal — none of these have a
+  # dedicated property named the obvious way. `active` (a plain boolean) is
+  # the closest to onboarding status MSP actually uses; `gmb_seo_start_date`
+  # is the onboarding date (confirmed with MSP — this app's core SEO product
+  # predates the "GMB" name but that's still the field in use); and
+  # `service_purchased` is a semicolon-delimited multi-select of every
+  # service tag a client has, including "AI SEO".
   class HubspotAdapter < Base
     SERVICE = "hubspot"
     BASE_URL = "https://api.hubapi.com"
-    PROPERTIES = %w[name address website onboarding_status onboarded_at ai_seo_enrolled].freeze
+    PROPERTIES = %w[name address website active gmb_seo_start_date service_purchased].freeze
+    AI_SEO_TAG = "AI SEO"
 
     private
 
@@ -27,10 +33,21 @@ module Adapters
         name: properties["name"],
         address: properties["address"],
         website_url: properties["website"],
-        onboarding_status: properties["onboarding_status"],
-        onboarded_at: properties["onboarded_at"].presence && Date.parse(properties["onboarded_at"]),
-        ai_seo_enrolled: ActiveModel::Type::Boolean.new.cast(properties["ai_seo_enrolled"])
+        onboarding_status: onboarding_status_from(properties["active"]),
+        onboarded_at: properties["gmb_seo_start_date"].presence && Date.parse(properties["gmb_seo_start_date"]),
+        ai_seo_enrolled: service_tags(properties["service_purchased"]).include?(AI_SEO_TAG)
       )
+    end
+
+    # `active` has no "pending" equivalent — a client only reaches this sync
+    # once they already have a real HubSpot company record, so "not active"
+    # here means offboarded, not merely not-yet-onboarded.
+    def onboarding_status_from(active)
+      ActiveModel::Type::Boolean.new.cast(active) ? "active" : "offboarded"
+    end
+
+    def service_tags(service_purchased)
+      service_purchased.to_s.split(";")
     end
   end
 end
