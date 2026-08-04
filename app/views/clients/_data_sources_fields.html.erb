@@ -1,0 +1,17 @@
+<%# locals: service_links (Array of ClientServiceLink, persisted or unsaved placeholders, one per service) %>
+<div class="mt-4 space-y-3">
+  <% service_links.each do |link| %>
+    <% display = AgencyConnection::DISPLAY.fetch(link.service) %>
+    <div class="flex items-center gap-3">
+      <div class="flex size-9 shrink-0 items-center justify-center rounded-lg <%= display[:badge_class] %> text-sm font-bold text-white">
+        <%= display[:letter] %>
+      </div>
+      <p class="w-36 shrink-0 font-medium text-slate-900"><%= display[:name] %></p>
+      <input type="text" name="service_links[<%= link.service %>]" value="<%= link.external_id %>" placeholder="Account / location ID"
+             class="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none">
+      <span class="ml-auto flex items-center gap-1.5 text-sm text-slate-500 whitespace-nowrap">
+        <span class="size-2 rounded-full <%= link.status_dot_class %>"></span> <%= link.status_label %>
+      </span>
+    </div>
+  <% end %>
+</div>

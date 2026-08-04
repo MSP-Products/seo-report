@@ -1,4 +1,6 @@
 class ClientsController < ApplicationController
+  before_action :require_editor!, only: [ :edit, :update ]
+
   def index
     @clients = ClientsQuery.new(search: params[:q], status: params[:status], page: params[:page]).call
   end
@@ -12,9 +14,35 @@ class ClientsController < ApplicationController
   end
 
   def new
+    @client = Client.new
   end
 
   def create
-    redirect_to clients_path
+    attrs = params.require(:client).permit(:name, :website_url, :phone, :address, :sitemap_url)
+    service_links = params.fetch(:service_links, {}).permit(*Service::KEYS)
+    @client = ClientCreator.new(attrs: attrs, service_external_ids: service_links).call
+
+    if @client.persisted?
+      redirect_to client_path(@client), notice: "#{@client.name} added."
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  def edit
+    @client = Client.kept.find(params[:id])
+  end
+
+  def update
+    client = Client.kept.find(params[:id])
+    attrs = params.require(:client).permit(:name, :website_url, :phone, :address, :sitemap_url)
+    service_links = params.fetch(:service_links, {}).permit(*Service::KEYS)
+    @client = ClientUpdater.new(client: client, attrs: attrs, service_external_ids: service_links).call
+
+    if @client.errors.empty?
+      redirect_to client_path(@client), notice: "#{@client.name} updated."
+    else
+      render :edit, status: :unprocessable_entity
+    end
   end
 end

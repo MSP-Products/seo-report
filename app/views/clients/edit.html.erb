@@ -1,19 +1,19 @@
-<% content_for :title, "Add practice — My Social Practice" %>
+<% content_for :title, "Edit practice — #{@client.name}" %>
 
 <p class="mb-2 text-sm text-slate-500"><%= link_to "← Clients", clients_path, class: "hover:underline" %></p>
 
-<h1 class="text-2xl font-semibold text-slate-900">Add practice</h1>
+<h1 class="text-2xl font-semibold text-slate-900">Edit practice</h1>
 <p class="mt-1 text-sm text-slate-500">
-  Enter the practice details and link its accounts. Enrollment flags sync from HubSpot and GoHighLevel once linked.
+  <%= @client.name %> — details and per-service data sources. Enrollment flags are synced from HubSpot and GoHighLevel.
 </p>
 
 <% if @client.errors.any? %>
   <div class="mb-4">
-    <%= render "shared/alert", type: "error", message: "Couldn't create this practice: #{@client.errors.full_messages.to_sentence}." %>
+    <%= render "shared/alert", type: "error", message: "Couldn't save this practice: #{@client.errors.full_messages.to_sentence}." %>
   </div>
 <% end %>
 
-<%= form_with model: @client, url: clients_path, class: "mt-6 space-y-6" do %>
+<%= form_with model: @client, url: client_path(@client), method: :patch, class: "mt-6 space-y-6" do %>
   <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
     <p class="text-xs font-medium uppercase text-teal-dark">Step 1</p>
     <h2 class="mt-1 font-medium text-slate-900">Practice details</h2>
@@ -62,20 +62,23 @@
   <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
     <div class="flex items-center justify-between">
       <h2 class="font-medium text-slate-900">Reporting</h2>
-      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Not linked yet</span>
+      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Read-only · synced</span>
     </div>
     <p class="mt-1 text-sm text-slate-500">
-      Nothing to show yet. Once this practice is saved and its HubSpot and GoHighLevel accounts are linked above,
-      these flags populate on the next run.
+      These flags are owned by HubSpot and GoHighLevel. They're pulled on every run and shown here so you can see
+      what the report will render — change them in the source system, not in this panel.
     </p>
 
     <div class="mt-4 space-y-3">
       <% [
-        [ "Onboarding status", "Active practices are included in the monthly run.", "hubspot" ],
-        [ "Onboarded on", "Drives the \"first report after onboarding\" layout.", "hubspot" ],
-        [ "AI SEO enrolled", "Shows AI Visibility instead of the not-enrolled state.", "hubspot" ],
-        [ "Online scheduler", "Enables appointments and revenue, else the \"?\" callout.", "ghl" ]
-      ].each do |label, description, source| %>
+        [ "Onboarding status", "Active practices are included in the monthly run.", "hubspot", @client.onboarding_status.capitalize ],
+        [ "Onboarded on", "Drives the \"first report after onboarding\" layout.", "hubspot",
+          @client.onboarded_at&.strftime("%b %-d, %Y") || "—" ],
+        [ "AI SEO enrolled", "Shows AI Visibility instead of the not-enrolled state.", "hubspot",
+          @client.ai_seo_enrolled? ? "Enrolled" : "Not enrolled" ],
+        [ "Online scheduler", "Enables appointments and revenue, else the \"?\" callout.", "ghl",
+          @client.scheduler_enrolled? ? "Connected" : "Not connected" ]
+      ].each do |label, description, source, value| %>
         <% display = AgencyConnection::DISPLAY.fetch(source) %>
         <div class="flex items-center justify-between gap-4">
           <div>
@@ -83,7 +86,7 @@
             <p class="text-xs text-slate-500"><%= description %></p>
           </div>
           <div class="flex shrink-0 items-center gap-2">
-            <span class="text-slate-400">—</span>
+            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"><%= value %></span>
             <span class="rounded-full px-2 py-0.5 text-xs font-medium text-white <%= display[:badge_class] %>"><%= display[:name] %></span>
           </div>
         </div>
@@ -91,10 +94,15 @@
     </div>
   </div>
 
-  <div class="flex items-center gap-3">
-    <button type="submit" class="rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark">
-      Create practice
-    </button>
-    <%= link_to "Cancel", clients_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <button type="submit" class="rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark">
+        Save practice
+      </button>
+      <%= link_to "Cancel", client_path(@client), class: "text-sm text-slate-500 hover:text-slate-700" %>
+    </div>
+    <%= button_to "Offboard", client_offboarding_path(@client), method: :post,
+          form: { data: { turbo_confirm: "Offboard #{@client.name}? They'll be excluded from future report runs." } },
+          class: "text-sm font-medium text-red-600 hover:underline bg-transparent border-none p-0 cursor-pointer" %>
   </div>
 <% end %>

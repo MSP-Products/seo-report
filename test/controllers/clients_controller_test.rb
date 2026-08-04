@@ -71,6 +71,83 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "new renders the add-practice form" do
+    sign_in_as(role: "admin")
+
+    get new_client_path
+
+    assert_response :success
+    assert_select "h1", text: "Add practice"
+  end
+
+  test "create with valid params persists the client and its service links, then redirects" do
+    sign_in_as(role: "admin")
+
+    post clients_path, params: {
+      client: { name: "New Practice", website_url: "https://newpractice.com" },
+      service_links: { hubspot: "company-9" }
+    }
+
+    client = Client.find_by(name: "New Practice")
+    assert client.present?
+    assert_redirected_to client_path(client)
+    assert_equal [ "hubspot" ], client.client_service_links.pluck(:service)
+  end
+
+  test "create with a blank name re-renders the form and persists nothing" do
+    sign_in_as(role: "admin")
+
+    post clients_path, params: { client: { name: "" } }
+
+    assert_response :unprocessable_entity
+    assert_select "h1", text: "Add practice"
+    assert_nil Client.find_by(name: "")
+  end
+
+  test "edit renders the form pre-filled with the client's real values" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Existing Practice", onboarding_status: "active", website_url: "https://existing.com")
+
+    get edit_client_path(client)
+
+    assert_response :success
+    assert_select "h1", text: "Edit practice"
+    assert_select "input[name=?][value=?]", "client[name]", "Existing Practice"
+  end
+
+  test "update with valid params persists changes and redirects to the client" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Old Name", onboarding_status: "active")
+
+    patch client_path(client), params: { client: { name: "New Name" }, service_links: { hubspot: "company-5" } }
+
+    assert_redirected_to client_path(client)
+    assert_equal "New Name", client.reload.name
+    assert_equal "company-5", client.client_service_links.find_by(service: "hubspot").external_id
+  end
+
+  test "update with a blank name re-renders the form and leaves the record unchanged" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Old Name", onboarding_status: "active")
+
+    patch client_path(client), params: { client: { name: "" } }
+
+    assert_response :unprocessable_entity
+    assert_select "h1", text: "Edit practice"
+    assert_equal "Old Name", client.reload.name
+  end
+
+  test "support role is redirected away from edit and blocked from update" do
+    sign_in_as(role: "support")
+    client = Client.create!(name: "Old Name", onboarding_status: "active")
+
+    get edit_client_path(client)
+    assert_redirected_to root_path
+
+    patch client_path(client), params: { client: { name: "Hijacked" } }
+    assert_equal "Old Name", client.reload.name
+  end
+
   private
 
   def sign_in_as(role:)

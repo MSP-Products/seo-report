@@ -7,7 +7,8 @@
        placeholder (String)  — placeholder text (optional)
        has_error   (Boolean) — whether to show error styling (optional, default false)
        toggle      (Boolean) — whether to show password visibility toggle (optional, default false;
-                                ignored when type is "textarea" — there's no masking to toggle) %>
+                                ignored when type is "textarea" — there's no masking to toggle)
+       required    (Boolean) — adds the HTML required attribute (optional, default false) %>
 
 <% input_classes = "w-full px-4 py-3 text-sm text-gray-800 bg-gray-50 border-[1.5px] rounded-lg outline-none transition-all duration-150 placeholder:text-gray-400 focus:border-teal-600 focus:bg-white focus:ring-3 focus:ring-teal-600/15" %>
 <% error_classes = "border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/15" %>
@@ -62,6 +63,7 @@
         placeholder="<%= local_assigns.fetch(:placeholder, '') %>"
         class="<%= input_classes %> <%= local_assigns.fetch(:has_error, false) ? error_classes : normal_classes %>"
         autocomplete="<%= type == 'email' ? 'email' : field_name %>"
+        <%= "required" if local_assigns.fetch(:required, false) %>
       >
     </div>
   <% end %>

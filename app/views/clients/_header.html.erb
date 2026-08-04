@@ -15,9 +15,8 @@
     <div class="flex shrink-0 items-center gap-2">
       <%= button_to "Generate report", report_generations_path(client_id: client.id), method: :post,
             class: "rounded-lg bg-white px-4 py-2 text-sm font-medium text-teal-dark hover:bg-white/90" %>
-      <span class="cursor-not-allowed rounded-lg bg-white/15 px-4 py-2 text-sm font-medium text-white/70" title="Not built yet">
-        Edit practice
-      </span>
+      <%= link_to "Edit practice", edit_client_path(client),
+            class: "rounded-lg bg-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/25" %>
     </div>
   </div>
 </div>
