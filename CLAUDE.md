@@ -243,8 +243,6 @@ parallel `app/actions/`, `app/operations/`, or `app/interactors/`.
 - **CONVENTIONS.md §24's tree omits `app/presenters/`** — it lists `app/validators/` (which
   doesn't exist) but not presenters (which do, and are load-bearing for the report). This file's
   tree is the current truth; fix §24 when you're next editing it.
-- **`app/javascript/controllers/hello_controller.js` is Rails scaffolding cruft** — it's eagerly
-  registered by `eagerLoadControllersFrom` but no view references it. Delete it.
 - **`app/views/pwa/`** holds a `manifest.json.erb` and `service-worker.js`, but the routes that
   serve them are commented out in `config/routes.rb`. Either wire them up or drop them; don't
   leave a third state.
@@ -669,8 +667,12 @@ worse than none.
 - **Extract a partial when markup repeats**, not a CSS component class — this app is
   utility-first with no component CSS layer, and `_stat_card` / `_section_card` are the
   established pattern for reuse.
-- **Mobile matters more than desktop** for the public report. Verify at 390px, 768px, 1280px;
-  check nothing overflows horizontally.
+- **Mobile matters more than desktop** for the public report, and the admin panel must not
+  break on a phone either — MSP staff do check it from one. Verify both at 390px, 768px,
+  1280px; check nothing overflows horizontally. Patterns for the recurring cases (off-canvas
+  nav, wide tables, stat grids) are in
+  [design-system.md#responsiveness](docs/reference/design-system.md#responsiveness) — reuse
+  them rather than inventing a new approach per page.
 - **Behaviour rules live in [Frontend behaviour](#frontend-behaviour)** — Stimulus, Turbo, and the
   no-JavaScript-only-paths rule.
 
@@ -1085,7 +1087,8 @@ of the product, not polish.
 - **Reach for Turbo Frames/Streams only for genuinely partial updates,** and scope any future
   broadcast carefully — this app has no per-tenant channel, so a broadcast is global.
 - **`bin/importmap pin` to add a package.** No Node build step; don't introduce one.
-- **Delete dead controllers.** `hello_controller.js` is scaffolding that no view references.
+- **Delete dead controllers** — a Stimulus file no view references (e.g. `hello_controller.js`,
+  removed as scaffolding cruft) is a liability, not neutral: it's still eagerly registered.
 
 ---
 
@@ -1152,6 +1155,14 @@ CONVENTIONS.md §26 is the full list and it is binding. The ones easiest to brea
   means you must run `bin/dev` (which watches Tailwind) to see CSS changes locally.
 - **Admin nav is partly stubbed.** Dashboard and Clients point at `connections_path` on purpose
   — don't "fix" the links; build the pages.
+- **`db/seeds.rb`'s demo clients are guarded against production, and that guard is load-bearing,
+  not decorative.** `bin/docker-entrypoint` runs `db:prepare` on every boot, and Rails' `db:prepare`
+  runs `db:seed` automatically the first time it creates a fresh database — which is exactly how
+  the 3 demo clients (Woodside/Bayview/Alameda, built to match the Lovable reference prototypes)
+  ended up in a real production database that should have started empty. Any *new* seed data
+  belongs above the `if Rails.env.production? ... return end` guard only if it's genuinely
+  needed in every environment (like the `Service::KEYS` lookup-table seed); anything that looks
+  like a fake client, keyword, or report belongs below it, never above.
 
 ---
 

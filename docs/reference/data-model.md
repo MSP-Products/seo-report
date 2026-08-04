@@ -303,7 +303,6 @@ For completeness, so their absence reads as a decision rather than an oversight:
 | `app/models/application_record.rb`, `app/jobs/application_job.rb`, `app/mailers/application_mailer.rb` | Stock Rails base classes, unmodified |
 | `app/javascript/application.js`, `app/javascript/controllers/application.js`, `app/javascript/controllers/index.js` | Stock importmap and Stimulus wiring |
 | `app/views/layouts/mailer.html.erb`, `app/views/layouts/mailer.text.erb` | Stock, and nothing sends mail yet |
-| `app/javascript/controllers/hello_controller.js` | **Scaffolding cruft** — eagerly registered, referenced by no view. Delete it |
 | `app/views/pwa/manifest.json.erb`, `app/views/pwa/service-worker.js` | Present, but the routes serving them are commented out in `config/routes.rb`. **Either wire them up or remove them** — don't leave a third state |
 
 ---

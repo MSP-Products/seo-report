@@ -154,7 +154,8 @@ is what implements "blank means unchanged".
 | `app/views/shared/_login_header.html.erb` | Logo and heading above the login form |
 | `app/views/shared/_alert.html.erb` | Flash notice and error banner |
 | `app/javascript/controllers/password_visibility_controller.js` | Show/hide toggle on password fields |
-| `app/views/shared/_admin_sidebar.html.erb` | Nav, incl. the Clients stub |
+| `app/javascript/controllers/mobile_nav_controller.js` | Opens/closes the off-canvas sidebar below the `md` breakpoint |
+| `app/views/shared/_admin_sidebar.html.erb` | Nav, incl. the Clients stub; off-canvas panel below `md` |
 | `app/views/connections/index.html.erb` | The five service cards |
 | `app/views/connections/_connection_card.html.erb` | One service's status and Edit link |
 | `app/views/connections/edit.html.erb` | The credential form |

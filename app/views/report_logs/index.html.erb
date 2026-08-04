@@ -34,43 +34,45 @@
 </div>
 
 <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-  <div class="grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr_90px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
-    <span>Practice</span>
-    <span>Month</span>
-    <span>Generated</span>
-    <span>Send status</span>
-    <span>Status</span>
-    <span></span>
-  </div>
+  <div class="overflow-x-auto">
+    <div class="grid min-w-[640px] grid-cols-[2fr_1fr_1.2fr_1fr_1fr_90px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <span>Practice</span>
+      <span>Month</span>
+      <span>Generated</span>
+      <span>Send status</span>
+      <span>Status</span>
+      <span></span>
+    </div>
 
-  <% if @reports.any? %>
-    <div class="divide-y divide-slate-100">
-      <% @reports.each do |report| %>
-        <div class="grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr_90px] items-center gap-4 px-5 py-3.5">
-          <p class="truncate text-sm font-medium text-slate-900"><%= report.client.name %></p>
-          <span class="text-sm text-slate-600"><%= report.report_month.strftime("%B %Y") %></span>
-          <div>
-            <span class="text-sm text-slate-600">
-              <%= report.generated_at? ? report.generated_at.strftime("%b %-d, %H:%M") : "—" %>
+    <% if @reports.any? %>
+      <div class="min-w-[640px] divide-y divide-slate-100">
+        <% @reports.each do |report| %>
+          <div class="grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr_90px] items-center gap-4 px-5 py-3.5">
+            <p class="truncate text-sm font-medium text-slate-900"><%= report.client.name %></p>
+            <span class="text-sm text-slate-600"><%= report.report_month.strftime("%B %Y") %></span>
+            <div>
+              <span class="text-sm text-slate-600">
+                <%= report.generated_at? ? report.generated_at.strftime("%b %-d, %H:%M") : "—" %>
+              </span>
+              <% if held_reason(report).present? %>
+                <p class="text-xs text-amber-700">Held — <%= held_reason(report) %></p>
+              <% end %>
+            </div>
+            <span class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium <%= send_status_badge_class(report) %>">
+              <%= send_status_label(report) %>
             </span>
-            <% if held_reason(report).present? %>
-              <p class="text-xs text-amber-700">Held — <%= held_reason(report) %></p>
+            <span class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium <%= generation_status_badge_class(report) %>">
+              <%= generation_status_label(report) %>
+            </span>
+            <% if report.ready? %>
+              <%= link_to "View", public_report_path(report.access_token), target: "_blank", rel: "noopener",
+                    class: "justify-self-end text-sm font-medium text-teal-dark hover:underline" %>
             <% end %>
           </div>
-          <span class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium <%= send_status_badge_class(report) %>">
-            <%= send_status_label(report) %>
-          </span>
-          <span class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium <%= generation_status_badge_class(report) %>">
-            <%= generation_status_label(report) %>
-          </span>
-          <% if report.ready? %>
-            <%= link_to "View", public_report_path(report.access_token), target: "_blank", rel: "noopener",
-                  class: "justify-self-end text-sm font-medium text-teal-dark hover:underline" %>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
-  <% else %>
-    <p class="px-5 py-6 text-sm text-slate-500">No reports generated yet.</p>
-  <% end %>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="px-5 py-6 text-sm text-slate-500">No reports generated yet.</p>
+    <% end %>
+  </div>
 </div>
