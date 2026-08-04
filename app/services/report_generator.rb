@@ -24,6 +24,7 @@ class ReportGenerator
       raise MonthNotCompleteError, "cannot generate a report for the current or a future month"
     end
 
+    started_at = Time.current
     @warnings = []
     report = find_or_create_report
 
@@ -35,10 +36,10 @@ class ReportGenerator
     sync_highlights(report) unless report.is_first_report?
 
     report.update!(generated_at: Time.current)
-    log_attempt(report, status: "success")
+    log_attempt(report, status: "success", started_at: started_at)
     report
   rescue StandardError => e
-    log_attempt(report, status: "failed", fatal_error: e) if report
+    log_attempt(report, status: "failed", fatal_error: e, started_at: started_at) if report
     raise
   end
 
@@ -224,12 +225,13 @@ class ReportGenerator
     )
   end
 
-  def log_attempt(report, status:, fatal_error: nil)
+  def log_attempt(report, status:, started_at:, fatal_error: nil)
     error_log = fatal_error ? ([ fatal_error.message ] + warnings).join("\n") : warnings.join("\n")
 
     report.report_generation_logs.create!(
       status: status,
       attempted_at: Time.current,
+      duration_seconds: (Time.current - started_at).round,
       error_summary: fatal_error&.message || warnings.first,
       error_log: error_log.presence
     )

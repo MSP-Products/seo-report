@@ -55,6 +55,13 @@ class AgencyConnection < ApplicationRecord
     "google_analytics" => { name: "Google Analytics", letter: "G", badge_class: "bg-amber-500" }
   }.freeze
 
+  # All 5 services, each backed by its persisted row or an unsaved placeholder —
+  # so the Connections page and Dashboard always show every service, even ones
+  # never configured yet.
+  def self.all_services
+    services.keys.map { |service| find_or_initialize_by(service: service) }
+  end
+
   def display_name
     DISPLAY.fetch(service)[:name]
   end

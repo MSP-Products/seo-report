@@ -98,6 +98,7 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     assert_nil ranking.previous_position # no prior month's report exists yet
 
     assert_equal "success", report.report_generation_logs.last.status
+    assert report.report_generation_logs.last.duration_seconds >= 0
   end
 
   test "snapshots only pages first seen within the report month" do
@@ -184,5 +185,6 @@ class ReportGeneratorTest < ActiveSupport::TestCase
 
     report = @client.monthly_reports.find_by(report_month: @month)
     assert_equal "failed", report.report_generation_logs.last.status
+    assert report.report_generation_logs.last.duration_seconds >= 0
   end
 end

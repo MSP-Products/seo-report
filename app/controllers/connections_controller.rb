@@ -8,7 +8,7 @@ class ConnectionsController < ApplicationController
   before_action :ensure_configurable!, only: [ :edit, :update ]
 
   def index
-    @connections = AgencyConnection.services.keys.map { |service| AgencyConnection.find_or_initialize_by(service: service) }
+    @connections = AgencyConnection.all_services
   end
 
   def edit

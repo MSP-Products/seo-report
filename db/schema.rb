@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_31_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_04_104352) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -162,6 +162,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_210000) do
 
   create_table "report_generation_logs", force: :cascade do |t|
     t.datetime "attempted_at", null: false
+    t.integer "duration_seconds"
     t.text "error_log"
     t.string "error_summary"
     t.string "monthly_report_id", limit: 36, null: false

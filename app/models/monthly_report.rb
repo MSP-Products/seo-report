@@ -28,6 +28,21 @@ class MonthlyReport < ApplicationRecord
   scope :generated, -> { where.not(generated_at: nil) }
   scope :not_emailed, -> { where(emailed_at: nil) }
 
+  # The most recent month a report can legally be generated for — ReportGenerator
+  # refuses the current/future month, so this is "last month" everywhere it's needed.
+  def self.reporting_month
+    Date.current.beginning_of_month - 1.month
+  end
+
+  # :generated once the run finished (generated_at set), :failed if the latest attempt
+  # errored out, :not_yet_generated if nothing has been attempted at all.
+  def generation_status
+    return :generated if generated_at.present?
+    return :failed if report_generation_logs.max_by(&:attempted_at)&.status == "failed"
+
+    :not_yet_generated
+  end
+
   # Callbacks
   before_validation :generate_access_token, on: :create
 

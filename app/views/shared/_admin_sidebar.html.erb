@@ -1,6 +1,6 @@
 <%# Sidebar nav shell, shown on every authenticated admin page (see layouts/application.html.erb).
-    Dashboard and Clients aren't built yet — they route to Connections for now,
-    same as the rest of the nav, so nothing 404s. %>
+    Team and Send history aren't built yet — they route to Connections for now,
+    same pattern Dashboard and Clients used before they existed, so nothing 404s. %>
 <aside class="flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
   <div class="flex items-center gap-2.5 border-b border-slate-200 px-5 py-4">
     <div class="flex size-9 items-center justify-center rounded-lg bg-teal-primary text-sm font-bold text-white">MSP</div>
@@ -9,11 +9,13 @@
 
   <nav class="flex-1 space-y-1 px-3 py-4">
     <% [
-      [:dashboard, "Dashboard", connections_path],
-      [:clients, "Clients", connections_path],
-      [:connections, "Connections", connections_path]
+      [:dashboard, "Dashboard", dashboard_path],
+      [:clients, "Clients", clients_path],
+      [:connections, "Connections", connections_path],
+      [:team, "Team", connections_path],
+      [:send_history, "Send history", connections_path]
     ].each do |key, label, path| %>
-      <% active = key == :connections %>
+      <% active = key.to_s == controller_name %>
       <%= link_to path, class: "flex items-center gap-3 rounded-lg px-3 py-2 text-sm #{active ? "bg-teal-primary/10 font-medium text-teal-dark" : "text-slate-600 hover:bg-slate-50"}" do %>
         <%= report_icon(admin_nav_icon(key), css_class: "size-4") %>
         <%= label %>

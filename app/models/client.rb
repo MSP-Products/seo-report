@@ -23,4 +23,13 @@ class Client < ApplicationRecord
 
   # Scopes
   scope :with_ai_seo, -> { where(ai_seo_enrolled: true) }
+
+  # address is one free-text field ("123 Oak St, San Francisco, CA 94102") — this
+  # pulls out "San Francisco, CA" for compact display (e.g. the Dashboard table).
+  def city_state
+    parts = address.to_s.split(",").map(&:strip)
+    return address if parts.size < 3
+
+    "#{parts[-2]}, #{parts[-1].sub(/\s*\d{5}(-\d{4})?\z/, "")}"
+  end
 end
