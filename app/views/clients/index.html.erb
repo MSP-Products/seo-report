@@ -1,73 +1,99 @@
-<% content_for :page_stylesheets do %>
-  <%= stylesheet_link_tag "dashboard" %>
-  <%= stylesheet_link_tag "clients" %>
-<% end %>
+<% content_for :title, "Clients — My Social Practice" %>
 
-<div class="page-wrapper">
-  <%= render "shared/sidebar", active_nav: "clients" %>
+<div class="mb-6 flex items-start justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900">Clients</h1>
+    <p class="mt-1 text-sm text-slate-500">Every practice enrolled in monthly SEO reporting.</p>
+  </div>
+  <%= link_to "+ Add client", new_client_path,
+        class: "rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
+</div>
 
-  <div class="client-main">
-    <div class="list-header-row">
-      <div>
-        <h1>Clients</h1>
-        <p class="dashboard-subtitle">All client practices and their latest report status.</p>
-      </div>
-      <%= link_to "+ Add Client", new_client_path, class: "btn-primary" %>
-    </div>
+<div class="mb-4 flex flex-wrap items-center gap-3">
+  <%= form_with url: clients_path, method: :get, class: "flex-1" do %>
+    <input type="hidden" name="status" value="<%= params[:status] %>">
+    <input type="text" name="q" value="<%= params[:q] %>" placeholder="Search practices"
+           class="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none">
+  <% end %>
 
-    <div class="list-toolbar">
-      <input type="text" class="search-input" placeholder="Search clients...">
-      <select class="filter-dropdown">
-        <option>All Statuses</option>
-      </select>
-    </div>
+  <% [ [ nil, "All", @clients.total_count ], [ "active", "Active", @clients.active_count ],
+       [ "pending", "Pending", @clients.pending_count ] ].each do |value, label, count| %>
+    <% active = params[:status].presence == value %>
+    <%= link_to "#{label} #{count}", clients_path(status: value, q: params[:q]),
+          class: "rounded-full px-3 py-1.5 text-sm font-medium #{active ? "bg-teal-primary/10 text-teal-dark" : "text-slate-600 hover:bg-slate-50"}" %>
+  <% end %>
+</div>
 
-    <div class="clients-table-card">
-      <table class="clients-table">
-        <thead>
-          <tr>
-            <th>Practice Name</th>
-            <th>Onboarding</th>
-            <th>Last Report</th>
-            <th>Generation</th>
-            <th>Send Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @clients.each do |client| %>
-            <tr>
-              <td><%= link_to client[:name], client_path(client[:id]), style: "color:#1a1a1a; text-decoration:none; font-weight:500;" %></td>
-              <td><span class="badge <%= badge_class(client[:onboarding]) %>"><%= client[:onboarding] %></span></td>
-              <td><%= client[:last_report] %></td>
-              <td><span class="badge <%= badge_class(client[:generation]) %>"><%= client[:generation] %></span></td>
-              <td>
-                <% if client[:send_status] == "Sent" %>
-                  <span class="send-status-sent">Sent<span class="send-status-date"><%= client[:sent_date] %></span></span>
-                <% else %>
-                  <span class="send-status-not-sent">Not Sent</span>
-                <% end %>
-              </td>
-              <td>
-                <%= link_to "View", client_path(client[:id]), class: "table-action-link" %>
-                <%= link_to "Edit", "#", class: "table-action-link" %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <table class="w-full text-left text-sm">
+    <thead class="text-xs uppercase text-slate-500">
+      <tr>
+        <th class="px-5 py-3">Practice</th>
+        <th class="px-5 py-3">Status</th>
+        <th class="px-5 py-3">Enrollments</th>
+        <th class="px-5 py-3">Latest report</th>
+        <th class="px-5 py-3">Generation</th>
+        <th class="px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      <% @clients.clients.each do |client| %>
+        <% latest = client.latest_monthly_report %>
+        <tr class="hover:bg-slate-50">
+          <td class="px-5 py-3">
+            <%= link_to client_path(client), class: "flex items-center gap-3" do %>
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-teal-primary/10 text-sm font-semibold text-teal-dark">
+                <%= initials(client.name) %>
+              </div>
+              <div>
+                <p class="font-medium text-slate-900"><%= client.name %></p>
+                <p class="text-xs text-slate-500"><%= client.website_url %></p>
+              </div>
+            <% end %>
+          </td>
+          <td class="px-5 py-3">
+            <% status_label = client.onboarding_status.capitalize %>
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= badge_class(status_label) %>"><%= status_label %></span>
+          </td>
+          <td class="px-5 py-3">
+            <div class="flex gap-1.5">
+              <span class="rounded-md px-2 py-0.5 text-xs font-medium <%= client.ai_seo_enrolled? ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-400" %>">AI SEO</span>
+              <span class="rounded-md px-2 py-0.5 text-xs font-medium <%= client.scheduler_enrolled? ? "bg-cyan-100 text-cyan-700" : "bg-slate-100 text-slate-400" %>">Scheduler</span>
+            </div>
+          </td>
+          <td class="px-5 py-3 text-slate-600">
+            <% if latest %>
+              <p><%= latest.report_month.strftime("%B %Y") %></p>
+              <p class="text-xs text-slate-500"><%= pluralize(client.monthly_reports.size, "report") %></p>
+            <% else %>
+              <span class="text-slate-400">No reports yet</span>
+            <% end %>
+          </td>
+          <td class="px-5 py-3">
+            <% if latest %>
+              <% generation_label = { generated: "Generated", failed: "Failed", not_yet_generated: "Not yet generated" }.fetch(latest.generation_status) %>
+              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= badge_class(generation_label) %>"><%= generation_label %></span>
+            <% else %>
+              <span class="text-slate-400">—</span>
+            <% end %>
+          </td>
+          <td class="px-5 py-3 text-right">
+            <%= link_to client_path(client), class: "text-slate-400 hover:text-slate-600" do %>
+              <%= report_icon(:chevron_down, css_class: "size-4 -rotate-90") %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
 
-    <div class="table-footer-row">
-      <span>Showing 1-<%= @clients.size %> of 47 clients</span>
-      <div class="pagination">
-        <%= link_to "Previous", "#" %>
-        <span class="active-page">1</span>
-        <%= link_to "2", "#" %>
-        <%= link_to "3", "#" %>
-        <span>...</span>
-        <%= link_to "Next", "#" %>
-      </div>
-    </div>
+<div class="mt-4 flex items-center justify-between text-sm text-slate-500">
+  <span>Showing <%= @clients.clients.size %> of <%= @clients.filtered_count %> practices</span>
+  <div class="flex gap-2">
+    <%= link_to "Previous", clients_path(status: params[:status], q: params[:q], page: @clients.page - 1),
+          class: "rounded-lg border border-slate-200 px-3 py-1.5 #{@clients.page <= 1 ? "pointer-events-none opacity-50" : "hover:bg-slate-50"}" %>
+    <%= link_to "Next", clients_path(status: params[:status], q: params[:q], page: @clients.page + 1),
+          class: "rounded-lg border border-slate-200 px-3 py-1.5 #{@clients.page >= @clients.total_pages ? "pointer-events-none opacity-50" : "hover:bg-slate-50"}" %>
   </div>
 </div>

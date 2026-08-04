@@ -23,6 +23,10 @@ module ApplicationHelper
     ADMIN_NAV_ICONS.fetch(key)
   end
 
+  def initials(name)
+    name.to_s.split.first(2).map { |word| word[0] }.join.upcase
+  end
+
   def badge_class(status)
     BADGE_STYLES.fetch(status, "bg-slate-100 text-slate-600")
   end

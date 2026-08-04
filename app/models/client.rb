@@ -32,4 +32,14 @@ class Client < ApplicationRecord
 
     "#{parts[-2]}, #{parts[-1].sub(/\s*\d{5}(-\d{4})?\z/, "")}"
   end
+
+  # GHL is the agency's appointment-scheduler integration — a link to it *is* the
+  # "uses our scheduler" signal, there's no separate flag (see docs/features/integration-ghl.md).
+  def scheduler_enrolled?
+    client_service_links.any? { |link| link.service == "ghl" }
+  end
+
+  def latest_monthly_report
+    monthly_reports.max_by(&:report_month)
+  end
 end

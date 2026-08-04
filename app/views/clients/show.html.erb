@@ -1,103 +1,68 @@
-<% content_for :page_stylesheets do %>
-  <%= stylesheet_link_tag "dashboard" %>
-  <%= stylesheet_link_tag "clients" %>
-<% end %>
+<% content_for :title, "#{@client.name} — My Social Practice" %>
 
-<div class="page-wrapper">
-  <%= render "shared/sidebar", active_nav: "clients" %>
+<p class="mb-2 text-sm text-slate-500"><%= link_to "Clients", clients_path, class: "hover:underline" %> / <%= @client.name %></p>
 
-  <div class="client-main">
-    <p class="client-breadcrumb"><%= link_to "Clients", clients_path %> &gt; <%= @client[:name] %></p>
+<div class="mb-4 flex items-start justify-between">
+  <h1 class="text-2xl font-semibold text-slate-900"><%= @client.name %></h1>
+</div>
 
-    <div class="client-detail-header">
-      <div>
-        <h1><%= @client[:name] %></h1>
-      </div>
-      <%= link_to "✎ Edit Client", "#", class: "btn-outline" %>
-    </div>
+<div class="mb-4 flex flex-wrap gap-4 text-sm text-slate-600">
+  <span><%= @client.address %></span>
+  <span><%= @client.website_url %></span>
+</div>
 
-    <div class="client-meta-row">
-      <span>📍 <%= @client[:address] %></span>
-      <span>🌐 <%= @client[:website] %></span>
-    </div>
+<div class="mb-6 flex flex-wrap gap-2">
+  <% status_label = @client.onboarding_status.capitalize %>
+  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= badge_class(status_label) %>"><%= status_label %></span>
+  <% if @client.ai_seo_enrolled? %>
+    <span class="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">AI SEO enrolled</span>
+  <% end %>
+  <% if @client.scheduler_enrolled? %>
+    <span class="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700">Scheduler connected</span>
+  <% end %>
+</div>
 
-    <div class="client-tags-row">
-      <span class="tag-pill tag-green">● Active</span>
-      <span class="tag-pill tag-blue">● AI SEO Enrolled</span>
-      <span class="tag-pill tag-teal">● Scheduler Connected</span>
-    </div>
-
-    <div class="client-card">
-      <div class="report-history-header">
-        <span class="client-card-title">Report History</span>
-        <%= link_to "⭳ Export All", "#", class: "export-link" %>
-      </div>
-      <p class="report-count"><%= @reports.size %> reports total</p>
-
-      <table class="clients-table">
-        <thead>
-          <tr>
-            <th>Report Period</th>
-            <th>Sent Date</th>
-            <th>Generation</th>
-            <th>Send Status</th>
-            <th>Report Preview</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @reports.each do |report| %>
-            <tr>
-              <td class="report-period-cell"><%= report[:period] %><span class="period-sub">Monthly Report</span></td>
-              <td><%= report[:sent_date] || "—" %></td>
-              <td><span class="badge <%= badge_class(report[:generation]) %>"><%= report[:generation] %></span></td>
-              <td><span class="<%= send_status_class(report[:send_status]) %>"><%= report[:send_status] %></span></td>
-              <td>
-                <% if report[:has_preview] %>
-                  <div class="preview-placeholder"></div>
-                <% else %>
-                  —
-                <% end %>
-              </td>
-              <td>
-                <% case report[:action] %>
-                <% when :view %>
-                  <%= link_to "View Report", "#", class: "table-action-link" %>
-                  <%= link_to "⭳ Download", "#", class: "table-action-link" %>
-                <% when :retry %>
-                  <button class="btn-retry">↻ Retry</button>
-                <% when :in_progress %>
-                  <span class="muted-text">In progress...</span>
-                <% when :awaiting %>
-                  <span class="muted-text">Awaiting data...</span>
-                <% end %>
-              </td>
-            </tr>
-
-            <% if report[:error] %>
-              <tr class="report-alert-row">
-                <td colspan="6">
-                  <div class="report-alert-box">
-                    <strong>⚠ Failed to generate report</strong>
-                    <%= report[:error] %>
-                  </div>
-                </td>
-              </tr>
-            <% end %>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="table-footer-row">
-      <span>Showing 1-<%= @reports.size %> of 18 reports</span>
-      <div class="pagination">
-        <%= link_to "Previous", "#" %>
-        <span class="active-page">1</span>
-        <%= link_to "2", "#" %>
-        <%= link_to "3", "#" %>
-        <%= link_to "Next", "#" %>
-      </div>
-    </div>
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div class="border-b border-slate-200 px-5 py-4">
+    <h2 class="font-medium text-slate-900">Report history</h2>
+    <p class="mt-0.5 text-xs text-slate-500"><%= pluralize(@reports.size, "report") %> total</p>
   </div>
+
+  <table class="w-full text-left text-sm">
+    <thead class="text-xs uppercase text-slate-500">
+      <tr>
+        <th class="px-5 py-2">Report period</th>
+        <th class="px-5 py-2">Sent date</th>
+        <th class="px-5 py-2">Generation</th>
+        <th class="px-5 py-2">Report preview</th>
+        <th class="px-5 py-2"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      <% @reports.each do |report| %>
+        <% label = { generated: "Generated", failed: "Failed", not_yet_generated: "Not yet generated" }.fetch(report.generation_status) %>
+        <tr>
+          <td class="px-5 py-3 font-medium text-slate-900"><%= report.report_month.strftime("%B %Y") %></td>
+          <td class="px-5 py-3 text-slate-600"><%= report.emailed_at&.strftime("%b %-d, %Y") || "—" %></td>
+          <td class="px-5 py-3">
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= badge_class(label) %>"><%= label %></span>
+          </td>
+          <td class="px-5 py-3">
+            <% if report.generation_status == :generated %>
+              <%= link_to "View report", public_report_path(report.access_token), target: "_blank", rel: "noopener",
+                    class: "text-sm font-medium text-teal-dark hover:underline" %>
+            <% else %>
+              <span class="text-slate-400">—</span>
+            <% end %>
+          </td>
+          <td class="px-5 py-3 text-right">
+            <% if report.generation_status == :failed && report.report_month == MonthlyReport.reporting_month %>
+              <%= button_to "Retry", report_generations_path(client_id: @client.id), method: :post,
+                    class: "text-sm font-medium text-teal-dark hover:underline" %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
 </div>

@@ -1,13 +1,4 @@
-<% content_for :page_stylesheets do %>
-  <%= stylesheet_link_tag "dashboard" %>
-  <%= stylesheet_link_tag "clients" %>
-<% end %>
-
-<div class="page-wrapper">
-  <%= render "shared/sidebar", active_nav: "clients" %>
-
-  <div class="client-main">
-    <p class="client-breadcrumb"><%= link_to "Clients", clients_path %> &gt; Add New Client</p>
+<p class="client-breadcrumb"><%= link_to "Clients", clients_path %> &gt; Add New Client</p>
 
     <div class="client-header-row">
       <h1>Add New Client</h1>
@@ -150,5 +141,3 @@
       </div>
 
     <% end %>
-  </div>
-</div>
