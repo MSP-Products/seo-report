@@ -200,6 +200,10 @@ class ReportGenerator
       report.report_keyword_rankings.find_or_initialize_by(keyword_id: ranking[:client_keyword_id]).update!(
         position: ranking[:position],
         potential_traffic: ranking[:potential_traffic],
+        growth: ranking[:growth],
+        keyword_difficulty: ranking[:keyword_difficulty],
+        intent: ranking[:intent],
+        serp_features: ranking[:serp_features],
         previous_position: previous_position
       )
     end

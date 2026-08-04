@@ -28,7 +28,7 @@ trying to do.
   - [Add a new practice](#add-a-new-practice)
   - [Connect a practice to the data sources](#connect-a-practice-to-the-data-sources)
   - [Set up Google Analytics for a practice](#set-up-google-analytics-for-a-practice)
-  - [Add tracked keywords](#add-tracked-keywords)
+  - [Tracked keywords](#tracked-keywords)
   - [Generate a report](#generate-a-report)
   - [Get a practice's report link](#get-a-practices-report-link)
   - [Check whether a report worked](#check-whether-a-report-worked)
@@ -256,23 +256,28 @@ change.
 
 ---
 
-## Add tracked keywords
+## Tracked keywords
 
-**Needs a developer.** These are the search terms shown in the report's keyword table.
+**Nothing to add by hand.** Whatever keywords a practice's SEMrush Position Tracking
+project tracks are exactly what shows up in their report — the system discovers them
+automatically on every generation run and creates the local record itself. A practice
+tracking 80+ keywords in SEMrush shows all 80+, paginated 10 per page; add or remove a
+keyword in SEMrush and the report picks it up (or drops it) the next time it generates.
+Ranking, Keyword Difficulty (KD%), search intent (`C` commercial, `T` transactional,
+`I` informational, `N` navigational), and SERP feature count are all pulled live from
+SEMrush too — whatever was true when that month generated is what stays on that report
+forever, even if the keyword's difficulty or intent shifts later.
+
+**Needs a developer** only to hide one specific SEMrush-tracked keyword from a practice's
+report — e.g. an informational long-tail term MSP doesn't want to showcase — without
+removing it from SEMrush itself:
 
 ```ruby
 client = Client.kept.find_by!(name: "Woodside Dental Care")
-client.client_keywords.create!(keyword: "dentist ventura", intent: "C")
+client.client_keywords.find_by!(keyword: "different kinds of toothache").update!(active: false)
 ```
 
-`intent` is why someone searched: `C` commercial, `T` transactional, `I` informational,
-`N` navigational. A keyword can carry more than one (`"I C"`).
-
-New keywords are active automatically — nothing extra to set. To stop tracking one
-without losing its history, a developer marks it inactive rather than deleting it.
-
-The keyword must **also** be tracked in the practice's SEMrush Position Tracking project.
-Adding it here alone gets you a row in the report with no ranking against it.
+That keyword's history is kept, just excluded from future reports until reactivated.
 
 ---
 
@@ -423,6 +428,7 @@ a specific, deliberate placeholder — worth knowing, because practices ask.
 | Not enrolled in AI SEO | The "Google & AI Search Performance" section is omitted entirely, not shown empty |
 | Yext unavailable that month | Citation figures blank; nothing else affected |
 | SEMrush unavailable, or keywords not tracked | Keyword table empty; nothing else affected |
+| SEMrush's Keyword Difficulty/Intent/SERP-feature call fails (rankings still succeed) | Rows still show position and movement; KD%, Intent, and SF show blank for that keyword only |
 | Nothing genuinely positive to summarise | The highlights paragraph is omitted rather than padded with filler |
 | Yext gives no directions/clicks split | That breakdown is omitted; the combined engagement total still shows |
 | It's the practice's first month | A "baseline month" introduction replaces the month-over-month summary |

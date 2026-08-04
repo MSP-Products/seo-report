@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_03_165738) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,6 +45,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_165738) do
     t.integer "keyword_difficulty"
     t.integer "serp_features"
     t.datetime "updated_at", null: false
+    t.index ["client_id", "keyword"], name: "index_client_keywords_on_client_id_and_keyword", unique: true
   end
 
   create_table "client_service_links", force: :cascade do |t|
@@ -185,11 +186,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_165738) do
 
   create_table "report_keyword_rankings", force: :cascade do |t|
     t.decimal "growth", precision: 10, scale: 2
+    t.string "intent"
+    t.integer "keyword_difficulty"
     t.bigint "keyword_id", null: false
     t.integer "position"
     t.decimal "potential_traffic", precision: 10, scale: 2
     t.integer "previous_position"
     t.string "report_id", limit: 36, null: false
+    t.integer "serp_features"
     t.index ["keyword_id"], name: "index_report_keyword_rankings_on_keyword_id"
     t.index ["report_id", "keyword_id"], name: "index_report_keyword_rankings_on_report_id_and_keyword_id", unique: true
   end

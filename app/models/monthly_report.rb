@@ -32,6 +32,25 @@ class MonthlyReport < ApplicationRecord
   scope :generated, -> { where.not(generated_at: nil) }
   scope :not_emailed, -> { where(emailed_at: nil) }
 
+  # The public report's one preload list — every association a report
+  # section reads. Add a new section's association here, or it N+1s on the
+  # one page clients actually load.
+  scope :for_public_view, -> {
+    includes(
+      :client,
+      :report_highlight,
+      :report_traffic,
+      :report_citation,
+      :report_gbp_summary,
+      :gbp_posts,
+      :gbp_reviews,
+      :gbp_photos,
+      :report_pages_published,
+      report_ai_visibility: :report_ai_platform_scores,
+      report_keyword_rankings: :keyword
+    )
+  }
+
   # Callbacks
   before_validation :generate_access_token, on: :create
 

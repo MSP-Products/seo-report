@@ -1086,6 +1086,13 @@ of the product, not polish.
   form.
 - **Reach for Turbo Frames/Streams only for genuinely partial updates,** and scope any future
   broadcast carefully — this app has no per-tenant channel, so a broadcast is global.
+- **Wrap in-page pagination in a `turbo_frame_tag`** so paging within one section (e.g. the
+  report's keyword table, `KEYWORDS_PER_PAGE` in `report_presenter.rb`) swaps just that frame
+  instead of a full-page navigation that jumps the scroll position back to the top. Links
+  inside the frame need no extra `data-turbo-frame` attribute — Turbo scopes them to their
+  enclosing frame automatically. Keep the links real `<a href>`s to the same action with a
+  page param (no client-side-only state) so the no-JS fallback still works: without Turbo, the
+  browser just does a normal full-page GET.
 - **`bin/importmap pin` to add a package.** No Node build step; don't introduce one.
 - **Delete dead controllers** — a Stimulus file no view references (e.g. `hello_controller.js`,
   removed as scaffolding cruft) is a liability, not neutral: it's still eagerly registered.
