@@ -2,7 +2,7 @@
 title: Design system
 slug: design-system
 kind: reference
-last_verified: 2026-08-03
+last_verified: 2026-08-04
 ---
 
 # Design system
@@ -241,18 +241,67 @@ Use `shared/_alert`. It carries `role="alert"` and the success/error variants.
 
 ## Layout
 
-**Admin:** fixed `w-60` sidebar, white with a `border-r border-slate-200`, against a
-`bg-slate-50` page. Content in `main` with `p-8`. Active nav item is
-`bg-teal-primary/10 font-medium text-teal-dark`; inactive is `text-slate-600
-hover:bg-slate-50`.
+**Admin:** `w-60` sidebar, white with a `border-r border-slate-200`, against a `bg-slate-50`
+page. Content in `main` with `p-4 md:p-8`. Active nav item is `bg-teal-primary/10
+font-medium text-teal-dark`; inactive is `text-slate-600 hover:bg-slate-50`. Below `md`, the
+sidebar becomes an off-canvas drawer — see [Responsiveness](#responsiveness).
 
 **Public report:** centred `max-w-4xl` column, `px-4 sm:px-6`, sections `space-y-10`.
 
 **Grids:** `grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3` for cards; metric rows use
-`md:grid-cols-3`.
+`md:grid-cols-3`. The Dashboard's 4-up stat row is the one exception —
+`grid-cols-2 lg:grid-cols-4` — since 4 single-column cards is too much scrolling before
+anything useful is on screen; see Responsiveness.
 
-Admin is desktop-first but must not break on a tablet. The public report is phone-first —
-that is how practices read it.
+---
+
+## Responsiveness
+
+**Both surfaces must work at 390px, 768px, and 1280px — verify all three before calling a
+view done.** The public report is phone-first (that's how practices actually read it); the
+admin panel used to be desktop-only but is not anymore — MSP staff do check things from a
+phone.
+
+### The admin sidebar is an off-canvas drawer below `md`
+
+`shared/_admin_sidebar.html.erb`'s `<aside>` is `fixed` and `-translate-x-full` (off-screen)
+by default, `md:static md:translate-x-0` (normal in-flow, always visible) at `md` and up.
+`layouts/application.html.erb` wraps the page in `data-controller="mobile-nav"` and adds a
+`md:hidden` topbar with a hamburger button, plus a `md:hidden` backdrop that closes the
+drawer on click. `mobile_nav_controller.js` just toggles the two Tailwind classes
+(`-translate-x-full` / `translate-x-0`) and the backdrop's `hidden` class — no other state.
+
+**Why a real toggle and not a CSS-only collapse:** the sidebar's nav links need to work
+exactly the same whether the drawer is open or the `md:` static layout applies, and a
+Stimulus controller is the established pattern for this kind of interactive behaviour (see
+[Frontend behaviour](../../CLAUDE.md#frontend-behaviour) in CLAUDE.md). Without JS, the
+hamburger button simply does nothing and the drawer stays closed — a real regression for
+that one case, accepted because the admin panel is an internal, session-authenticated tool,
+not the public report, where CLAUDE.md's plain-HTML-first rule is non-negotiable.
+
+### Stat card grids: 2-up on mobile, not 1-up
+
+The Dashboard's 4 top-level stat cards use `grid-cols-2 lg:grid-cols-4` rather than the
+usual `grid-cols-1 sm:grid-cols-2`. Four short numeric cards read fine at half-width even on
+a 375px screen, and stacking them 1-per-row means scrolling past four screens' worth of
+mostly-empty cards before reaching anything else. This is a deliberate exception — most card
+grids should still default to 1-up on mobile.
+
+### Wide tables/grids get a horizontal scroll wrapper, not a squeeze
+
+The Report Log page's CSS-grid "table" (`grid-cols-[2fr_1fr_1.2fr_1fr_1fr_90px]`) will not
+fit six columns of real data at 375px. It does not reflow to fewer columns — it's wrapped in
+`overflow-x-auto` with an explicit `min-w-[640px]` on the grid itself, so the columns keep
+their intended proportions and the row scrolls sideways instead of squeezing into
+unreadable, misaligned text. This is the same pattern the public report's keyword table
+already uses (`app/views/reports/_keyword_table.html.erb`) — copy that shape for any future
+wide table or grid, admin or report.
+
+**Don't let a flex or grid container's content force it wider than the viewport.** A flex
+child defaults to `min-width: auto`, which respects its content's intrinsic width and can
+push the whole row past 100%. `main` in `layouts/application.html.erb` carries `min-w-0` for
+exactly this reason — without it, a wide table anywhere on the page reopens horizontal
+overflow at the layout level, above and beyond the table's own scroll wrapper.
 
 ---
 

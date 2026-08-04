@@ -11,6 +11,16 @@ Service::KEYS.each { |key| Service.find_or_create_by!(key: key) }
 # Demo data for the public report page, replicating the 3 reference Lovable prototypes
 # (seoreport1/2/3.lovable.app) so /reports/:access_token can be visually checked against
 # them. Re-running this file replaces the 3 demo clients (idempotent by name).
+#
+# Skipped in production, deliberately: `bin/docker-entrypoint` runs `db:prepare` on every
+# boot, which runs this file the first time it creates a fresh database — that's exactly how
+# these 3 fake clients ended up in a production database that should have started empty. Fake
+# clients are useful for local visual QA against the reference prototypes; they are never
+# useful in production, where a "client" is a real onboarded practice.
+if Rails.env.production?
+  puts "Skipping demo client seed data in production."
+  return
+end
 
 REPORT_MONTH = Date.new(2026, 6, 1)
 
