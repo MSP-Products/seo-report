@@ -38,6 +38,15 @@ class ReportGenerationsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "redirects back to the referring page instead of always the dashboard" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Some Practice", onboarding_status: "active")
+
+    post report_generations_path, params: { client_id: client.id }, headers: { "HTTP_REFERER" => client_url(client) }
+
+    assert_redirected_to client_url(client)
+  end
+
   private
 
   def sign_in_as(role:)

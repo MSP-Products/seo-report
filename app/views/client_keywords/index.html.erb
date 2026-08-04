@@ -1,0 +1,65 @@
+<% content_for :title, "#{@client.name} — Keywords" %>
+
+<p class="mb-2 text-sm text-slate-500"><%= link_to "← Clients", clients_path, class: "hover:underline" %></p>
+
+<%= render "clients/header", client: @client, active_tab: :keywords %>
+
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <div>
+      <h2 class="font-medium text-slate-900">Tracked keywords</h2>
+      <p class="mt-0.5 text-xs text-slate-500">Position tracked via SEMrush each month for the keywords below.</p>
+    </div>
+    <% if @client.client_service_links.any? { |link| link.service == "semrush" } %>
+      <%= link_to "https://www.semrush.com", target: "_blank", rel: "noopener",
+            class: "flex items-center gap-1 text-sm font-medium text-teal-dark hover:underline" do %>
+        Open in SEMrush <%= report_icon(:external_link, css_class: "size-3.5") %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <table class="w-full text-left text-sm">
+    <thead class="text-xs uppercase text-slate-500">
+      <tr>
+        <th class="px-5 py-2">Keyword</th>
+        <th class="px-5 py-2">Intent</th>
+        <th class="px-5 py-2 text-right">KD%</th>
+        <th class="px-5 py-2 text-right">Position</th>
+        <th class="px-5 py-2">Source</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      <% @client_keywords.each do |client_keyword| %>
+        <% ranking = @latest_report&.report_keyword_rankings&.find { |r| r.keyword_id == client_keyword.id } %>
+        <tr>
+          <td class="px-5 py-3 font-medium text-slate-900"><%= client_keyword.keyword %></td>
+          <td class="px-5 py-3">
+            <span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium <%= intent_badge_class(client_keyword.intent) %>">
+              <%= client_keyword.intent || "—" %>
+            </span>
+          </td>
+          <td class="px-5 py-3 text-right tabular-nums <%= keyword_difficulty_class(client_keyword.keyword_difficulty) %>">
+            <%= client_keyword.keyword_difficulty || "—" %>
+          </td>
+          <td class="px-5 py-3 text-right tabular-nums text-slate-900">
+            <% if ranking&.position.blank? %>
+              <span class="text-slate-400">—</span>
+            <% else %>
+              <%= ranking.position %>
+              <% movement = @latest_report_presenter.keyword_movement(ranking) %>
+              <% change = @latest_report_presenter.keyword_change(ranking) %>
+              <% if movement == :gained %>
+                <span class="text-emerald-600">▲<%= change %></span>
+              <% elsif movement == :dropped %>
+                <span class="text-red-600">▼<%= change.abs %></span>
+              <% else %>
+                <span class="text-slate-400">—</span>
+              <% end %>
+            <% end %>
+          </td>
+          <td class="px-5 py-3 text-slate-500">SEMrush</td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

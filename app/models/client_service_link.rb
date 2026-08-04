@@ -28,4 +28,22 @@ class ClientServiceLink < ApplicationRecord
 
     JSON.parse(override_credentials)
   end
+
+  # Mirrors AgencyConnection#status_label/#status_dot_class (agency_connection.rb:66-82) with
+  # per-client wording — "Linked" reads better than "Active" for one practice's account.
+  def status_label
+    return "Linked" if credential_active?
+    return "Key expiring" if credential_expiring_soon?
+    return "Auth error" if credential_expired? || credential_invalid?
+
+    external_id.present? ? "Unverified" : "Not linked"
+  end
+
+  def status_dot_class
+    return "bg-emerald-500" if credential_active?
+    return "bg-amber-500" if credential_expiring_soon?
+    return "bg-red-500" if credential_expired? || credential_invalid?
+
+    "bg-slate-300"
+  end
 end

@@ -1,0 +1,8 @@
+<% content_for :title, "#{@client.name} — Reports" %>
+
+<p class="mb-2 text-sm text-slate-500"><%= link_to "← Clients", clients_path, class: "hover:underline" %></p>
+
+<%= render "clients/header", client: @client, active_tab: :reports %>
+
+<%= render "clients/report_history", reports: @reports, title: "All reports",
+      subtitle: "Every completed month since onboarding, with generation and delivery state." %>

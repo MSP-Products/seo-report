@@ -35,4 +35,22 @@ class MonthlyReportTest < ActiveSupport::TestCase
 
     assert_equal :not_yet_generated, report.generation_status
   end
+
+  test "failed_attempts_count counts only failed attempts" do
+    client = Client.create!(name: "Retried Practice", onboarding_status: "active")
+    report = client.monthly_reports.create!(report_month: Date.new(2026, 6, 1), generated_at: Time.current)
+    report.report_generation_logs.create!(status: "failed", attempted_at: 2.hours.ago)
+    report.report_generation_logs.create!(status: "failed", attempted_at: 1.hour.ago)
+    report.report_generation_logs.create!(status: "success", attempted_at: Time.current)
+
+    assert_equal 2, report.failed_attempts_count
+  end
+
+  test "failed_attempts_count is 0 with no failed attempts" do
+    client = Client.create!(name: "Clean Practice", onboarding_status: "active")
+    report = client.monthly_reports.create!(report_month: Date.new(2026, 6, 1), generated_at: Time.current)
+    report.report_generation_logs.create!(status: "success", attempted_at: Time.current)
+
+    assert_equal 0, report.failed_attempts_count
+  end
 end

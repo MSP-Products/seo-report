@@ -1,0 +1,50 @@
+<%# locals: reports (Array/Relation of MonthlyReport, newest first),
+    title (String, optional), subtitle (String, optional) %>
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <h2 class="font-medium text-slate-900"><%= local_assigns.fetch(:title, "Report history") %></h2>
+    <span class="text-xs text-slate-500"><%= local_assigns.fetch(:subtitle, "Only completed months are viewable") %></span>
+  </div>
+  <table class="w-full text-left text-sm">
+    <thead class="text-xs uppercase text-slate-500">
+      <tr>
+        <th class="px-5 py-2">Month</th>
+        <th class="px-5 py-2">Generated</th>
+        <th class="px-5 py-2">Emailed</th>
+        <th class="px-5 py-2">Status</th>
+        <th class="px-5 py-2"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      <% reports.each do |report| %>
+        <% status = report.generation_status
+           color_label = { generated: "Generated", failed: "Failed", not_yet_generated: "Not yet generated" }.fetch(status)
+           label =
+             if report.is_first_report? && status == :generated
+               "First report"
+             elsif status == :failed && report.failed_attempts_count > 1
+               "Failed ×#{report.failed_attempts_count}"
+             else
+               color_label
+             end %>
+        <tr>
+          <td class="px-5 py-3 font-medium text-slate-900"><%= report.report_month.strftime("%B %Y") %></td>
+          <td class="px-5 py-3 text-slate-600"><%= report.generated_at&.strftime("%b %-d") || "—" %></td>
+          <td class="px-5 py-3 text-slate-600"><%= report.emailed_at&.strftime("%b %-d") || "—" %></td>
+          <td class="px-5 py-3">
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= badge_class(color_label) %>"><%= label %></span>
+          </td>
+          <td class="px-5 py-3 text-right">
+            <% if status == :generated %>
+              <%= link_to "Open", public_report_path(report.access_token), target: "_blank", rel: "noopener",
+                    class: "text-sm font-medium text-teal-dark hover:underline" %>
+            <% elsif status == :failed && report.report_month == MonthlyReport.reporting_month %>
+              <%= button_to "Retry", report_generations_path(client_id: report.client_id), method: :post,
+                    class: "text-sm font-medium text-teal-dark hover:underline" %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

@@ -43,6 +43,10 @@ class MonthlyReport < ApplicationRecord
     :not_yet_generated
   end
 
+  def failed_attempts_count
+    report_generation_logs.count { |log| log.status == "failed" }
+  end
+
   # Callbacks
   before_validation :generate_access_token, on: :create
 

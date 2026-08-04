@@ -38,6 +38,30 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Real Practice"
   end
 
+  test "show renders the empty states for a client with no reports" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Fresh Practice", onboarding_status: "active")
+
+    get client_path(client)
+
+    assert_response :success
+    assert_select "p", text: "No report generated yet."
+    assert_select "p", text: "Not generated yet."
+  end
+
+  test "show renders the latest report snapshot and secure link for a client with a generated report" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Established Practice", onboarding_status: "active")
+    report = client.monthly_reports.create!(report_month: Date.new(2026, 6, 1), generated_at: Time.current)
+    report.create_report_traffic!(total_visits: 3482, appointments_booked: 61, ghl_data_status: "connected")
+
+    get client_path(client)
+
+    assert_response :success
+    assert_select "h2", text: "Latest report snapshot"
+    assert_select "input[readonly][value=?]", public_report_path(report.access_token)
+  end
+
   test "show 404s for an id that doesn't exist, instead of silently substituting another client" do
     sign_in_as(role: "admin")
     Client.create!(name: "Some Other Practice", onboarding_status: "active")

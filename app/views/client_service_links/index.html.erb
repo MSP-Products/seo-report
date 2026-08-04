@@ -1,0 +1,49 @@
+<% content_for :title, "#{@client.name} — Data sources" %>
+
+<p class="mb-2 text-sm text-slate-500"><%= link_to "← Clients", clients_path, class: "hover:underline" %></p>
+
+<%= render "clients/header", client: @client, active_tab: :data_sources %>
+
+<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <div class="border-b border-slate-200 px-5 py-4">
+    <h2 class="font-medium text-slate-900">Data sources for this practice</h2>
+    <p class="mt-0.5 text-xs text-slate-500">Inherits the agency connection unless an override is set.</p>
+  </div>
+
+  <table class="w-full text-left text-sm">
+    <thead class="text-xs uppercase text-slate-500">
+      <tr>
+        <th class="px-5 py-2">Service</th>
+        <th class="px-5 py-2">Account / location ID</th>
+        <th class="px-5 py-2">Status</th>
+        <th class="px-5 py-2"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      <% @client_service_links.each do |link| %>
+        <% display = AgencyConnection::DISPLAY.fetch(link.service) %>
+        <tr>
+          <td class="px-5 py-3">
+            <div class="flex items-center gap-2">
+              <div class="flex size-6 shrink-0 items-center justify-center rounded <%= display[:badge_class] %> text-xs font-bold text-white">
+                <%= display[:letter] %>
+              </div>
+              <span class="font-medium text-slate-900"><%= display[:name] %></span>
+            </div>
+          </td>
+          <td class="px-5 py-3 text-slate-600"><%= link.external_id.presence || "—" %></td>
+          <td class="px-5 py-3">
+            <div class="flex items-center gap-2">
+              <span class="size-2 rounded-full <%= link.status_dot_class %>"></span>
+              <span class="text-slate-600"><%= link.status_label %></span>
+            </div>
+          </td>
+          <td class="px-5 py-3 text-right">
+            <%= link_to "Edit", edit_client_data_source_path(@client, link.service),
+                  class: "text-sm font-medium text-teal-dark hover:underline" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

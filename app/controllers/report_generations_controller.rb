@@ -3,6 +3,6 @@ class ReportGenerationsController < ApplicationController
 
   def create
     ReportGenerationScheduler.new(client_id: params[:client_id]).call
-    redirect_to dashboard_path, notice: "Report generation queued."
+    redirect_to request.referer || dashboard_path, notice: "Report generation queued."
   end
 end

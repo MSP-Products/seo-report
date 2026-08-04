@@ -24,7 +24,12 @@ Rails.application.routes.draw do
   # Dashboard overview and client roster
   get "dashboard", to: "dashboard#index", as: :dashboard
   resources :report_generations, only: [ :create ]
-  resources :clients, only: [ :index, :show, :new, :create ]
+  resources :clients, only: [ :index, :show, :new, :create ] do
+    resources :monthly_reports, only: [ :index ], as: :reports, path: "reports"
+    resources :client_keywords, only: [ :index ], as: :keywords, path: "keywords"
+    resources :client_service_links, only: [ :index, :edit, :update ], as: :data_sources, path: "data_sources",
+      param: :service
+  end
 
   # Defines the root path route ("/")
   root "connections#index"

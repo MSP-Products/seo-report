@@ -42,4 +42,25 @@ class Client < ApplicationRecord
   def latest_monthly_report
     monthly_reports.max_by(&:report_month)
   end
+
+  def status_badge_text
+    base = "#{onboarding_status.capitalize} client"
+    return base if onboarded_at.blank?
+
+    "#{base} · onboarded #{onboarded_at.strftime('%b %Y')}"
+  end
+
+  def latest_generated_report
+    monthly_reports.generated.order(report_month: :desc).first
+  end
+
+  def current_cycle_report
+    monthly_reports.find_by(report_month: MonthlyReport.reporting_month)
+  end
+
+  # All 5 services, each backed by its persisted link or an unsaved placeholder — mirrors
+  # AgencyConnection.all_services so the Data sources tab always shows every service.
+  def all_service_links
+    Service::KEYS.map { |service| client_service_links.find_or_initialize_by(service: service) }
+  end
 end

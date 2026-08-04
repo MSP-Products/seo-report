@@ -1,68 +1,75 @@
 <% content_for :title, "#{@client.name} — My Social Practice" %>
 
-<p class="mb-2 text-sm text-slate-500"><%= link_to "Clients", clients_path, class: "hover:underline" %> / <%= @client.name %></p>
+<p class="mb-2 text-sm text-slate-500"><%= link_to "← Clients", clients_path, class: "hover:underline" %></p>
 
-<div class="mb-4 flex items-start justify-between">
-  <h1 class="text-2xl font-semibold text-slate-900"><%= @client.name %></h1>
-</div>
+<%= render "clients/header", client: @client, active_tab: :overview %>
 
-<div class="mb-4 flex flex-wrap gap-4 text-sm text-slate-600">
-  <span><%= @client.address %></span>
-  <span><%= @client.website_url %></span>
-</div>
+<div class="space-y-6">
+  <%= render "clients/report_history", reports: @reports %>
 
-<div class="mb-6 flex flex-wrap gap-2">
-  <% status_label = @client.onboarding_status.capitalize %>
-  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= badge_class(status_label) %>"><%= status_label %></span>
-  <% if @client.ai_seo_enrolled? %>
-    <span class="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">AI SEO enrolled</span>
+  <% if @latest_report_presenter %>
+    <div>
+      <h2 class="mb-1 font-medium text-slate-900">Latest report snapshot</h2>
+      <p class="mb-3 text-xs text-slate-500">
+        <%= @latest_report.report_month.strftime("%B %Y") %> — the same numbers the client sees.
+      </p>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <%= render "reports/stat_card", icon: :trending_up,
+              value: @latest_report_presenter.traffic&.total_visits || "—", label: "Website visits" %>
+        <%= render "reports/stat_card", icon: :calendar_check,
+              value: @latest_report_presenter.traffic&.appointments_booked || "—", label: "Appointments" %>
+        <%= render "reports/stat_card", icon: :star,
+              value: @latest_report_presenter.keywords_top10_count, label: "Keywords in top 10" %>
+        <%= render "reports/stat_card", icon: :sparkles,
+              value: @latest_report_presenter.ai_visibility&.overall_score || "—", label: "AI visibility score" %>
+      </div>
+    </div>
   <% end %>
-  <% if @client.scheduler_enrolled? %>
-    <span class="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700">Scheduler connected</span>
-  <% end %>
-</div>
 
-<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-  <div class="border-b border-slate-200 px-5 py-4">
-    <h2 class="font-medium text-slate-900">Report history</h2>
-    <p class="mt-0.5 text-xs text-slate-500"><%= pluralize(@reports.size, "report") %> total</p>
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="flex items-center justify-between">
+      <h2 class="font-medium text-slate-900">Current month — <%= MonthlyReport.reporting_month.strftime("%B %Y") %></h2>
+      <% if @current_cycle_report %>
+        <% status = @current_cycle_report.generation_status
+           label = { generated: "Generated", failed: "Failed", not_yet_generated: "Not yet generated" }.fetch(status) %>
+        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= badge_class(label) %>"><%= label %></span>
+      <% end %>
+    </div>
+
+    <% if @current_cycle_report %>
+      <div class="mt-4 space-y-2 text-sm">
+        <div class="flex items-center gap-2">
+          <%= report_icon(@current_cycle_report.report_highlight.present? ? :check : :info, css_class: "size-4 text-slate-400") %>
+          <span class="text-slate-700">Highlights written</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <%= report_icon(@current_cycle_report.generated_at.present? ? :check : :info, css_class: "size-4 text-slate-400") %>
+          <span class="text-slate-700">Report rendered</span>
+        </div>
+      </div>
+    <% else %>
+      <p class="mt-3 text-sm text-slate-500">Not generated yet.</p>
+    <% end %>
+
+    <%= button_to (@current_cycle_report ? "Regenerate" : "Generate report"),
+          report_generations_path(client_id: @client.id), method: :post,
+          class: "mt-4 rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
   </div>
 
-  <table class="w-full text-left text-sm">
-    <thead class="text-xs uppercase text-slate-500">
-      <tr>
-        <th class="px-5 py-2">Report period</th>
-        <th class="px-5 py-2">Sent date</th>
-        <th class="px-5 py-2">Generation</th>
-        <th class="px-5 py-2">Report preview</th>
-        <th class="px-5 py-2"></th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-slate-100">
-      <% @reports.each do |report| %>
-        <% label = { generated: "Generated", failed: "Failed", not_yet_generated: "Not yet generated" }.fetch(report.generation_status) %>
-        <tr>
-          <td class="px-5 py-3 font-medium text-slate-900"><%= report.report_month.strftime("%B %Y") %></td>
-          <td class="px-5 py-3 text-slate-600"><%= report.emailed_at&.strftime("%b %-d, %Y") || "—" %></td>
-          <td class="px-5 py-3">
-            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <%= badge_class(label) %>"><%= label %></span>
-          </td>
-          <td class="px-5 py-3">
-            <% if report.generation_status == :generated %>
-              <%= link_to "View report", public_report_path(report.access_token), target: "_blank", rel: "noopener",
-                    class: "text-sm font-medium text-teal-dark hover:underline" %>
-            <% else %>
-              <span class="text-slate-400">—</span>
-            <% end %>
-          </td>
-          <td class="px-5 py-3 text-right">
-            <% if report.generation_status == :failed && report.report_month == MonthlyReport.reporting_month %>
-              <%= button_to "Retry", report_generations_path(client_id: @client.id), method: :post,
-                    class: "text-sm font-medium text-teal-dark hover:underline" %>
-            <% end %>
-          </td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="font-medium text-slate-900">Secure report link</h2>
+    <% if @latest_report %>
+      <div class="mt-3 flex items-center gap-2" data-controller="clipboard">
+        <input type="text" readonly value="<%= public_report_path(@latest_report.access_token) %>" data-clipboard-target="source"
+               class="w-full max-w-md truncate rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+        <button type="button" data-action="clipboard#copy" data-clipboard-target="button"
+                class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          Copy
+        </button>
+      </div>
+      <p class="mt-2 text-xs text-slate-500">The unguessable link for <%= @latest_report.report_month.strftime("%B %Y") %>'s report.</p>
+    <% else %>
+      <p class="mt-3 text-sm text-slate-500">No report generated yet.</p>
+    <% end %>
+  </div>
 </div>
