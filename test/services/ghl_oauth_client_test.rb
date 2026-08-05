@@ -67,7 +67,7 @@ class GhlOauthClientTest < ActiveSupport::TestCase
   test "location_access_token! does not refresh a still-valid agency token" do
     AgencyConnection.create!(service: "ghl", encrypted_credentials: {
       access_token: "valid-access-token", refresh_token: "unused-refresh-token", company_id: "company-abc"
-    }.to_json, expires_at: 1.hour.from_now)
+    }.to_json, expires_at: 2.hours.from_now)
 
     stub_request(:post, LOCATION_TOKEN_URL).to_return(status: 200, body: { access_token: "location-token-xyz" }.to_json)
 
@@ -93,7 +93,7 @@ class GhlOauthClientTest < ActiveSupport::TestCase
   test "a location-token-mint HTTP failure propagates unwrapped, without touching credential_status" do
     AgencyConnection.create!(service: "ghl", credential_status: "active", encrypted_credentials: {
       access_token: "valid-access-token", refresh_token: "unused-refresh-token", company_id: "company-abc"
-    }.to_json, expires_at: 1.hour.from_now)
+    }.to_json, expires_at: 2.hours.from_now)
 
     stub_request(:post, LOCATION_TOKEN_URL).to_return(status: 500)
 
@@ -118,12 +118,50 @@ class GhlOauthClientTest < ActiveSupport::TestCase
   test "raises without minting a location token when company_id is missing" do
     AgencyConnection.create!(service: "ghl", encrypted_credentials: {
       access_token: "valid-access-token", refresh_token: "unused-refresh-token"
-    }.to_json, expires_at: 1.hour.from_now)
+    }.to_json, expires_at: 2.hours.from_now)
 
     assert_raises(GhlOauthClient::NotConnectedError) do
       GhlOauthClient.new.location_access_token!(location_id: "location-1")
     end
 
     assert_not_requested :post, LOCATION_TOKEN_URL
+  end
+
+  test "refresh_if_stale! refreshes a stale agency token" do
+    connection = AgencyConnection.create!(service: "ghl", encrypted_credentials: {
+      access_token: "stale-access-token", refresh_token: "old-refresh-token", company_id: "company-abc"
+    }.to_json, expires_at: 1.minute.ago)
+
+    stub_request(:post, TOKEN_URL)
+      .with(body: hash_including("grant_type" => "refresh_token", "refresh_token" => "old-refresh-token"))
+      .to_return(status: 200, body: { access_token: "fresh-access-token", refresh_token: "new-refresh-token", expires_in: 86400 }.to_json)
+
+    GhlOauthClient.new.refresh_if_stale!
+
+    assert_equal "new-refresh-token", connection.reload.credentials["refresh_token"]
+  end
+
+  test "refresh_if_stale! does nothing to a still-valid agency token" do
+    AgencyConnection.create!(service: "ghl", encrypted_credentials: {
+      access_token: "valid-access-token", refresh_token: "unused-refresh-token", company_id: "company-abc"
+    }.to_json, expires_at: 2.hours.from_now)
+
+    GhlOauthClient.new.refresh_if_stale!
+
+    assert_not_requested :post, TOKEN_URL
+  end
+
+  test "refresh_if_stale! is a no-op, not an error, when never connected via OAuth" do
+    AgencyConnection.create!(service: "ghl", encrypted_credentials: "{}")
+
+    GhlOauthClient.new.refresh_if_stale!
+
+    assert_not_requested :post, TOKEN_URL
+  end
+
+  test "refresh_if_stale! is a no-op when there is no AgencyConnection row at all" do
+    GhlOauthClient.new.refresh_if_stale!
+
+    assert_not_requested :post, TOKEN_URL
   end
 end

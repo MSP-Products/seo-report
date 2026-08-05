@@ -36,6 +36,9 @@ class ReportGeneratorTest < ActiveSupport::TestCase
       .with(body: hash_including("dimensions" => [ { "name" => "sessionDefaultChannelGroup" } ]))
       .to_return(status: 200, body: { rows: [] }.to_json)
 
+    stub_request(:get, "https://services.leadconnectorhq.com/calendars/")
+      .with(query: hash_including("locationId"))
+      .to_return(status: 200, body: { calendars: [ { id: "cal-1" } ] }.to_json)
     stub_request(:get, "https://services.leadconnectorhq.com/calendars/events")
       .with(query: hash_including("locationId"))
       .to_return(status: 200, body: { events: [ { id: "1" } ] }.to_json)

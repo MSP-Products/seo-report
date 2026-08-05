@@ -23,9 +23,14 @@ Rails.application.routes.draw do
 
   # GoHighLevel's agency-level OAuth redirect flow (see GhlOauthClient) — a
   # GET-based external redirect, not RESTful CRUD, hence the custom routes.
+  # Path deliberately avoids the literal "ghl"/"highlevel" — GHL's own
+  # Marketplace rejects a redirect URI containing a HighLevel brand
+  # reference for white-labeled apps. The Ruby-side naming (controller,
+  # route helpers, GhlOauthController) is unaffected since it never appears
+  # in the URL itself.
   namespace :connections do
-    get "ghl/authorize", to: "ghl_oauth#authorize", as: :ghl_authorize
-    get "ghl/callback", to: "ghl_oauth#callback", as: :ghl_callback
+    get "scheduler/authorize", to: "ghl_oauth#authorize", as: :ghl_authorize
+    get "scheduler/callback", to: "ghl_oauth#callback", as: :ghl_callback
   end
 
   # Practices. Data-source external_ids are edited inline on the Edit practice

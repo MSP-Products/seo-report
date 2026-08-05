@@ -35,9 +35,25 @@ module Adapters
       )
     end
 
+    # GHL's /calendars/events has no "all events for this location" mode —
+    # it requires filtering by one of calendarId/userId/groupId (confirmed
+    # live: querying without one 422s with "Either of userId, calendarId or
+    # groupId is required"). So this lists the location's calendars first,
+    # then sums each one's event count for the month.
     def fetch_appointments_count
+      fetch_calendar_ids.sum { |calendar_id| fetch_calendar_events_count(calendar_id) }
+    end
+
+    def fetch_calendar_ids
+      response = api_connection.get("/calendars/", { locationId: external_id })
+
+      JSON.parse(response.body).fetch("calendars", []).map { |calendar| calendar["id"] }
+    end
+
+    def fetch_calendar_events_count(calendar_id)
       response = api_connection.get("/calendars/events", {
         locationId: external_id,
+        calendarId: calendar_id,
         startTime: month_range.begin.beginning_of_day.to_i * 1000,
         endTime: month_range.end.end_of_day.to_i * 1000
       })
@@ -45,12 +61,18 @@ module Adapters
       JSON.parse(response.body).fetch("events", []).size
     end
 
+    # date/endDate (mm-dd-yyyy) are this endpoint's real date-filter params —
+    # confirmed live after date_updated_start/date_updated_end (a reasonable-
+    # looking guess) 422'd with "property ... should not exist". location_id
+    # must stay snake_case: GHL's own docs page shows `locationId`, but the
+    # live endpoint rejects that with "property locationId should not exist" —
+    # the docs and the deployed API disagree here, and the deployed API wins.
     def fetch_won_opportunities_revenue
       response = api_connection.get("/opportunities/search", {
         location_id: external_id,
         status: "won",
-        date_updated_start: month_range.begin.iso8601,
-        date_updated_end: month_range.end.iso8601
+        date: month_range.begin.strftime("%m-%d-%Y"),
+        endDate: month_range.end.strftime("%m-%d-%Y")
       })
 
       JSON.parse(response.body).fetch("opportunities", []).sum { |o| o["monetaryValue"].to_f }

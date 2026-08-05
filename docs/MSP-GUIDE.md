@@ -119,10 +119,15 @@ What each service needs:
 | Service | Field(s) |
 |---|---|
 | HubSpot | Access Token |
-| GoHighLevel | Access Token |
 | Yext | API Key |
 | SEMrush | API Key |
 | Google Analytics | Client Email **and** Private Key (see [GA4 setup](#set-up-google-analytics-for-a-practice)) |
+
+**GoHighLevel is the one exception — there's no field to paste.** Click **Connect to
+GoHighLevel** instead and authorize once through GHL's own consent screen; from then on the
+Connections page shows a live status (Active / Expiring soon / Expired) that refreshes
+itself automatically, and reconnecting only comes up again if the grant is revoked on GHL's
+side.
 
 ---
 
@@ -138,10 +143,13 @@ The Connections page shows a coloured dot and a label per service:
 | Unverified | Saved, but not yet checked against the live service |
 | Not configured | No credential saved |
 
-**These statuses are not yet updated automatically.** Nothing currently sets them by
-testing the credential, so treat them as a note rather than live monitoring. The reliable
-way to know a service is working is to [generate a report and read the
-warnings](#check-whether-a-report-worked).
+**For every service except GoHighLevel, these statuses are not yet updated
+automatically.** Nothing currently sets them by testing the credential, so treat them as a
+note rather than live monitoring for HubSpot, Yext, SEMrush, and Google Analytics. **GHL is
+the exception:** its status is live — set on every connect and refreshed hourly in the
+background — because the OAuth connection genuinely is verified each time it renews. For
+everything else, the reliable way to know a service is working is to [generate a report and
+read the warnings](#check-whether-a-report-worked).
 
 ---
 

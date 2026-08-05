@@ -31,8 +31,19 @@ class GhlOauthClient
   TOKEN_PATH = "/oauth/token"
   LOCATION_TOKEN_PATH = "/oauth/locationToken" # unverified — see class comment
   API_VERSION = "2021-07-28"
-  SCOPES = %w[locations.readonly calendars/events.readonly opportunities.readonly].freeze # unverified
-  EXPIRY_BUFFER = 5.minutes
+  # Matches the app's Target User: Sub-Account (not Agency) configuration —
+  # only Sub-Account-scoped resources are grantable. oauth.write/oauth.readonly
+  # are required for #location_access_token! to mint per-location tokens.
+  # calendars.readonly (list a location's calendars) is separate from
+  # calendars/events.readonly (list events on one of them) — GHL's
+  # /calendars/events requires filtering by a specific calendarId/userId/
+  # groupId, so listing calendars first is a real prerequisite, not optional.
+  SCOPES = %w[calendars.readonly calendars/events.readonly opportunities.readonly oauth.write oauth.readonly].freeze
+  # Wider than the strict minimum on purpose: RefreshGhlTokenJob runs hourly
+  # (config/recurring.yml), and this buffer must exceed that hour-long gap so
+  # the job always catches a token before it actually expires, rather than
+  # leaving that entirely to the lazy refresh in #location_access_token!.
+  EXPIRY_BUFFER = 90.minutes
 
   def initialize
     @connection = AgencyConnection.find_or_initialize_by(service: "ghl")
@@ -66,7 +77,21 @@ class GhlOauthClient
     mint_location_token!(location_id: location_id)
   end
 
+  # Called by RefreshGhlTokenJob's hourly schedule to keep the agency token
+  # from ever going stale between monthly report runs. A no-op, not an error,
+  # when there's no connection yet — the job shouldn't fail an agency that
+  # simply hasn't connected GHL at all.
+  def refresh_if_stale!
+    return unless connected?
+
+    refresh! if token_stale?
+  end
+
   private
+
+  def connected?
+    @connection.credentials["refresh_token"].present?
+  end
 
   def client_id
     Rails.application.credentials.dig(:ghl, :client_id) || ENV["GHL_CLIENT_ID"]
