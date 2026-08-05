@@ -12,10 +12,8 @@
 # access_token/refresh_token/expires_at instead stay in its encrypted JSON
 # blob (this agency's live, volatile grant).
 #
-# VERIFY AGAINST GHL'S LIVE MARKETPLACE DOCS BEFORE SHIPPING: the exact
-# path/param names for LOCATION_TOKEN_PATH (below) and SCOPES were not
-# reliably confirmed against GHL's client-rendered docs site — see
-# docs/features/integration-ghl.md and the plan this was built from.
+# LOCATION_TOKEN_PATH and SCOPES are confirmed live against a real GHL
+# Marketplace app and account — see docs/features/integration-ghl.md.
 class GhlOauthClient
   class AuthorizationError < StandardError; end
 
@@ -38,7 +36,9 @@ class GhlOauthClient
   # calendars/events.readonly (list events on one of them) — GHL's
   # /calendars/events requires filtering by a specific calendarId/userId/
   # groupId, so listing calendars first is a real prerequisite, not optional.
-  SCOPES = %w[calendars.readonly calendars/events.readonly opportunities.readonly oauth.write oauth.readonly].freeze
+  # locations.readonly is not used by GhlAdapter yet — added ahead of a
+  # planned domain-based auto-match between GHL locations and Client records.
+  SCOPES = %w[calendars.readonly calendars/events.readonly opportunities.readonly oauth.write oauth.readonly locations.readonly].freeze
   # Wider than the strict minimum on purpose: RefreshGhlTokenJob runs hourly
   # (config/recurring.yml), and this buffer must exceed that hour-long gap so
   # the job always catches a token before it actually expires, rather than
