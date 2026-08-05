@@ -21,9 +21,20 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="font-sans antialiased bg-gray-50 text-gray-800">
+  <body class="font-sans antialiased bg-slate-50 text-slate-800">
     <% if current_admin_user %>
       <div data-controller="mobile-nav">
+        <% if notice || alert %>
+          <div class="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-end gap-2 sm:inset-x-auto sm:right-4 sm:w-full sm:max-w-sm">
+            <% if notice %>
+              <%= render "shared/alert", type: "success", message: notice %>
+            <% end %>
+            <% if alert %>
+              <%= render "shared/alert", type: "error", message: alert %>
+            <% end %>
+          </div>
+        <% end %>
+
         <div class="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
           <button type="button" data-action="click->mobile-nav#open" class="text-slate-500 hover:text-slate-700" aria-label="Open menu">
             <%= report_icon(:menu, css_class: "size-6") %>
@@ -37,12 +48,6 @@
             class="fixed inset-0 z-30 hidden bg-slate-900/40 md:hidden"></div>
           <%= render "shared/admin_sidebar" %>
           <main class="min-w-0 flex-1 overflow-y-auto p-4 md:p-8">
-            <% if notice %>
-              <%= render "shared/alert", type: "success", message: notice %>
-            <% end %>
-            <% if alert %>
-              <%= render "shared/alert", type: "error", message: alert %>
-            <% end %>
             <%= yield %>
           </main>
         </div>
