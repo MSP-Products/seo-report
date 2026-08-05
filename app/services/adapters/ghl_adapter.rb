@@ -5,7 +5,12 @@ module Adapters
   # adapter when a ClientServiceLink for "ghl" exists; absence means
   # `ghl_data_status: "not_connected"` without ever calling the API.
   #
-  # Credentials shape: {"access_token" => "..."} (GHL v2 OAuth access token).
+  # Bearer token: a client-level ClientServiceLink#override_credentials
+  # access_token (a raw Private Integration Token, the pre-OAuth per-client
+  # workaround) if one is on record, else a location-scoped token minted
+  # on demand from the agency-wide OAuth grant via GhlOauthClient — never the
+  # agency connection's own access_token directly, which is scoped for
+  # minting location tokens, not for calling these two endpoints itself.
   # external_id: the GHL location ID for this client.
   #
   # Uses GHL's v2 API (services.leadconnectorhq.com), which requires the
@@ -53,9 +58,15 @@ module Adapters
 
     def api_connection
       connection(BASE_URL, headers: {
-        "Authorization" => "Bearer #{credentials["access_token"]}",
+        "Authorization" => "Bearer #{bearer_token}",
         "Version" => API_VERSION
       })
+    end
+
+    # Memoized per #perform (both calls below share one token) rather than
+    # cached across requests — mirrors GoogleAnalyticsAdapter#access_token.
+    def bearer_token
+      @bearer_token ||= client_service_link&.credentials&.dig("access_token") || GhlOauthClient.new.location_access_token!(location_id: external_id)
     end
   end
 end

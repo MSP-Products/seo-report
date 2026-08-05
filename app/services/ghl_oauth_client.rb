@@ -1,0 +1,144 @@
+# frozen_string_literal: true
+
+# Owns the whole GoHighLevel (GHL) agency-level OAuth lifecycle against the
+# one "ghl" AgencyConnection row: the one-time authorization-code exchange,
+# transparent refresh-token rotation, and minting a short-lived per-location
+# token from the stored agency token (so GhlAdapter can keep making its two
+# report-data calls per client without a credential of its own).
+#
+# App identity (client_id/client_secret) lives in Rails credentials/ENV, not
+# here — it's the Marketplace app's own registration, shared across every
+# deploy, not part of any one agency's grant. See AgencyConnection for why
+# access_token/refresh_token/expires_at instead stay in its encrypted JSON
+# blob (this agency's live, volatile grant).
+#
+# VERIFY AGAINST GHL'S LIVE MARKETPLACE DOCS BEFORE SHIPPING: the exact
+# path/param names for LOCATION_TOKEN_PATH (below) and SCOPES were not
+# reliably confirmed against GHL's client-rendered docs site — see
+# docs/features/integration-ghl.md and the plan this was built from.
+class GhlOauthClient
+  class AuthorizationError < StandardError; end
+
+  # Raised by the report-generation path (#location_access_token!), never by
+  # the human-facing OAuth callback — a Faraday::Error subclass so it flows
+  # through Adapters::Base#call's existing `rescue Faraday::Error` unchanged,
+  # into the standard Result.failure/logged/re-raised path, instead of
+  # escaping uncaught the way a plain StandardError would.
+  class NotConnectedError < Faraday::Error; end
+
+  BASE_URL = "https://services.leadconnectorhq.com"
+  AUTHORIZE_URL = "https://marketplace.gohighlevel.com/oauth/chooselocation"
+  TOKEN_PATH = "/oauth/token"
+  LOCATION_TOKEN_PATH = "/oauth/locationToken" # unverified — see class comment
+  API_VERSION = "2021-07-28"
+  SCOPES = %w[locations.readonly calendars/events.readonly opportunities.readonly].freeze # unverified
+  EXPIRY_BUFFER = 5.minutes
+
+  def initialize
+    @connection = AgencyConnection.find_or_initialize_by(service: "ghl")
+  end
+
+  def authorize_url(redirect_uri:, state:)
+    query = URI.encode_www_form(
+      response_type: "code", client_id: client_id, redirect_uri: redirect_uri,
+      scope: SCOPES.join(" "), state: state, user_type: "Company"
+    )
+
+    "#{AUTHORIZE_URL}?#{query}"
+  end
+
+  # Called by Connections::GhlOauthController#callback. Human-facing: raises
+  # AuthorizationError with a short, generic message on any failure — never
+  # let GHL's raw response body reach an admin's flash.
+  def exchange_code!(code:, redirect_uri:)
+    request_token!(grant_type: "authorization_code", code: code, redirect_uri: redirect_uri)
+  rescue Faraday::Error => e
+    Rails.logger.warn("ghl_oauth: code exchange failed (#{e.response&.dig(:status)})")
+    raise AuthorizationError, "could not complete authorization"
+  end
+
+  # Called by GhlAdapter. Report-generation-facing: lets Faraday::Error
+  # propagate UNWRAPPED — Adapters::Base#call already rescues it, so the
+  # existing failed/logged/re-raised path stays untouched.
+  def location_access_token!(location_id:)
+    refresh! if token_stale?
+
+    mint_location_token!(location_id: location_id)
+  end
+
+  private
+
+  def client_id
+    Rails.application.credentials.dig(:ghl, :client_id) || ENV["GHL_CLIENT_ID"]
+  end
+
+  def client_secret
+    Rails.application.credentials.dig(:ghl, :client_secret) || ENV["GHL_CLIENT_SECRET"]
+  end
+
+  # GHL rotates the refresh_token on every use — the response's NEW
+  # refresh_token must replace the old one, or the connection is bricked on
+  # the very next refresh attempt.
+  def refresh!
+    refresh_token = @connection.credentials["refresh_token"]
+    raise NotConnectedError, "ghl: not connected via OAuth yet" if refresh_token.blank?
+
+    request_token!(grant_type: "refresh_token", refresh_token: refresh_token)
+  rescue NotConnectedError
+    raise
+  rescue Faraday::Error
+    @connection.update!(credential_status: "expired")
+    raise
+  end
+
+  def token_stale?
+    access_token = @connection.credentials["access_token"]
+    return true if access_token.blank?
+
+    expires_at = @connection.expires_at
+    expires_at.blank? || expires_at <= Time.current + EXPIRY_BUFFER
+  end
+
+  def request_token!(**body)
+    response = token_connection.post(TOKEN_PATH) do |req|
+      req.headers["Content-Type"] = "application/x-www-form-urlencoded"
+      req.body = URI.encode_www_form(body.merge(client_id: client_id, client_secret: client_secret, user_type: "Company"))
+    end
+
+    persist_tokens!(JSON.parse(response.body))
+  end
+
+  def persist_tokens!(payload)
+    @connection.update!(
+      encrypted_credentials: @connection.credentials.merge(
+        "access_token" => payload.fetch("access_token"),
+        "refresh_token" => payload.fetch("refresh_token"),
+        "company_id" => payload["companyId"] || @connection.credentials["company_id"]
+      ).to_json,
+      expires_at: Time.current + payload.fetch("expires_in").seconds,
+      credential_status: "active",
+      last_verified_at: Time.current
+    )
+  end
+
+  def mint_location_token!(location_id:)
+    company_id = @connection.credentials["company_id"]
+    raise NotConnectedError, "ghl: no company id on record — reauthorize" if company_id.blank?
+
+    response = api_connection.post(LOCATION_TOKEN_PATH) do |req|
+      req.headers["Authorization"] = "Bearer #{@connection.credentials['access_token']}"
+      req.headers["Content-Type"] = "application/x-www-form-urlencoded"
+      req.body = URI.encode_www_form(companyId: company_id, locationId: location_id)
+    end
+
+    JSON.parse(response.body).fetch("access_token")
+  end
+
+  def token_connection
+    Adapters::ConnectionBuilder.build(BASE_URL)
+  end
+
+  def api_connection
+    Adapters::ConnectionBuilder.build(BASE_URL, headers: { "Version" => API_VERSION })
+  end
+end

@@ -34,5 +34,43 @@ module Adapters
       assert_not result.success?
       assert_match(/no credentials|location id/, result.error)
     end
+
+    test "a per-client override token is used as-is, without calling GHL's OAuth endpoints" do
+      stub_request(:get, "https://services.leadconnectorhq.com/calendars/events")
+        .with(query: hash_including("locationId" => "location-123"), headers: { "Authorization" => "Bearer loc-token" })
+        .to_return(status: 200, body: { events: [] }.to_json)
+      stub_request(:get, "https://services.leadconnectorhq.com/opportunities/search")
+        .with(query: hash_including("location_id" => "location-123"), headers: { "Authorization" => "Bearer loc-token" })
+        .to_return(status: 200, body: { opportunities: [] }.to_json)
+
+      result = GhlAdapter.new(@client, report_month: @report_month).call
+
+      assert result.success?
+      assert_not_requested :post, "https://services.leadconnectorhq.com/oauth/token"
+      assert_not_requested :post, "https://services.leadconnectorhq.com/oauth/locationToken"
+    end
+
+    test "with no client override, mints a location token from the agency-wide OAuth grant" do
+      @client.client_service_links.destroy_all
+      @client.client_service_links.create!(service: "ghl", external_id: "location-123")
+      AgencyConnection.create!(service: "ghl", encrypted_credentials: {
+        access_token: "agency-access-token", refresh_token: "agency-refresh-token", company_id: "company-abc"
+      }.to_json, expires_at: 1.hour.from_now)
+
+      stub_request(:post, "https://services.leadconnectorhq.com/oauth/locationToken")
+        .with(body: hash_including("companyId" => "company-abc", "locationId" => "location-123"))
+        .to_return(status: 200, body: { access_token: "minted-location-token" }.to_json)
+
+      stub_request(:get, "https://services.leadconnectorhq.com/calendars/events")
+        .with(query: hash_including("locationId" => "location-123"), headers: { "Authorization" => "Bearer minted-location-token" })
+        .to_return(status: 200, body: { events: [] }.to_json)
+      stub_request(:get, "https://services.leadconnectorhq.com/opportunities/search")
+        .with(query: hash_including("location_id" => "location-123"), headers: { "Authorization" => "Bearer minted-location-token" })
+        .to_return(status: 200, body: { opportunities: [] }.to_json)
+
+      result = GhlAdapter.new(@client, report_month: @report_month).call
+
+      assert result.success?
+    end
   end
 end
