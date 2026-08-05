@@ -216,7 +216,8 @@ error handling.
 | `app/views/layouts/auth.html.erb` | Login layout |
 | `app/views/sessions/new.html.erb` | The login form |
 | `app/views/shared/_login_header.html.erb` | Logo and heading above the login form |
-| `app/views/shared/_alert.html.erb` | Flash notice and error banner |
+| `app/views/shared/_alert.html.erb` | Toast alert (success/error), rendered from `flash[:notice]`/`flash[:alert]` |
+| `app/javascript/controllers/toast_controller.js` | Fades the toast in, auto-dismisses it after 5s, handles manual close |
 | `app/javascript/controllers/password_visibility_controller.js` | Show/hide toggle on password fields |
 | `app/javascript/controllers/mobile_nav_controller.js` | Opens/closes the off-canvas sidebar below the `md` breakpoint |
 | `app/views/shared/_admin_sidebar.html.erb` | Nav; off-canvas panel below `md` |

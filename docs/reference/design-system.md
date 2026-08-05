@@ -235,9 +235,20 @@ Dashed border, centred, muted:
 rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600
 ```
 
-### Flash alert
+### Toast alert
 
-Use `shared/_alert`. It carries `role="alert"` and the success/error variants.
+Use `shared/_alert` (locals: `type` — `"success"`/`"error"`, `message`). Renders as a
+floating card, not a full-width banner — `fixed bottom-4 right-4` (full-width on mobile via
+`inset-x-4`), `rounded-xl border bg-white shadow-lg`, `emerald-200`/`red-200` border by
+type, `icon_badge` (`check`/`alert_circle`) plus a manual close button. `toast_controller.js`
+fades it in on connect, auto-dismisses after 5s, and removes it either on `transitionend` or
+a `setTimeout` fallback — don't rely on `transitionend` alone, it can fail to fire.
+
+`layouts/application.html.erb` renders it once, outside `<main>`, wrapping whichever of
+`notice`/`alert` is present for the request — same `flash[:notice]`/`flash[:alert]`
+mechanism as before, just floating instead of pushing page content down. `role="alert"` and
+the `id="alert-#{type}"` convention are preserved for existing test hooks
+(`test/controllers/sessions_controller_test.rb` asserts `#alert-error`).
 
 ---
 
@@ -333,8 +344,7 @@ separately.
 
 | Issue | Where | Intended |
 |---|---|---|
-| `gray-*` used instead of `slate-*` | `shared/_form_group.html.erb`, `shared/_login_header.html.erb`, `layouts/application.html.erb` | `slate-*` everywhere |
-| `green-*` used instead of `emerald-*` | `shared/_alert.html.erb` | `emerald-*` |
+| `gray-*` used instead of `slate-*` | `shared/_form_group.html.erb`, `shared/_login_header.html.erb` | `slate-*` everywhere |
 | Bare `rounded` and `rounded-md` | Scattered | The four-step ladder above |
 | `shadow-md` / `shadow-xl` one-offs | Scattered | `shadow-sm`, or `shadow-lg` if genuinely floating |
 
