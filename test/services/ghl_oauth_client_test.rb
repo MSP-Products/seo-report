@@ -76,6 +76,34 @@ class GhlOauthClientTest < ActiveSupport::TestCase
     assert_not_requested :post, TOKEN_URL
   end
 
+  test "agency_access_token! refreshes a stale token and returns the raw agency access_token" do
+    connection = AgencyConnection.create!(service: "ghl", encrypted_credentials: {
+      access_token: "stale-access-token", refresh_token: "old-refresh-token", company_id: "company-abc"
+    }.to_json, expires_at: 1.minute.ago)
+
+    stub_request(:post, TOKEN_URL)
+      .with(body: hash_including("grant_type" => "refresh_token", "refresh_token" => "old-refresh-token"))
+      .to_return(status: 200, body: { access_token: "fresh-access-token", refresh_token: "new-refresh-token", expires_in: 86400 }.to_json)
+
+    token = GhlOauthClient.new.agency_access_token!
+
+    assert_equal "fresh-access-token", token
+    assert_not_requested :post, LOCATION_TOKEN_URL
+    connection.reload
+    assert_equal "new-refresh-token", connection.credentials["refresh_token"]
+  end
+
+  test "agency_access_token! does not refresh a still-valid token" do
+    AgencyConnection.create!(service: "ghl", encrypted_credentials: {
+      access_token: "valid-access-token", refresh_token: "unused-refresh-token", company_id: "company-abc"
+    }.to_json, expires_at: 2.hours.from_now)
+
+    token = GhlOauthClient.new.agency_access_token!
+
+    assert_equal "valid-access-token", token
+    assert_not_requested :post, TOKEN_URL
+  end
+
   test "a refresh failure marks the connection expired and re-raises" do
     AgencyConnection.create!(service: "ghl", encrypted_credentials: {
       access_token: "stale", refresh_token: "bad-refresh-token", company_id: "company-abc"

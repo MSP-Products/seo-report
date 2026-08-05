@@ -37,7 +37,12 @@ Rails.application.routes.draw do
   # form (see docs/features/admin-panel.md) — saving with a HubSpot company
   # ID present triggers its own sync (ClientServiceLink#enqueue_hubspot_sync),
   # so there's no separate "sync now" endpoint.
-  resources :clients
+  resources :clients do
+    # Suggests a GHL location match by domain (see GhlLocationMatcher) — never
+    # persists anything itself, just re-renders Edit practice with a
+    # suggestion for the admin to confirm by saving.
+    resource :ghl_location_match, only: [ :create ], controller: "clients/ghl_location_matches"
+  end
 
   get "dashboard", to: "dashboard#index"
 

@@ -77,6 +77,15 @@ class GhlOauthClient
     mint_location_token!(location_id: location_id)
   end
 
+  # Called by GhlLocationMatcher — some GHL endpoints (e.g. /locations/search)
+  # are agency-scoped and take the raw agency token directly, not a minted
+  # per-location one.
+  def agency_access_token!
+    refresh! if token_stale?
+
+    @connection.credentials["access_token"]
+  end
+
   # Called by RefreshGhlTokenJob's hourly schedule to keep the agency token
   # from ever going stale between monthly report runs. A no-op, not an error,
   # when there's no connection yet — the job shouldn't fail an agency that

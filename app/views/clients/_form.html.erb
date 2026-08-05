@@ -1,4 +1,12 @@
 <%# locals: client (Client) %>
+<% if client.persisted? %>
+  <%# A standalone form, deliberately OUTSIDE the main form below — nesting a
+      second <form> inside it is invalid HTML, and browsers resolve that by
+      silently closing the outer form early (breaking Save practice
+      entirely), not by keeping both intact. The "Find GHL match" button
+      references this one by id via the form="" attribute instead. %>
+  <%= form_with url: client_ghl_location_match_path(client), method: :post, id: "ghl_location_match_form" do %><% end %>
+<% end %>
 <%= form_with model: client, class: "space-y-4" do |form| %>
   <% if client.errors.any? %>
     <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -87,6 +95,30 @@
                 <% end %>
               <% end %>
             </p>
+          <% end %>
+          <% if lf.object.service == "ghl" && client.persisted? %>
+            <p class="mt-2 pl-12 text-xs">
+              <%= button_tag "Find GHL match", type: "submit", form: "ghl_location_match_form",
+                    class: "cursor-pointer font-medium text-teal-dark hover:underline" %>
+            </p>
+            <% if @ghl_suggested_match %>
+              <p class="mt-2 pl-12 text-xs text-slate-500">
+                Suggested match: <span class="font-medium text-slate-700"><%= @ghl_suggested_match.name %></span>
+                (<%= @ghl_suggested_match.website %>) →
+                <code><%= @ghl_suggested_match.location_id %></code>
+                <button type="button" data-controller="apply-suggestion"
+                        data-apply-suggestion-value-value="<%= @ghl_suggested_match.location_id %>"
+                        data-action="apply-suggestion#apply"
+                        class="cursor-pointer font-medium text-teal-dark hover:underline">
+                  Use this
+                </button>
+                — review, then click Save practice below to confirm.
+              </p>
+            <% elsif @ghl_suggested_match == false %>
+              <p class="mt-2 pl-12 text-xs text-slate-500">
+                No GHL location found matching this practice's website.
+              </p>
+            <% end %>
           <% end %>
         </div>
       <% end %>
