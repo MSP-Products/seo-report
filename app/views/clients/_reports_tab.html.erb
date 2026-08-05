@@ -10,7 +10,7 @@
         <span>Send status</span>
         <span></span>
       </div>
-      <div class="divide-y divide-slate-100">
+      <div class="min-w-[560px] divide-y divide-slate-100">
         <% reports.each do |report| %>
           <div class="grid grid-cols-[1fr_1fr_1fr_90px] items-center gap-4 px-5 py-3.5">
             <span class="text-sm font-medium text-slate-900"><%= report.report_month.strftime("%B %Y") %></span>

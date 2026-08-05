@@ -45,7 +45,7 @@
         <span>Delivery</span>
         <span></span>
       </div>
-      <div class="divide-y divide-slate-100">
+      <div class="min-w-[900px] divide-y divide-slate-100">
         <% @query.records.each do |client| %>
           <% row = ClientRowPresenter.new(client) %>
           <%= link_to client_path(client), class: "grid grid-cols-[2fr_0.7fr_1.1fr_0.9fr_1fr_0.9fr_24px] items-center gap-4 px-5 py-3.5 hover:bg-slate-50/75" do %>
