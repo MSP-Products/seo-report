@@ -26,10 +26,10 @@
 </div>
 
 <div class="max-w-4xl">
-  <nav class="mb-6 flex gap-1 border-b border-slate-200">
+  <nav class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
     <% [["overview", "Overview"], ["reports", "Reports"], ["keywords", "Keywords"], ["sources", "Data sources"]].each do |tab, label| %>
       <%= link_to label, client_path(@client, tab: tab),
-            class: "border-b-2 px-4 py-2 text-sm font-medium #{@tab == tab ? "border-teal-primary text-teal-dark" : "border-transparent text-slate-500 hover:text-slate-700"}" %>
+            class: "shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium #{@tab == tab ? "border-teal-primary text-teal-dark" : "border-transparent text-slate-500 hover:text-slate-700"}" %>
     <% end %>
   </nav>
 

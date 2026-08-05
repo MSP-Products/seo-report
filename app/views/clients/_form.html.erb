@@ -61,19 +61,19 @@
         <% display = AgencyConnection::DISPLAY.fetch(lf.object.service) %>
         <% hubspot = lf.object.service == "hubspot" %>
         <div class="<%= hubspot ? "bg-rose-50/40" : "" %> px-4 py-3">
-          <div class="flex flex-wrap items-center gap-4">
+          <div class="flex flex-wrap items-center gap-3 sm:gap-4">
             <div class="flex size-8 shrink-0 items-center justify-center rounded-lg <%= display[:badge_class] %> text-xs font-bold text-white">
               <%= display[:letter] %>
             </div>
-            <span class="w-36 shrink-0 text-sm font-medium text-slate-900"><%= display[:name] %></span>
+            <span class="shrink-0 text-sm font-medium text-slate-900 sm:w-36"><%= display[:name] %></span>
             <%= lf.hidden_field :id %>
             <%= lf.hidden_field :service %>
-            <%= lf.text_field :external_id, placeholder: hubspot ? "HubSpot company ID" : nil,
-                  class: "min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-xs focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
             <span class="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-600">
               <span class="size-2 rounded-full <%= client_source_status_dot_class(lf.object) %>"></span>
               <%= client_source_status_label(lf.object) %>
             </span>
+            <%= lf.text_field :external_id, placeholder: hubspot ? "HubSpot company ID" : nil,
+                  class: "order-last min-w-0 basis-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-xs focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15 sm:order-none sm:basis-auto sm:flex-1" %>
           </div>
           <% if hubspot %>
             <p class="mt-2 pl-12 text-xs text-slate-500">
