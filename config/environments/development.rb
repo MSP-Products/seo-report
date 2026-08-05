@@ -28,6 +28,11 @@ Rails.application.configure do
   # Change to :null_store to avoid any caching.
   config.cache_store = :memory_store
 
+  # Solid Queue backs bin/jobs (see Procfile.dev) — it needs its own tables even
+  # though development shares one physical database with the primary connection
+  # (see config/database.yml's development: queue: entry).
+  config.solid_queue.connects_to = { database: { writing: :queue } }
+
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
