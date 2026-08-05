@@ -119,10 +119,15 @@ What each service needs:
 | Service | Field(s) |
 |---|---|
 | HubSpot | Access Token |
-| GoHighLevel | Access Token |
 | Yext | API Key |
 | SEMrush | API Key |
 | Google Analytics | Client Email **and** Private Key (see [GA4 setup](#set-up-google-analytics-for-a-practice)) |
+
+**GoHighLevel is the one exception — there's no field to paste.** Click **Connect to
+GoHighLevel** instead and authorize once through GHL's own consent screen; from then on the
+Connections page shows a live status (Active / Expiring soon / Expired) that refreshes
+itself automatically, and reconnecting only comes up again if the grant is revoked on GHL's
+side.
 
 ---
 
@@ -138,10 +143,13 @@ The Connections page shows a coloured dot and a label per service:
 | Unverified | Saved, but not yet checked against the live service |
 | Not configured | No credential saved |
 
-**These statuses are not yet updated automatically.** Nothing currently sets them by
-testing the credential, so treat them as a note rather than live monitoring. The reliable
-way to know a service is working is to [generate a report and read the
-warnings](#check-whether-a-report-worked).
+**For every service except GoHighLevel, these statuses are not yet updated
+automatically.** Nothing currently sets them by testing the credential, so treat them as a
+note rather than live monitoring for HubSpot, Yext, SEMrush, and Google Analytics. **GHL is
+the exception:** its status is live — set on every connect and refreshed hourly in the
+background — because the OAuth connection genuinely is verified each time it renews. For
+everything else, the reliable way to know a service is working is to [generate a report and
+read the warnings](#check-whether-a-report-worked).
 
 ---
 
@@ -215,6 +223,16 @@ See [where each ID comes from](#where-each-id-comes-from). Paste in the ID and *
 practice**; a status dot next to each field shows Not linked / Linked (or, for HubSpot
 specifically, Syncing… / Synced / Sync failed, since that one is a live sync rather than
 just an ID used at report time — see "Add a new practice" above).
+
+**For GoHighLevel specifically, you don't have to already know the location ID.** Click
+**Find GHL match** under that row and the system checks every sub-account in the agency's
+connected GHL account for one whose own website matches this practice's — if it finds one,
+it shows the match (name, website, location ID) for you to review. Nothing is linked yet at
+that point; you still need to click **Save practice** to actually confirm it, same as if
+you'd typed the ID in yourself. If nothing comes back ("No GHL location found matching this
+practice's website"), the practice either isn't a GHL sub-account under this agency yet, or
+its website in GHL doesn't exactly match what's on file here — type the ID in by hand if you
+have it from elsewhere.
 
 **Changing a HubSpot ID re-syncs immediately** and clears whatever the previous ID's sync
 found, so the status briefly shows "Syncing…" again rather than a stale result from the ID

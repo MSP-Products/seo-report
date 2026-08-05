@@ -12,8 +12,11 @@ module FindsClient
 
   private
 
+  # params[:client_id] covers a nested singular resource (e.g.
+  # Clients::GhlLocationMatchesController) whose parent id arrives under that
+  # key instead of :id — inert for every other caller, which always has :id.
   def set_client
-    @client = Client.kept.find(params[:id])
+    @client = Client.kept.find(params[:id] || params[:client_id])
   end
 
   # onboarding_status/onboarded_at/ai_seo_enrolled are excluded: SyncClientFromHubspot

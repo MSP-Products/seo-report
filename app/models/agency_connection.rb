@@ -35,9 +35,11 @@ class AgencyConnection < ApplicationRecord
   # token — its private_key is `multiline: true` so the form renders a
   # textarea instead of a single-line input (the key is a multi-line PEM
   # string; browsers can mangle newlines pasted into a plain <input>).
+  # ghl is intentionally empty — its access_token/refresh_token are OAuth-managed
+  # (see GhlOauthClient), never hand-typed. See #oauth_managed?.
   CREDENTIAL_FIELDS = {
     "hubspot" => [ { key: "access_token", label: "Access Token" } ],
-    "ghl" => [ { key: "access_token", label: "Access Token" } ],
+    "ghl" => [],
     "yext" => [ { key: "api_key", label: "API Key" } ],
     "semrush" => [ { key: "api_key", label: "API Key" } ],
     "google_analytics" => [
@@ -67,8 +69,16 @@ class AgencyConnection < ApplicationRecord
     CREDENTIAL_FIELDS.fetch(service)
   end
 
+  # ghl has no hand-typed credential_fields (see CREDENTIAL_FIELDS) but is not
+  # "unavailable" the way a genuinely unbuilt integration would be — it's
+  # configured via the OAuth connect flow instead. Drives the Connections
+  # edit view's branch and the status_label guard below.
+  def oauth_managed?
+    service == "ghl"
+  end
+
   def status_label
-    return "Not available yet" if credential_fields.empty?
+    return "Not available yet" if credential_fields.empty? && !oauth_managed?
     return "Active" if credential_active?
     return "Expiring soon" if credential_expiring_soon?
     return "Expired" if credential_expired?

@@ -19,7 +19,7 @@
       <% end %>
     </div>
 
-    <% if connection.credential_fields.any? %>
+    <% if connection.credential_fields.any? || connection.oauth_managed? %>
       <%= link_to "Edit", edit_connection_path(connection.service), class: "text-sm font-medium text-teal-dark hover:underline" %>
     <% end %>
   </div>
