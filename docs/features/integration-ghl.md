@@ -40,7 +40,11 @@ it is the number practices care about most.
   Connections → GoHighLevel, an admin clicks **Connect to GoHighLevel** and authorizes once
   through GHL's own consent screen. From then on, every practice's data flows through that
   one grant — there is no access token to copy-paste, and none is ever shown back.
-- **Per practice:** the GHL **location ID** (the sub-account ID), same as before.
+- **Per practice:** the GHL **location ID** (the sub-account ID). An admin can type this in
+  by hand, or click **Find GHL match** on the Edit practice page to have the system suggest
+  one by matching the practice's website against every GHL sub-account's own website — see
+  [Location auto-match by domain](#location-auto-match-by-domain) below. Either way, nothing
+  is linked until the admin saves the form.
 
 ### The enrolment signal
 
@@ -105,6 +109,18 @@ scheduler.**
 A: Confirm the location ID is right, then check directly in GHL whether that location's
 calendars actually have events in the target month — 0 is a real, correctly-computed
 answer when there is genuinely no calendar activity, not necessarily a bug.
+
+**Q: I clicked "Find GHL match" and got "No GHL location found matching this practice's
+website."**
+A: Either the practice's `website_url` doesn't exactly match the `website` field on any GHL
+sub-account (check for a typo, a missing/extra `www.`, or the practice using a different
+domain in GHL than on their real site), or the practice genuinely has no sub-account in this
+agency's GHL account yet. Either way, type the location ID in by hand if you have it from
+another source.
+
+**Q: The suggested match is wrong.**
+A: It's a suggestion, not an assignment — nothing is saved until you click **Save practice**.
+Just type the correct ID into the field yourself instead of using the suggestion.
 
 ---
 
@@ -250,6 +266,94 @@ and it is easy to get wrong when adding a third call:
   and re-raises — surfaced on the Connections page, and it will fail generation for any
   practice linked to GHL until an admin reconnects.
 
+### Location auto-match by domain
+
+`GhlLocationMatcher` (`app/services/ghl_location_matcher.rb`) suggests a GHL location for a
+`Client` by matching each of the agency's sub-accounts' own `website` field against the
+practice's `website_url` — a suggestion for an admin to confirm on the Edit practice page,
+never a silent auto-assign. Triggered by a **Find GHL match** button, scoped to persisted
+clients only (a brand-new, unsaved client has no ID to hang the lookup route off of).
+
+**Endpoint** — `GET /locations/search` (agency-token scoped; no per-location token mint
+needed, unlike the two report-data calls above):
+
+| Parameter | Value |
+|---|---|
+| `companyId` | the agency's own company ID, from the stored grant |
+| `skip` / `limit` | pagination — `limit: 100` confirmed live (GHL's docs only document a default of 10, not a documented maximum) |
+
+Response shape: `{ "locations": [ { "id", "name", "website", "domain", ... } ] }`. **`website`
+is the field to match on** — it carries the practice's real site URL (e.g.
+`https://www.adamsdentalassociates.com/`). There's a separate `domain` field on the same
+object, but it was blank on every real location checked — it isn't the practice's own site.
+
+**Matching is exact, not fuzzy** — both sides are normalized (strip `https?://`, strip
+`www.`, strip a trailing slash, downcase — the same shape as
+`SemrushAdapter#tracked_url_mask`, copied rather than shared: this is only the second
+occurrence, and the rule of three says extract on the third, not the second) and compared
+for equality. No partial-match ranking, no Levenshtein distance — a mismatch just means "no
+match," not "closest match."
+
+**How it's wired up:**
+
+1. `Clients::GhlLocationMatchesController#create` (`POST
+   /clients/:client_id/ghl_location_match`) calls `GhlLocationMatcher.new(@client).call` and
+   re-renders `clients/edit` with the result in `@ghl_suggested_match` — a `Match` (found), or
+   `false` (checked, nothing found). It never touches `@client.client_service_links` or saves
+   anything.
+2. `rescue_from Faraday::Error, GhlOauthClient::NotConnectedError` catches a genuine API
+   failure and flashes a generic alert instead — this is what lets the view distinguish
+   "checked, found nothing" (`false`) from "couldn't check at all" (`@ghl_suggested_match`
+   stays unset, no caption renders, alert shows instead).
+3. The view shows the match's name/website/location ID as plain text (readable and
+   copy-pasteable with no JavaScript at all) plus a **Use this** button that fills the
+   adjacent `external_id` field client-side
+   (`app/javascript/controllers/apply_suggestion_controller.js`, a small Stimulus controller
+   in the same size class as `copy_controller.js`). Either way, the admin still has to click
+   **Save practice** to actually persist it — same as typing the ID in by hand.
+
+**A real HTML gotcha this surfaced, worth not repeating:** the trigger button cannot be a
+`button_to` (or any element rendering its own `<form>`) nested inside the main
+`_form.html.erb`'s `form_with` block. Nested `<form>` elements are invalid HTML, and browsers
+handle the resulting stray closing tag by silently closing the **outer** form early —
+which would have orphaned **Save practice** outside any form entirely (clicking it would do
+nothing). The fix: a standalone, empty `form_with` (`id="ghl_location_match_form"`) rendered
+*before* the main form opens, and a plain `button_tag ..., form: "ghl_location_match_form"` —
+HTML5's `form=""` attribute lets a button submit a form it isn't nested inside, with no
+JavaScript involved. See `app/views/clients/_form.html.erb`.
+
+**Route note:** `resource :ghl_location_match, only: [:create]` nested under `resources
+:clients` puts the parent id under `params[:client_id]`, not `params[:id]` — `FindsClient`'s
+`set_client` checks both (`params[:id] || params[:client_id]`), so every existing caller is
+unaffected and this one new controller works without its own loader.
+
+### Recovery: moving a GHL connection between environments
+
+Local dev has no OAuth redirect URI of its own registered with GHL — only production's
+stable Railway URL (and, transiently, an ngrok tunnel while actively testing) are. Day to
+day this doesn't matter: refreshing an existing token (`grant_type: "refresh_token"`) takes
+no `redirect_uri` at all, so a connected local dev environment keeps refreshing itself
+indefinitely with zero redirect-URI involvement. It only becomes a problem if local dev's
+refresh token goes fully invalid (revoked, or expired from long disuse) and needs a genuine
+**re**authorization — which localhost can't do on its own.
+
+The fix doesn't require registering a new redirect URI at all: the agency-level grant is the
+same GHL company regardless of which environment's database holds it, so a token pair
+obtained anywhere (production, which always has a valid registered redirect URI) can be
+copied directly into another environment's `AgencyConnection` row.
+
+```bash
+# on the source environment (e.g. production, via Railway's console)
+bin/rails ghl:print_connection
+# copy the printed JSON, then on the target environment:
+GHL_CONNECTION_JSON='<pasted json>' bin/rails ghl:import_connection
+```
+
+See `lib/tasks/ghl.rake`. **The printed JSON contains a live access_token/refresh_token** —
+handle it like any other credential. `ghl:print_connection` should only ever be run directly
+by a human in their own terminal, never piped through a channel that might log or display
+it — that's exactly the mistake to avoid (see Gotchas).
+
 ### Field mapping
 
 → `ReportTraffic`
@@ -283,11 +387,19 @@ no third `ghl_data_status` value is ever written (see
 | `app/views/connections/edit.html.erb` | Renders status + Connect/Reauthorize instead of a field form, for `oauth_managed?` services |
 | `config/routes.rb` | `/connections/scheduler/authorize` / `/connections/scheduler/callback` (path avoids GHL's brand-reference check; route helpers stay `ghl_*`) |
 | `config/initializers/filter_parameter_logging.rb` | Filters `:code` so the callback's query string never lands unredacted in logs |
-| `test/services/ghl_oauth_client_test.rb` | Code exchange, refresh + rotation, `refresh_if_stale!`, failure paths |
+| `app/services/ghl_location_matcher.rb` | Paginated `/locations/search` + domain-normalized matching |
+| `app/controllers/clients/ghl_location_matches_controller.rb` | `create` — computes the suggestion, re-renders `clients/edit` |
+| `app/controllers/concerns/finds_client.rb` | `set_client` — accepts `params[:client_id]` (this controller's nested-resource param) as well as `params[:id]` |
+| `app/views/clients/_form.html.erb` | The GHL row's suggestion caption + the standalone `ghl_location_match_form` (see Gotchas) |
+| `app/javascript/controllers/apply_suggestion_controller.js` | Click-to-fill the suggested location ID; JS optional, the ID is always visible as plain text too |
+| `lib/tasks/ghl.rake` | `ghl:print_connection` / `ghl:import_connection` — the cross-environment recovery path |
+| `test/services/ghl_oauth_client_test.rb` | Code exchange, refresh + rotation, `refresh_if_stale!`, `agency_access_token!`, failure paths |
 | `test/controllers/connections/ghl_oauth_controller_test.rb` | State mismatch, successful callback, role gate |
 | `test/services/adapters/ghl_adapter_test.rb` | Both calls, the per-client override path, the missing-location-id case |
 | `test/jobs/refresh_ghl_token_job_test.rb` | Delegates to `refresh_if_stale!`; no-op when never connected |
 | `test/models/agency_connection_test.rb` | `oauth_managed?`, `status_label` branching |
+| `test/services/ghl_location_matcher_test.rb` | Match found (incl. across pagination), no match, blank `website_url`/missing `company_id` short-circuit without an HTTP call, HTTP failure propagates |
+| `test/controllers/clients/ghl_location_matches_controller_test.rb` | Match found, no match, GHL error → generic alert, `support` role blocked |
 
 ### Data
 
@@ -347,6 +459,16 @@ works unchanged; the OAuth grant is only the fallback when no override exists.
   There is no "linked but degraded" state — see [report-generation](report-generation.md).
 - **`monetaryValue` is coerced with `to_f`**, so a missing or non-numeric value contributes
   zero rather than raising.
+- **Never nest a `button_to` (or anything else rendering its own `<form>`) inside
+  `_form.html.erb`'s main `form_with`.** It's invalid HTML, and the browser resolves it by
+  closing the *outer* form early — which silently breaks **Save practice**, not just the
+  nested control. Use the `form=""` attribute pattern instead (see Location auto-match by
+  domain, above).
+- **`ghl:print_connection` prints a live access_token/refresh_token to stdout.** Only ever
+  run it directly in a human's own terminal — piping it through any tool or channel that
+  logs/displays its output is a real credential exposure, not a hypothetical one.
+- **The Locations API's `domain` field is not the practice's website** — it was blank on
+  every real location checked. Match on `website`.
 
 ### Not built yet
 
@@ -361,6 +483,10 @@ works unchanged; the OAuth grant is only the fallback when no override exists.
   [Observability](../../CLAUDE.md#observability-and-operations)), but worth knowing this is
   the one place a silent failure would first surface.
 - No appointment or opportunity detail is stored, only the aggregates.
+- **Location auto-match is a suggestion only** — there's no bulk "match every unlinked
+  practice" action, only the one-at-a-time button on Edit practice. Confirmed via the full
+  service/controller test suite and a live `/locations/search` call against the real agency
+  account; not yet separately confirmed end-to-end through a live click in a browser.
 
 ---
 
@@ -381,3 +507,7 @@ works unchanged; the OAuth grant is only the fallback when no override exists.
   OAuth endpoint, before falling back to the agency grant.
 - **Re-confirm any new GHL query parameter against a live call**, not just the Marketplace
   docs page — this integration has two confirmed cases of the docs being wrong.
+- **Location auto-match must stay a suggestion, never a silent auto-assign.** Any change
+  here must still require the admin to click Save practice before anything is persisted.
+- **Never add a second `<form>` element nested inside `_form.html.erb`'s main form.** Use
+  the `form=""` attribute pattern for any future standalone action on that page.

@@ -224,6 +224,16 @@ practice**; a status dot next to each field shows Not linked / Linked (or, for H
 specifically, Syncing… / Synced / Sync failed, since that one is a live sync rather than
 just an ID used at report time — see "Add a new practice" above).
 
+**For GoHighLevel specifically, you don't have to already know the location ID.** Click
+**Find GHL match** under that row and the system checks every sub-account in the agency's
+connected GHL account for one whose own website matches this practice's — if it finds one,
+it shows the match (name, website, location ID) for you to review. Nothing is linked yet at
+that point; you still need to click **Save practice** to actually confirm it, same as if
+you'd typed the ID in yourself. If nothing comes back ("No GHL location found matching this
+practice's website"), the practice either isn't a GHL sub-account under this agency yet, or
+its website in GHL doesn't exactly match what's on file here — type the ID in by hand if you
+have it from elsewhere.
+
 **Changing a HubSpot ID re-syncs immediately** and clears whatever the previous ID's sync
 found, so the status briefly shows "Syncing…" again rather than a stale result from the ID
 you just replaced.

@@ -2,7 +2,7 @@
 title: Admin panel
 slug: admin-panel
 status: partial
-last_verified: 2026-08-05
+last_verified: 2026-08-06
 related: [integrations, report-generation]
 ---
 
@@ -10,7 +10,7 @@ related: [integrations, report-generation]
 
 > **Status:** partial — login, Dashboard, Connections, and Clients work; admin user
 > management and credential verification are still missing ·
-> **Last verified:** 2026-08-05
+> **Last verified:** 2026-08-06
 >
 > The internal, logged-in side of the system: who can get in, and what they see once
 > they're in.
@@ -89,7 +89,11 @@ There is no separate "sync now" control — saving the form is the trigger.
 one row per service (HubSpot, GoHighLevel, Yext, SEMrush, Google Analytics), each an ID
 field plus a status dot. HubSpot's row additionally shows its live sync state (Syncing… /
 Synced *n* ago / Sync failed, with a plain-language reason on failure) since it's the one
-service whose ID drives more than report data.
+service whose ID drives more than report data. **GoHighLevel's row, on Edit practice only,**
+additionally has a **Find GHL match** action that suggests a location ID by matching the
+practice's website against every GHL sub-account's own — a suggestion only, never a silent
+auto-assign; the admin still has to click Save practice to persist it. See
+[integration-ghl](integration-ghl.md#location-auto-match-by-domain).
 
 **The Clients index's "HubSpot sync" column mirrors the Edit page's status**, so an admin
 scanning the whole list can see which practices are mid-sync or failing without opening
@@ -261,6 +265,9 @@ error handling.
 | `app/views/clients/new.html.erb` | Thin wrapper around `_form` for `create` |
 | `app/views/clients/edit.html.erb` | Thin wrapper around `_form` for `update` |
 | `app/javascript/controllers/copy_controller.js` | Copy-to-clipboard for the report link and any other `data-controller="copy"` field |
+| `app/controllers/clients/ghl_location_matches_controller.rb` | The **Find GHL match** action — see [integration-ghl](integration-ghl.md#location-auto-match-by-domain) |
+| `app/services/ghl_location_matcher.rb` | The domain-matching logic itself |
+| `app/javascript/controllers/apply_suggestion_controller.js` | Click-to-fill the suggested location ID into the field above |
 | `test/controllers/clients_controller_test.rb` | Search/filter/pagination, create/update incl. nested attributes, HubSpot sync enqueue, role gating, discard-not-delete |
 | `test/models/client_test.rb` | Onboarding-status default, conditional name validation, placeholder name, `search`/`by_status` scopes |
 | `test/models/client_service_link_test.rb` | Sync-enqueue conditions, sync-status reset on ID change |
@@ -303,6 +310,8 @@ Invariants:
 | Service with no configurable fields | Redirect, "isn't configurable yet" | Nothing |
 | HubSpot sync fails (bad ID, no access, timeout, etc.) | Plain-language reason on the Overview tab, Edit form, and index row | `client_service_links.last_sync_error` |
 | Client created/edited with no name and no HubSpot ID | 422, "Name can't be blank" | Nothing |
+| GHL location match: no location's website matches | "No GHL location found matching this practice's website." | Nothing |
+| GHL location match: GHL API call fails | Generic "Couldn't reach GoHighLevel…" alert | Nothing |
 
 **No failed-login auditing of any kind.** Nothing records or limits repeated attempts.
 
@@ -349,6 +358,10 @@ practice to see it.
   move into `app/controllers/concerns/`. They are the documented migration targets.
 - **Login has no rate limiting**, and looking the user up before authenticating leaks which
   emails exist through response timing. Both are recorded in CLAUDE.md → Security.
+- **The GHL suggestion button (`Find GHL match`) is not a `button_to`** — a nested `<form>`
+  inside `_form.html.erb`'s main form is invalid HTML and silently breaks **Save practice**.
+  It uses the `form=""` attribute instead. See
+  [integration-ghl](integration-ghl.md#location-auto-match-by-domain).
 
 ### Not built yet
 
