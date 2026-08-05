@@ -1,0 +1,37 @@
+<% content_for :title, "#{@client.name} — My Social Practice" %>
+
+<%= link_to "← Clients", clients_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+
+<div class="mb-6 mt-2 rounded-2xl bg-gradient-to-br from-teal-dark via-teal-primary to-cyan-primary p-6 shadow-sm">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <span class="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white">
+      <%= @client.onboarding_status.capitalize %> client<% if @client.onboarded_at %> · onboarded <%= @client.onboarded_at.strftime("%b %Y") %><% end %>
+    </span>
+    <% if current_admin_user.admin? %>
+      <div class="flex items-center gap-2">
+        <%= link_to "Edit practice", edit_client_path(@client),
+              class: "rounded-lg bg-white px-4 py-2 text-sm font-medium text-teal-dark hover:bg-slate-50" %>
+        <%= button_to "Offboard", client_path(@client), method: :delete,
+              data: { turbo_confirm: "Offboard #{@client.name}? This hides them everywhere but keeps their history." },
+              class: "rounded-lg bg-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/25" %>
+      </div>
+    <% end %>
+  </div>
+  <h1 class="mt-3 text-2xl font-semibold tracking-tight text-white"><%= @client.name %></h1>
+  <p class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-teal-50">
+    <% if @client.address.present? %><span><%= @client.address %></span><% end %>
+    <% if @client.website_url.present? %><span><%= @client.website_url %></span><% end %>
+    <% if @client.phone.present? %><span><%= @client.phone %></span><% end %>
+  </p>
+</div>
+
+<div class="max-w-4xl">
+  <nav class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
+    <% [["overview", "Overview"], ["reports", "Reports"], ["keywords", "Keywords"], ["sources", "Data sources"]].each do |tab, label| %>
+      <%= link_to label, client_path(@client, tab: tab),
+            class: "shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium #{@tab == tab ? "border-teal-primary text-teal-dark" : "border-transparent text-slate-500 hover:text-slate-700"}" %>
+    <% end %>
+  </nav>
+
+  <%= render "clients/#{@tab}_tab", client: @client %>
+</div>

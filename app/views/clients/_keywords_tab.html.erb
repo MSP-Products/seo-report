@@ -1,0 +1,40 @@
+<%# locals: client (Client) %>
+<% latest_report = client.monthly_reports.generated.order(report_month: :desc).first %>
+<% rankings = latest_report&.report_keyword_rankings&.sort_by { |row| row.keyword.keyword } || [] %>
+
+<% if latest_report %>
+  <p class="mb-3 text-xs text-slate-500">
+    From the <%= latest_report.report_month.strftime("%B %Y") %> report — refreshed automatically from
+    SEMrush on the next generation run, not editable here.
+  </p>
+<% end %>
+
+<% if rankings.any? %>
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="overflow-x-auto">
+      <div class="grid min-w-[480px] grid-cols-[2fr_1fr_1fr_1fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span>Keyword</span>
+        <span>Intent</span>
+        <span>KD %</span>
+        <span>Position</span>
+      </div>
+      <div class="min-w-[480px] divide-y divide-slate-100">
+        <% rankings.each do |row| %>
+          <div class="grid grid-cols-[2fr_1fr_1fr_1fr] items-center gap-4 px-5 py-3.5">
+            <p class="truncate text-sm font-medium text-slate-900"><%= row.keyword.keyword %></p>
+            <span class="inline-flex w-fit items-center rounded-md px-2 py-0.5 text-xs font-medium <%= intent_badge_class(row.intent) %>">
+              <%= row.intent %>
+            </span>
+            <span class="text-sm tabular-nums <%= keyword_difficulty_class(row.keyword_difficulty) %>"><%= row.keyword_difficulty %></span>
+            <span class="text-sm tabular-nums text-slate-900"><%= row.position.present? ? "##{row.position}" : "—" %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% else %>
+  <div class="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+    No tracked keywords yet — these are discovered automatically from SEMrush the first
+    time a report generates for this practice.
+  </div>
+<% end %>

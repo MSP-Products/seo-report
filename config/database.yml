@@ -14,8 +14,13 @@ default: &default
   port: 5432
 
 development:
-  <<: *default
-  database: msp_seo_report_development
+  primary:
+    <<: *default
+    database: msp_seo_report_development
+  queue:
+    <<: *default
+    database: msp_seo_report_development
+    migrations_paths: db/queue_migrate
 
 # Warning: The database defined as "test" will be erased and
 # re-generated from your development database when you run "rake".

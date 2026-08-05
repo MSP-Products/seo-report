@@ -1,0 +1,171 @@
+<%# locals: client (Client) %>
+<%= form_with model: client, class: "space-y-4" do |form| %>
+  <% if client.errors.any? %>
+    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <p class="font-medium"><%= pluralize(client.errors.count, "error") %> prevented this practice from saving:</p>
+      <ul class="mt-1 list-disc pl-5">
+        <% client.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Step 1</p>
+    <h2 class="mt-0.5 text-base font-semibold text-slate-900">Practice details</h2>
+    <p class="mt-1 text-sm text-slate-500">
+      Fill these in by hand, or enter the HubSpot company ID below and sync them automatically.
+    </p>
+
+    <div class="mt-5 space-y-5">
+      <div>
+        <%= form.label :name, "Practice name", class: "block text-sm font-medium text-slate-700" %>
+        <%= form.text_field :name,
+              class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
+        <p class="mt-1.5 text-xs text-slate-500">Optional if you enter a HubSpot company ID below — it'll be filled in from there.</p>
+      </div>
+
+      <div class="grid gap-5 sm:grid-cols-2">
+        <div>
+          <%= form.label :website_url, "Website URL", class: "block text-sm font-medium text-slate-700" %>
+          <%= form.url_field :website_url, placeholder: "https://",
+                class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
+        </div>
+        <div>
+          <%= form.label :phone, class: "block text-sm font-medium text-slate-700" %>
+          <%= form.telephone_field :phone,
+                class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
+        </div>
+      </div>
+
+      <div>
+        <%= form.label :address, class: "block text-sm font-medium text-slate-700" %>
+        <%= form.text_field :address,
+              class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
+        <p class="mt-1.5 text-xs text-slate-500">Shown in the report header. Synced from Yext when a location is linked.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Step 2</p>
+    <h2 class="mt-0.5 text-base font-semibold text-slate-900">Data sources</h2>
+    <p class="mt-1 text-sm text-slate-500">
+      Each service uses the agency-wide credentials by default. Add an account ID so this
+      practice's data can be pulled, or override credentials if the client has their own account.
+    </p>
+
+    <div class="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
+      <%= form.fields_for :client_service_links, client.service_links_for_form do |lf| %>
+        <% display = AgencyConnection::DISPLAY.fetch(lf.object.service) %>
+        <% hubspot = lf.object.service == "hubspot" %>
+        <div class="<%= hubspot ? "bg-rose-50/40" : "" %> px-4 py-3">
+          <div class="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div class="flex size-8 shrink-0 items-center justify-center rounded-lg <%= display[:badge_class] %> text-xs font-bold text-white">
+              <%= display[:letter] %>
+            </div>
+            <span class="shrink-0 text-sm font-medium text-slate-900 sm:w-36"><%= display[:name] %></span>
+            <%= lf.hidden_field :id %>
+            <%= lf.hidden_field :service %>
+            <span class="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-600">
+              <span class="size-2 rounded-full <%= client_source_status_dot_class(lf.object) %>"></span>
+              <%= client_source_status_label(lf.object) %>
+            </span>
+            <%= lf.text_field :external_id, placeholder: hubspot ? "HubSpot company ID" : nil,
+                  class: "order-last min-w-0 basis-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-xs focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15 sm:order-none sm:basis-auto sm:flex-1" %>
+          </div>
+          <% if hubspot %>
+            <p class="mt-2 pl-12 text-xs text-slate-500">
+              Saving with a company ID syncs this practice's name, address, website, onboarding
+              status, and AI SEO enrollment from HubSpot immediately, and again every day after
+              that. <span class="font-medium text-slate-700">A practice only reaches Active once this sync succeeds.</span>
+              <% if client.persisted? %>
+                <br><%= hubspot_sync_status_label(lf.object) %>
+                <% if lf.object.last_sync_error.present? %>
+                  · <span class="text-red-600"><%= hubspot_sync_error_message(lf.object) %></span>
+                <% end %>
+              <% end %>
+            </p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <% if client.persisted? %>
+    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="flex items-start justify-between gap-4">
+        <h2 class="text-base font-semibold text-slate-900">Reporting</h2>
+        <span class="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Read-only · synced</span>
+      </div>
+      <p class="mt-1 text-sm text-slate-500">
+        These flags are owned by HubSpot and GoHighLevel. They're pulled on every run and shown
+        here so you can see what the report will render — change them in the source system, not
+        in this panel.
+      </p>
+
+      <dl class="mt-4 divide-y divide-slate-100 text-sm">
+        <div class="flex items-center justify-between gap-4 py-3">
+          <div>
+            <dt class="font-medium text-slate-900">Onboarding status</dt>
+            <dd class="text-slate-500">Active practices are included in the monthly run.</dd>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <span class="rounded-full px-2 py-0.5 text-xs font-medium <%= client_status_badge_class(client) %>"><%= client.onboarding_status.capitalize %></span>
+            <span class="text-xs text-slate-400">HubSpot</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between gap-4 py-3">
+          <div>
+            <dt class="font-medium text-slate-900">Onboarded on</dt>
+            <dd class="text-slate-500">Drives the "first report after onboarding" layout.</dd>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+              <%= client.onboarded_at&.strftime("%b %-d, %Y") || "—" %>
+            </span>
+            <span class="text-xs text-slate-400">HubSpot</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between gap-4 py-3">
+          <div>
+            <dt class="font-medium text-slate-900">AI SEO enrolled</dt>
+            <dd class="text-slate-500">Shows AI Visibility instead of the not-enrolled state.</dd>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <span class="rounded-full px-2 py-0.5 text-xs font-medium <%= client.ai_seo_enrolled? ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600" %>">
+              <%= client.ai_seo_enrolled? ? "Enrolled" : "Not enrolled" %>
+            </span>
+            <span class="text-xs text-slate-400">HubSpot</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between gap-4 py-3">
+          <div>
+            <dt class="font-medium text-slate-900">Online scheduler</dt>
+            <dd class="text-slate-500">Enables appointments and revenue, else the "?" callout.</dd>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <span class="rounded-full px-2 py-0.5 text-xs font-medium <%= client.online_scheduler_connected? ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600" %>">
+              <%= client.online_scheduler_connected? ? "Connected" : "Not connected" %>
+            </span>
+            <span class="text-xs text-slate-400">GoHighLevel</span>
+          </div>
+        </div>
+      </dl>
+    </div>
+  <% end %>
+
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <%= form.submit client.new_record? ? "Add client" : "Save practice",
+            class: "cursor-pointer rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
+      <%= link_to "Cancel", client.new_record? ? clients_path : client_path(client), class: "text-sm text-slate-500 hover:text-slate-700" %>
+    </div>
+    <% if client.persisted? %>
+      <%= button_to "Offboard", client_path(client), method: :delete,
+            data: { turbo_confirm: "Offboard #{client.name}? This hides them everywhere but keeps their history." },
+            class: "cursor-pointer text-sm font-medium text-red-600 hover:text-red-700 hover:underline" %>
+    <% end %>
+  </div>
+<% end %>

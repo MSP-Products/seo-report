@@ -2,7 +2,7 @@
 title: GoHighLevel integration
 slug: integration-ghl
 status: partial
-last_verified: 2026-08-02
+last_verified: 2026-08-05
 related: [integrations, monthly-report, report-generation]
 ---
 
@@ -56,11 +56,16 @@ claims about them.
 | Situation | What the client sees | Stored as |
 |---|---|---|
 | No GHL link at all | **?** for both figures, plus the explanatory note | `not_connected` |
-| Linked but the call failed | The same **?** and note | `access_unavailable` |
+| Linked but the call failed | **Nothing — report generation fails entirely** for that practice and month | `report_generation_logs` status `failed` |
 | Linked and working | Real figures, revenue in the hero tile | `connected` |
 
-The first two look identical to the practice but are stored as different states, so
-afterwards you can tell "they don't use the scheduler" from "we couldn't reach GHL".
+**A linked practice is expected to have a working GHL connection.** Presence of the link
+is still the enrolment signal, but it now carries weight: an unlinked practice degrades
+gracefully (no scheduler, `?` placeholders), while a linked one that fails aborts the whole
+report — it isn't rendered with placeholders. See
+[report-generation](report-generation.md#when-data-is-missing) for why: HubSpot, GA4, Yext,
+and SEMrush are unconditionally mandatory, and GHL/AI SEO are mandatory the moment a
+practice opts in.
 
 ### Known limits
 
@@ -134,16 +139,19 @@ easy to get wrong when adding a third call:
 | `sum(opportunities[].monetaryValue)` | `estimated_revenue` |
 | *constant* `"connected"` | `ghl_data_status` |
 
-`ghl_data_status` is set to `not_connected` or `access_unavailable` by `ReportGenerator`,
-not by this adapter — the adapter only ever reports success.
+`ghl_data_status` is set to `not_connected` (no link) by `ReportGenerator` before ever
+calling this adapter, or to `"connected"` after a successful call — those are the only two
+values now. A failed call never reaches `traffic.save!`; `ReportGenerator` raises first, so
+no third `ghl_data_status` value is ever written (see
+[report-generation](report-generation.md)).
 
 ### Key files
 
 | Path | Role in this feature |
 |---|---|
 | `app/services/adapters/ghl_adapter.rb` | Both calls |
-| `app/services/report_generator.rb` | `sync_traffic` — decides `not_connected` vs `access_unavailable` before or after calling |
-| `app/models/report_traffic.rb` | The three-value `ghl_data_status` enum |
+| `app/services/report_generator.rb` | `sync_traffic` — sets `not_connected` without calling, or raises on a linked call's failure |
+| `app/models/report_traffic.rb` | The two-value `ghl_data_status` enum |
 | `app/presenters/report_presenter.rb` | `ghl_connected?` — drives the `?` placeholder |
 | `app/views/reports/_traffic.html.erb` | The `?` placeholders and explanatory callout |
 | `test/services/adapters/ghl_adapter_test.rb` | Both calls, and the missing-location-id case |
@@ -162,9 +170,9 @@ all.
 | Failure | Result | Recorded in |
 |---|---|---|
 | No `ClientServiceLink` for `ghl` | Adapter **never constructed**; `ghl_data_status: "not_connected"` | Nothing — a normal state |
-| Link exists, `external_id` blank | `Result.failure("ghl: no location id configured…")` | `error_log`, status `access_unavailable` |
-| HTTP error after retries | `Result.failure` | `error_log`, status `access_unavailable` |
-| Missing `Version` header | Request rejected by GHL | `error_log` |
+| Link exists, `external_id` blank | `Result.failure("ghl: no location id configured…")` → `ReportGenerator` raises | `report_generation_logs` status `failed` |
+| HTTP error after retries | `Result.failure` → `ReportGenerator` raises | `report_generation_logs` status `failed` |
+| Missing `Version` header | Request rejected by GHL → `Result.failure` → raises | `report_generation_logs` status `failed` |
 
 ### Gotchas
 
@@ -177,6 +185,8 @@ all.
 - **The adapter never returns a non-`connected` status** — that distinction is
   `ReportGenerator`'s, which is why `sync_traffic` has branching that looks redundant but
   is not.
+- **A linked practice's GHL failure now fails the whole report**, not just this section.
+  There is no more "linked but degraded" state — see [report-generation](report-generation.md).
 - **`monetaryValue` is coerced with `to_f`**, so a missing or non-numeric value contributes
   zero rather than raising.
 
@@ -195,7 +205,8 @@ all.
 
 - **Keep link-presence as the enrolment signal**, or introduce an explicit flag and migrate
   deliberately — but do not have both.
-- **Keep `not_connected` and `access_unavailable` distinct.** They look identical to the
-  client but must stay distinguishable to MSP.
+- **A linked practice's GHL call must be mandatory.** Don't reintroduce a degrade path for
+  "linked but failed" — that decision was deliberately reversed (see
+  [report-generation](report-generation.md#changing-this-feature)).
 - **Never call GHL for an unlinked practice.** The check exists so an unenrolled practice
-  costs nothing and generates no misleading warning.
+  costs nothing and never blocks their report.

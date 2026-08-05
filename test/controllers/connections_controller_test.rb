@@ -94,12 +94,4 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_no_match(/secret-key-material/, response.body)
   end
-
-  private
-
-  def sign_in_as(role:)
-    admin = AdminUser.create!(email: "admin-#{SecureRandom.hex(4)}@example.com", password: "password123", role: role)
-    post login_path, params: { email: admin.email, password: "password123" }
-    admin
-  end
 end

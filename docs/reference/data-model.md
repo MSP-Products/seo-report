@@ -149,7 +149,7 @@ recreated on each generation run, which is what makes generation idempotent.
 | `total_visits`, `unique_visitors`, `pages_per_visit` | GA4 |
 | `organic_visits`, `direct_visits`, `referral_visits`, `paid_visits` | GA4, by channel. **`paid_visits` sums five paid channels** |
 | `appointments_booked`, `estimated_revenue` | GHL. Revenue is `decimal(12,2)` |
-| `ghl_data_status` | Enum: `connected` / `not_connected` / `access_unavailable` |
+| `ghl_data_status` | Enum: `connected` / `not_connected`. A linked practice's failed call fails the whole report rather than writing a third status here — see [report-generation](../features/report-generation.md) |
 | `previous_*` (seven columns) | **Never written.** Intended for month-over-month traffic movement |
 
 `total_visits` being present is what `ReportPresenter#ga4_available?` keys on — that one

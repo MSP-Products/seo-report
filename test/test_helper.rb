@@ -12,6 +12,8 @@ WebMock.disable_net_connect!
 # doesn't conflict with this project's no-fixtures convention.
 Service::KEYS.each { |key| Service.find_or_create_by!(key: key) }
 
+Dir[Rails.root.join("test/support/**/*.rb")].each { |f| require f }
+
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers, once the suite is large
@@ -29,4 +31,8 @@ module ActiveSupport
 
     # Add more helper methods to be used by all tests here...
   end
+end
+
+class ActionDispatch::IntegrationTest
+  include AuthenticationHelpers
 end

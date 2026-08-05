@@ -215,9 +215,10 @@ Invariants that matter here:
 - **Tailwind only compiles class names it can see literally.** Never interpolate a colour
   into a class string in these views.
 - **Icons never go inline.** New icons are added to `ICON_INNER` in `reports_helper.rb`.
-- **`ghl_data_status` has three values**, not two: `connected`, `not_connected` (no link
-  configured) and `access_unavailable` (link exists but the call failed). The report
-  currently renders the latter two identically.
+- **`ghl_data_status` has two values**: `connected`, and `not_connected` (no link
+  configured). A linked practice's failed GHL call no longer produces a third,
+  degraded state — it fails the whole report instead (see
+  [report-generation](report-generation.md)).
 
 ### Not built yet
 

@@ -571,10 +571,15 @@ Adapters **return, never raise**:
 Result = Data.define(:success?, :data, :error)
 ```
 
-This is deliberate: one dead API degrades one report section into a placeholder rather than
-failing the whole run. Preserve that property. `ReportGenerator` collects `warnings` per adapter
-and only marks an attempt `"failed"` on an unexpected exception — a real bug — which it logs and
-then **re-raises** (`report_generator.rb:37-40`). Never swallow.
+This is deliberate: `ReportGenerator` (not the adapter) decides what a failure means for that
+client. HubSpot, Google Analytics, Yext, and SEMrush are mandatory for every client — a failure
+there raises `ReportGenerator::AdapterFailureError`, aborting the whole run, since a properly
+onboarded client is assumed to have all four working. GHL and AI SEO are the two opt-in
+exceptions: not configured / not enrolled degrades to an omitted section as before, but once a
+client *is* opted into one of them, a failure there is mandatory too — see
+`ReportGenerator#sync_traffic`/`#sync_ai_visibility`. Either way, a failure is logged
+(`report_generation_logs`) and then **re-raised** (`report_generator.rb`'s top-level `rescue`).
+Never swallow.
 
 ---
 

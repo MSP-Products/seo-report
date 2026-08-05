@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_04_125538) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -53,6 +53,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
     t.datetime "created_at", null: false
     t.string "credential_status"
     t.string "external_id"
+    t.string "last_sync_error"
+    t.datetime "last_synced_at"
     t.datetime "last_verified_at"
     t.text "override_credentials"
     t.string "service", null: false
@@ -70,7 +72,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
     t.string "logo_url"
     t.string "name", null: false
     t.date "onboarded_at"
-    t.string "onboarding_status"
+    t.string "onboarding_status", default: "pending"
     t.string "page_scan_method"
     t.string "phone"
     t.string "sitemap_url"
