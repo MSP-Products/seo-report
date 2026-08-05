@@ -23,8 +23,8 @@
 
   <body class="font-sans antialiased bg-gray-50 text-gray-800">
     <% if current_admin_user %>
-      <div data-controller="mobile-nav">
-        <div class="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+      <div data-controller="mobile-nav" class="flex h-screen flex-col overflow-hidden">
+        <div class="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
           <button type="button" data-action="click->mobile-nav#open" class="text-slate-500 hover:text-slate-700" aria-label="Open menu">
             <%= report_icon(:menu, css_class: "size-6") %>
           </button>
@@ -32,7 +32,7 @@
           <span class="font-semibold text-slate-900">My Social Practice</span>
         </div>
 
-        <div class="flex min-h-screen">
+        <div class="flex min-h-0 flex-1">
           <div data-mobile-nav-target="backdrop" data-action="click->mobile-nav#close"
             class="fixed inset-0 z-30 hidden bg-slate-900/40 md:hidden"></div>
           <%= render "shared/admin_sidebar" %>

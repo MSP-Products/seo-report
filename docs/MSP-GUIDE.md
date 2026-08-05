@@ -3,11 +3,12 @@
 How to run the SEO reporting system. Written for MSP staff, organised by the task you're
 trying to do.
 
-> **Read this first.** The admin panel has **two working pages** today: Dashboard and
-> Connections. Adding a practice, connecting it to a data source, getting a report's link,
-> and troubleshooting one client's history are all commands a developer runs. Where that's
-> the case, this guide says so and gives the exact command. It is not a permanent state, but
-> it is today's state, and pretending otherwise would waste your time.
+> **Read this first.** The admin panel has **three working pages** today: Dashboard,
+> Connections, and Clients. Adding a practice and connecting it to a data source are now
+> done from Clients — see below. Getting a practice's report link and troubleshooting one
+> client's history are also done from Clients now (its Overview and Reports tabs). Tracked
+> keywords and Google Analytics setup still need a developer or a source-system change;
+> this guide says so and gives the exact command where that's the case.
 >
 > **Generating a report is the one exception** — it now runs automatically every 1st of
 > the month. A developer is only needed to generate one on demand (a backfill, a retry
@@ -24,9 +25,9 @@ trying to do.
   - [Add or update an API credential](#add-or-update-an-api-credential)
   - [Check whether a connection is healthy](#check-whether-a-connection-is-healthy)
   - [Check this cycle's status](#check-this-cycles-status)
-- **Needs a developer**
   - [Add a new practice](#add-a-new-practice)
   - [Connect a practice to the data sources](#connect-a-practice-to-the-data-sources)
+- **Needs a developer**
   - [Set up Google Analytics for a practice](#set-up-google-analytics-for-a-practice)
   - [Tracked keywords](#tracked-keywords)
   - [Generate a report](#generate-a-report)
@@ -168,36 +169,60 @@ send is held, the Dashboard is showing what's actually in the database right now
 
 ## Add a new practice
 
-**Needs a developer.** There is no Clients page yet.
+**Go to Clients → Add client.** You have two ways to fill it in, and you can mix them:
 
-```ruby
-Client.create!(
-  name: "Woodside Dental Care",
-  website_url: "www.woodsidedentalcare.net",
-  address: "10883 Telegraph Rd, Ventura, CA 93004",
-  onboarding_status: "active",
-  onboarded_at: Time.current,
-  ai_seo_enrolled: true
-)
-```
+1. **Enter the HubSpot company ID** (in Data sources, at the bottom) and leave the rest
+   blank. Saving immediately pulls the practice's name, address, website, onboarding
+   status, and AI SEO enrolment from HubSpot — you don't have to type any of it. The
+   practice is created right away with a placeholder name ("Syncing from HubSpot…") that's
+   replaced the moment the sync completes, usually within a few seconds.
+2. **Type the details in by hand** — name, website, phone, address — and save without a
+   HubSpot ID. The practice is created as **Pending**.
 
-- **`ai_seo_enrolled`** decides whether the AI search section appears in their reports.
-- **`website_url`** is used to find their sitemap and to match their SEMrush rankings, so
-  it must be the real site.
-- HubSpot is the source of truth for name, address, website, onboarding status, onboarding
-  date, and AI SEO enrolment — **once this client has a HubSpot Company ID linked** (see
-  "Connect a practice to the data sources" below), whatever HubSpot says overwrites what
-  you type here, within the hour. Until then, these values just sit as typed.
+**A practice only reaches Active once a HubSpot sync has succeeded for it.**
+`onboarding_status`, `onboarded_at`, and AI SEO enrolment are owned by HubSpot — they are
+not fields you set on this form, they're read-only, and they stay "Pending" / unset until a
+real HubSpot company record has been linked and synced at least once. This is deliberate:
+it stops a practice from silently drifting out of sync with what HubSpot actually says
+about them. Once a HubSpot ID is linked, it re-syncs automatically once a day after that
+too, so this isn't a one-time action.
+
+**What it actually reads off the HubSpot Company record:**
+
+| HubSpot property | Goes to |
+|---|---|
+| Company name | Practice name |
+| Address | Practice address |
+| Website | Website URL |
+| Active (checkbox) | Onboarding status — checked → **Active**, unchecked → **Offboarded** |
+| GMB SEO Start Date | Onboarded on |
+| Services Purchased | AI SEO enrolled — checked if this multi-select includes **"AI SEO"** |
+
+If the "Active" checkbox has never been set on the HubSpot side, that practice can't
+show as Active here either — check that property in HubSpot first before assuming the
+sync is broken.
+
+**`website_url`** is used to find their sitemap and to match their SEMrush rankings, so it
+must be the real site.
 
 ---
 
 ## Connect a practice to the data sources
 
-**Needs a developer.** Each service identifies the practice by its own ID, so every
-practice needs one link per service. See [where each ID comes
-from](#where-each-id-comes-from).
+**Go to the practice's page → Edit practice.** The Data sources section lists all five
+services — HubSpot, GoHighLevel, Yext, SEMrush, Google Analytics — each with one ID field.
+See [where each ID comes from](#where-each-id-comes-from). Paste in the ID and **Save
+practice**; a status dot next to each field shows Not linked / Linked (or, for HubSpot
+specifically, Syncing… / Synced / Sync failed, since that one is a live sync rather than
+just an ID used at report time — see "Add a new practice" above).
 
-The supported route today is a rake task driven by environment variables:
+**Changing a HubSpot ID re-syncs immediately** and clears whatever the previous ID's sync
+found, so the status briefly shows "Syncing…" again rather than a stale result from the ID
+you just replaced.
+
+The old rake task still works for bulk-seeding a practice from environment variables in one
+shot (useful when standing up several practices from a script), but the Edit practice page
+is the normal path now:
 
 ```bash
 REAL_CLIENT_NAME="Woodside Dental Care" \
@@ -209,11 +234,13 @@ bin/rails reports:seed_real_client
 ```
 
 Any service whose variables are missing is skipped and reported as such. A practice with
-no link for a service simply has that section unavailable in their report.
+no link for a service simply has that section unavailable in their report — same as leaving
+a field blank on the Edit page.
 
 **GoHighLevel is special:** whether a GHL link exists *is* the "does this practice use our
 appointment scheduler" signal. No link means appointments and revenue show `?`, and the
-system never calls GHL at all for that practice.
+system never calls GHL at all for that practice. This is shown on the Edit page's Reporting
+section as "Online scheduler — Connected / Not connected".
 
 ---
 
@@ -236,7 +263,8 @@ saved under Connections → Google Analytics.
    practice's own Google login, it doesn't have to be MSP — goes to **Admin → Property
    Access Management → + → Add users**, pastes the service account email, sets the role to
    **Viewer**, and clicks **Add**.
-3. Give the Property ID to a developer to save against the practice.
+3. Paste the Property ID into that practice's **Edit practice → Data sources → Google
+   Analytics** field yourself — no developer needed for this step anymore.
 
 That's the whole per-practice cost. No new service account, no OAuth screen, no code
 change.
@@ -308,7 +336,10 @@ Attempting the current month is refused — reports cover completed months only.
 
 ## Get a practice's report link
 
-**Open the Report Log page** — find the practice and month, and click **View** on its
+**Fastest: open that practice's page → Overview tab → Secure report link.** It shows the
+full URL for the current month's report with a one-click **Copy** button.
+
+**Or open the Report Log page** — find the practice and month, and click **View** on its
 row (only `ready` reports have one). That opens the actual report; copy its URL from the
 browser to send it.
 
@@ -418,20 +449,28 @@ returns "campaign not found" and the practice's keyword section comes back empty
 
 ## What a practice sees when data is missing
 
-The report never shows an error and never invents a number. Each missing source produces
-a specific, deliberate placeholder — worth knowing, because practices ask.
+**Most of the time, the practice sees nothing missing at all — because HubSpot, Google
+Analytics, Yext, and SEMrush are all required for generation to succeed.** If any of them
+fails, no report is produced for that practice that month; there's no placeholder to show.
+The only genuinely degraded states left are opt-in ones (GoHighLevel, AI SEO) and small
+per-field gaps within an otherwise-successful call:
 
 | What's missing | What they see |
 |---|---|
 | No GoHighLevel link (no scheduler with us) | Appointments and revenue show **?**, with a note that connecting the scheduler will populate them |
-| Google Analytics not connected | Visits show **—** and "Google Analytics isn't connected yet for this practice"; the traffic-sources breakdown is hidden |
 | Not enrolled in AI SEO | The "Google & AI Search Performance" section is omitted entirely, not shown empty |
-| Yext unavailable that month | Citation figures blank; nothing else affected |
-| SEMrush unavailable, or keywords not tracked | Keyword table empty; nothing else affected |
+| A practice tracks zero keywords in their SEMrush Position Tracking project | Keyword table empty; nothing else affected — this is a successful call that just returned nothing |
 | SEMrush's Keyword Difficulty/Intent/SERP-feature call fails (rankings still succeed) | Rows still show position and movement; KD%, Intent, and SF show blank for that keyword only |
 | Nothing genuinely positive to summarise | The highlights paragraph is omitted rather than padded with filler |
 | Yext gives no directions/clicks split | That breakdown is omitted; the combined engagement total still shows |
 | It's the practice's first month | A "baseline month" introduction replaces the month-over-month summary |
+
+**HubSpot, Google Analytics, Yext, or SEMrush actually failing** (bad credentials, an
+expired ID, the service being down) doesn't produce any of the above — it fails the whole
+month's generation instead. See ["Check whether a report
+worked"](#check-whether-a-report-worked) and
+[report-generation](features/report-generation.md#when-data-is-missing) for what that looks
+like and how to fix it.
 
 ---
 

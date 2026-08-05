@@ -1,0 +1,106 @@
+<% content_for :title, "Clients — My Social Practice" %>
+
+<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Clients</h1>
+    <p class="mt-1 text-sm text-slate-500">Every practice enrolled in monthly SEO reporting.</p>
+  </div>
+  <% if current_admin_user.admin? %>
+    <%= link_to new_client_path,
+          class: "flex items-center gap-1.5 rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" do %>
+      <%= report_icon(:plus, css_class: "size-4") %> Add client
+    <% end %>
+  <% end %>
+</div>
+
+<%= form_with url: clients_path, method: :get, class: "mb-4 flex flex-wrap items-center gap-3" do %>
+  <div class="relative w-full max-w-xs sm:w-auto">
+    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+      <%= report_icon(:search, css_class: "size-4") %>
+    </span>
+    <input type="search" name="q" value="<%= params[:q] %>" placeholder="Search practices"
+      class="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:ring-3 focus:ring-teal-600/15 sm:w-64">
+  </div>
+  <div class="flex flex-wrap gap-1.5">
+    <% all_count = Client.kept.search(params[:q]).count %>
+    <%= link_to "All #{all_count}", clients_path(q: params[:q]),
+          class: "rounded-full border px-3 py-1 text-xs font-medium #{@status.nil? ? "border-teal-primary bg-teal-primary/10 text-teal-dark" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}" %>
+    <% Client.onboarding_statuses.each_key do |status| %>
+      <% count = Client.kept.search(params[:q]).by_status(status).count %>
+      <%= link_to "#{status.capitalize} #{count}", clients_path(q: params[:q], status: status),
+            class: "rounded-full border px-3 py-1 text-xs font-medium #{@status == status ? "border-teal-primary bg-teal-primary/10 text-teal-dark" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}" %>
+    <% end %>
+  </div>
+<% end %>
+
+<% if @query.records.any? %>
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="overflow-x-auto">
+      <div class="grid min-w-[900px] grid-cols-[2fr_0.7fr_1.1fr_0.9fr_1fr_0.9fr_24px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span>Practice</span>
+        <span>Status</span>
+        <span>Enrollments</span>
+        <span>HubSpot sync</span>
+        <span>Latest report</span>
+        <span>Delivery</span>
+        <span></span>
+      </div>
+      <div class="divide-y divide-slate-100">
+        <% @query.records.each do |client| %>
+          <% row = ClientRowPresenter.new(client) %>
+          <%= link_to client_path(client), class: "grid grid-cols-[2fr_0.7fr_1.1fr_0.9fr_1fr_0.9fr_24px] items-center gap-4 px-5 py-3.5 hover:bg-slate-50/75" do %>
+            <div class="flex min-w-0 items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-teal-primary/10 text-xs font-bold text-teal-dark">
+                <%= row.initials %>
+              </div>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-slate-900"><%= row.name %></p>
+                <p class="truncate text-xs text-slate-500"><%= row.website_url %></p>
+              </div>
+            </div>
+            <span class="inline-flex w-fit items-center self-center rounded-full px-2 py-0.5 text-xs font-medium <%= client_status_badge_class(client) %>">
+              <%= row.onboarding_status.capitalize %>
+            </span>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="rounded-md px-2 py-0.5 text-xs font-medium <%= row.ai_seo_enrolled? ? "bg-teal-primary/10 text-teal-dark" : "bg-slate-100 text-slate-400" %>">AI SEO</span>
+              <span class="rounded-md px-2 py-0.5 text-xs font-medium <%= row.scheduler_enabled? ? "bg-teal-primary/10 text-teal-dark" : "bg-slate-100 text-slate-400" %>">Scheduler</span>
+            </div>
+            <span class="flex items-center gap-1.5 text-sm font-medium text-slate-700">
+              <span class="size-2 shrink-0 rounded-full <%= hubspot_sync_status_dot_class(row.hubspot_link) %>"></span>
+              <%= row.hubspot_sync_label %>
+            </span>
+            <div>
+              <p class="text-sm text-slate-900"><%= row.latest_report_label %></p>
+              <p class="text-xs text-slate-500"><%= row.latest_report_sublabel %></p>
+            </div>
+            <span class="flex items-center gap-1.5 text-sm font-medium text-slate-700">
+              <span class="size-2 shrink-0 rounded-full <%= row.delivery_dot_class %>"></span>
+              <%= row.delivery_label %>
+            </span>
+            <span class="flex justify-end text-slate-400">
+              <%= report_icon(:chevron_right, css_class: "size-4") %>
+            </span>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3 flex items-center justify-between text-sm text-slate-500">
+    <span>Showing <%= @query.records.size %> of <%= @query.total_count %> practices</span>
+    <div class="flex items-center gap-2">
+      <%= link_to "Previous", clients_path(q: params[:q], status: @status, page: @query.page - 1),
+            class: "rounded-lg border px-3 py-1.5 text-sm font-medium #{@query.page > 1 ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50" : "pointer-events-none border-slate-100 bg-white text-slate-300"}" %>
+      <%= link_to "Next", clients_path(q: params[:q], status: @status, page: @query.page + 1),
+            class: "rounded-lg border px-3 py-1.5 text-sm font-medium #{@query.page < @query.total_pages ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50" : "pointer-events-none border-slate-100 bg-white text-slate-300"}" %>
+    </div>
+  </div>
+<% else %>
+  <div class="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+    <% if params[:q].present? || @status.present? %>
+      No clients match that search.
+    <% else %>
+      No practices yet. <%= link_to "Add the first one", new_client_path, class: "font-medium text-teal-dark hover:underline" if current_admin_user.admin? %>
+    <% end %>
+  </div>
+<% end %>

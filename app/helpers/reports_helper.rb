@@ -29,7 +29,9 @@ module ReportsHelper
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     menu: '<path d="M4 12h16"/><path d="M4 18h16"/><path d="M4 6h16"/>',
-    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+    chevron_right: '<path d="m9 18 6-6-6-6"/>'
   }.freeze
 
   def report_icon(name, css_class: "size-4")

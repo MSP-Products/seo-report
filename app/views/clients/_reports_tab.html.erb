@@ -1,0 +1,41 @@
+<%# locals: client (Client) %>
+<% reports = client.monthly_reports.order(report_month: :desc) %>
+
+<% if reports.any? %>
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="overflow-x-auto">
+      <div class="grid min-w-[560px] grid-cols-[1fr_1fr_1fr_90px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span>Month</span>
+        <span>Generation</span>
+        <span>Send status</span>
+        <span></span>
+      </div>
+      <div class="divide-y divide-slate-100">
+        <% reports.each do |report| %>
+          <div class="grid grid-cols-[1fr_1fr_1fr_90px] items-center gap-4 px-5 py-3.5">
+            <span class="text-sm font-medium text-slate-900"><%= report.report_month.strftime("%B %Y") %></span>
+            <span class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium <%= generation_status_badge_class(report) %>">
+              <%= generation_status_label(report) %>
+            </span>
+            <div>
+              <span class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium <%= send_status_badge_class(report) %>">
+                <%= send_status_label(report) %>
+              </span>
+              <% if held_reason(report).present? %>
+                <p class="text-xs text-amber-700">Held — <%= held_reason(report) %></p>
+              <% end %>
+            </div>
+            <% if report.ready? %>
+              <%= link_to "View", public_report_path(report.access_token), target: "_blank", rel: "noopener",
+                    class: "justify-self-end text-sm font-medium text-teal-dark hover:underline" %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% else %>
+  <div class="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+    No reports generated yet for this practice.
+  </div>
+<% end %>

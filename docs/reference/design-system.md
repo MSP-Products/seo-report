@@ -78,8 +78,10 @@ For status pills use the colour's `-50` background with its `-700` text:
 
 ### Gradients
 
-Reserved for the **public report hero only**. Do not introduce gradients into the admin
-panel.
+Reserved for **hero banners only** — the public report header, and a client's detail page
+banner (the one place in the admin panel worth that visual weight). Do not introduce
+gradients anywhere else in the admin panel — list pages, cards, and forms stay flat white
+against `slate-50`.
 
 ```
 bg-gradient-to-br from-teal-primary to-cyan-primary

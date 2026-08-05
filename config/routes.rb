@@ -21,6 +21,12 @@ Rails.application.routes.draw do
   # Agency-wide API credentials for the external data-source adapters
   resources :connections, only: [ :index, :edit, :update ], param: :service
 
+  # Practices. Data-source external_ids are edited inline on the Edit practice
+  # form (see docs/features/admin-panel.md) — saving with a HubSpot company
+  # ID present triggers its own sync (ClientServiceLink#enqueue_hubspot_sync),
+  # so there's no separate "sync now" endpoint.
+  resources :clients
+
   get "dashboard", to: "dashboard#index"
 
   get "report-log", to: "report_logs#index", as: :report_log

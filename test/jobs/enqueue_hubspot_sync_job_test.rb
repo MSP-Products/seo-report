@@ -31,6 +31,10 @@ class EnqueueHubspotSyncJobTest < ActiveJob::TestCase
     client = Client.create!(name: "Gone Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
     client.client_service_links.create!(service: "hubspot", external_id: "company-999")
     client.discard
+    # Creating the link above enqueues its own immediate sync
+    # (ClientServiceLink#enqueue_hubspot_sync) — irrelevant here, so clear it and
+    # only look at what EnqueueHubspotSyncJob itself enqueues below.
+    clear_enqueued_jobs
 
     EnqueueHubspotSyncJob.perform_now
 

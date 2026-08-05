@@ -2,14 +2,15 @@
 title: Admin panel
 slug: admin-panel
 status: partial
-last_verified: 2026-08-03
+last_verified: 2026-08-05
 related: [integrations, report-generation]
 ---
 
 # Admin panel
 
-> **Status:** partial — login, Dashboard, and Connections work; Clients is still a stub ·
-> **Last verified:** 2026-08-03
+> **Status:** partial — login, Dashboard, Connections, and Clients work; admin user
+> management and credential verification are still missing ·
+> **Last verified:** 2026-08-05
 >
 > The internal, logged-in side of the system: who can get in, and what they see once
 > they're in.
@@ -24,9 +25,9 @@ MSP staff need somewhere to see whether this cycle's reports are generating, and
 the API credentials reports are built from, without a developer editing a config file or
 running a console command. The admin panel is that place.
 
-It is deliberately small. Today it shows the current reporting cycle's status and manages
-agency-wide credentials — every other operational task is still a command. See
-[MSP-GUIDE](../MSP-GUIDE.md).
+It is deliberately small. Today it shows the current reporting cycle's status, manages
+agency-wide credentials, and manages the practice list itself — most other operational
+tasks are still a command. See [MSP-GUIDE](../MSP-GUIDE.md).
 
 ### Who uses it
 
@@ -34,7 +35,7 @@ agency-wide credentials — every other operational task is still a command. See
 
 | Role | Can |
 |---|---|
-| **admin** | View everything and change API credentials |
+| **admin** | View everything and change API credentials, practices, and data sources |
 | **support** | View everything, change nothing |
 
 ### How it behaves
@@ -42,18 +43,57 @@ agency-wide credentials — every other operational task is still a command. See
 1. Go to `/login`, enter email and password.
 2. Landing page is **Dashboard** — this cycle's client counts, generation progress, and
    per-service connection health, all real data.
-3. **Report Log** lists every generated report across every practice and month, filterable
+3. **Clients** lists every practice, searchable by name and filterable by onboarding
+   status, each row showing its enrollments, HubSpot sync status, latest report, and
+   delivery status. Clicking a practice opens Overview / Reports / Keywords / Data sources
+   tabs.
+4. **Add client** takes either a HubSpot company ID (which syncs the rest automatically) or
+   manually typed details, or both.
+5. **Edit practice** is where an admin enters or changes any of the five services' IDs, and
+   where HubSpot sync status is visible per practice.
+6. **Report Log** lists every generated report across every practice and month, filterable
    by month, with a link to view each ready report.
-4. **Connections** lists all five services with a status; an admin clicks **Edit**, enters
+7. **Connections** lists all five services with a status; an admin clicks **Edit**, enters
    the credential, and saves.
-5. A support user clicking Edit is redirected with a permission message.
-6. Log out from the sidebar.
+8. A support user clicking an Edit/Add link on any of these pages is redirected with a
+   permission message.
+9. Log out from the sidebar.
 
 **There is no sign-up page and no password reset.** Accounts are created by a developer.
 
 **Credential fields always render blank**, even when a value is stored — a saved secret can
 never be read back out of the page. **Leaving a field blank keeps the existing value**; you
 only type into it to replace one.
+
+**Adding or editing a practice takes either path, or both.** The form has no required
+field except a name — and even the name becomes optional the moment a HubSpot company ID
+is entered, since saving with one immediately triggers a sync that fills in the name (and
+address, website, onboarding status, and AI SEO enrolment) from HubSpot. Until that first
+sync succeeds, a newly-created client shows a placeholder name ("Syncing from HubSpot…")
+that the sync overwrites within moments.
+
+**`onboarding_status`, `onboarded_at`, and `ai_seo_enrolled` are read-only on this form.**
+They are shown in a "Reporting" panel, each tagged with the source system (HubSpot or
+GoHighLevel), because `SyncClientFromHubspot` overwrites them from HubSpot on every report
+run — letting an admin type a value here would just have it silently clobbered on the next
+sync. A practice's onboarding status genuinely stays "Pending" until a real HubSpot sync
+succeeds; there is no way to force it to "Active" from this UI, by design.
+
+**Changing a HubSpot company ID re-syncs immediately** (`ClientServiceLink`'s
+`after_commit` callback enqueues `SyncHubspotClientJob`), rather than waiting for the daily
+`EnqueueHubspotSyncJob` run, and clears the link's previous `last_synced_at`/
+`last_sync_error` so the UI doesn't show a stale result from the ID that was just replaced.
+There is no separate "sync now" control — saving the form is the trigger.
+
+**The Data sources section is the same list on both Add client and Edit practice** —
+one row per service (HubSpot, GoHighLevel, Yext, SEMrush, Google Analytics), each an ID
+field plus a status dot. HubSpot's row additionally shows its live sync state (Syncing… /
+Synced *n* ago / Sync failed, with a plain-language reason on failure) since it's the one
+service whose ID drives more than report data.
+
+**The Clients index's "HubSpot sync" column mirrors the Edit page's status**, so an admin
+scanning the whole list can see which practices are mid-sync or failing without opening
+each one.
 
 **The Dashboard shows, for the last completed month:** active/pending client counts;
 reports generated vs. total active clients, with a Running/Completed badge; reports sent
@@ -82,15 +122,15 @@ status) double-counting the same report:
 | `held` | `ready?`, not emailed, and a `send_logs` row has `status: "held"` |
 | `ready` | `ready?`, not emailed, not held |
 
-The sidebar also shows **Clients**, still a stub that routes back to Connections so nothing
-404s. It is not built.
-
 ### When data is missing
 
 | Situation | What's shown |
 |---|---|
 | A service has no credential saved | "Not configured", grey dot |
 | A credential is saved but never verified | "Unverified" |
+| A practice has no HubSpot company ID | "Not linked", grey dot, on both the index and Edit page |
+| A practice's HubSpot sync is enqueued but hasn't completed yet | "Syncing…", amber dot |
+| A practice's most recent HubSpot sync failed | "Sync failed" plus a plain-language reason (bad ID, no access, timeout, etc.), red dot |
 | A service has no configurable fields | "Not available yet", and Edit is hidden |
 | An active client has no report row for the cycle yet | Shown on the Dashboard as "Not started", never omitted |
 | A report is ready but hasn't been emailed | "Not sent" — there is no mailer yet, so this is the default, not a failure |
@@ -138,6 +178,30 @@ and using `find_or_initialize_by`, so unsaved services still render. `#update` m
 non-blank submitted values into the existing credentials blob before re-serialising — this
 is what implements "blank means unchanged".
 
+**Clients** — `PaginatedClientsQuery` wraps the `Client.kept.search.by_status` scope chain
+for the index. The Add/Edit form is one partial (`clients/_form`) shared by both actions,
+using `accepts_nested_attributes_for :client_service_links` so all five services' IDs save
+in the same request as the practice's own fields — `Client#service_links_for_form` returns
+one row per `Service::KEYS`, existing or a built stub, so every service always has an input.
+`Client#set_placeholder_name_for_hubspot_sync` (a `before_validation`) is what lets `name`
+stay blank when a HubSpot ID is present — it fills in a placeholder that the sync's own
+`client.update!` overwrites moments later. The actual sync trigger lives on
+`ClientServiceLink`, not the controller: `after_commit :enqueue_hubspot_sync` fires
+`SyncHubspotClientJob.perform_later` whenever its `service == "hubspot"` row saves with a
+present `external_id`, and a `before_save :reset_sync_status` clears `last_synced_at`/
+`last_sync_error` whenever that `external_id` changes, so a fresh sync doesn't leave the
+previous ID's result on screen. `SyncClientFromHubspot#record_attempt` is what writes
+`last_synced_at`/`last_sync_error` back onto the link after each attempt, success or not.
+
+`Adapters::HubspotAdapter::PROPERTIES` names the exact HubSpot Company properties fetched
+— `name`, `address`, `website`, `active`, `gmb_seo_start_date`, `service_purchased` — and
+maps them: `active` (a plain boolean, no separate "pending" state in HubSpot) → `"active"`
+if true else `"offboarded"`; `gmb_seo_start_date` → `onboarded_at`; `service_purchased`
+(HubSpot's semicolon-delimited multi-select) → `ai_seo_enrolled` if it contains the literal
+tag `"AI SEO"` (`HubspotAdapter::AI_SEO_TAG`). `name`/`address`/`website` map straight
+across. See [integrations](integrations.md) for the adapter's credential resolution and
+error handling.
+
 ### Key files
 
 | Path | Role in this feature |
@@ -155,7 +219,7 @@ is what implements "blank means unchanged".
 | `app/views/shared/_alert.html.erb` | Flash notice and error banner |
 | `app/javascript/controllers/password_visibility_controller.js` | Show/hide toggle on password fields |
 | `app/javascript/controllers/mobile_nav_controller.js` | Opens/closes the off-canvas sidebar below the `md` breakpoint |
-| `app/views/shared/_admin_sidebar.html.erb` | Nav, incl. the Clients stub; off-canvas panel below `md` |
+| `app/views/shared/_admin_sidebar.html.erb` | Nav; off-canvas panel below `md` |
 | `app/views/connections/index.html.erb` | The five service cards |
 | `app/views/connections/_connection_card.html.erb` | One service's status and Edit link |
 | `app/views/connections/edit.html.erb` | The credential form |
@@ -175,6 +239,31 @@ is what implements "blank means unchanged".
 | `test/presenters/dashboard_presenter_test.rb` | Counts, progress percent, average generation time, elapsed |
 | `test/controllers/report_logs_controller_test.rb` | Lists a ready report with a view link, hides the link when not ready, month filter |
 | `test/models/monthly_report_test.rb` | `for_report_log` ordering/scoping, `parse_month_param` |
+| `app/controllers/clients_controller.rb` | The 7 RESTful actions; search/status/pagination in `index`, tab selection in `show` |
+| `app/controllers/concerns/finds_client.rb` | `set_client`, `client_params` (name/address/website/phone + nested `client_service_links_attributes`) |
+| `app/queries/paginated_clients_query.rb` | Page/offset math and `total_count` for the index |
+| `app/presenters/client_row_presenter.rb` | Index row: initials, enrollment tags, HubSpot sync label, delivery status |
+| `app/models/client.rb` | `service_links_for_form`, `hubspot_link`, placeholder-name and name-validation logic |
+| `app/models/client_service_link.rb` | HubSpot sync trigger and status-reset callbacks |
+| `app/models/service.rb` | `Service::KEYS` — the five service keys iterated on the Data sources form |
+| `app/models/agency_connection.rb` | `DISPLAY` — badge letter/colour reused for each Data sources row |
+| `app/services/sync_client_from_hubspot.rb` | `record_attempt` — writes `last_synced_at`/`last_sync_error` after every sync attempt |
+| `app/jobs/sync_hubspot_client_job.rb`, `app/jobs/enqueue_hubspot_sync_job.rb` | The immediate (per-save) and daily (per-cycle) HubSpot sync paths — see [integrations](integrations.md) |
+| `app/helpers/clients_helper.rb` | Status badge classes/labels for onboarding, reports, data sources, and HubSpot sync; `hubspot_sync_error_message`'s plain-language translation table |
+| `app/views/clients/index.html.erb` | Search, status chips, the practice table, pagination |
+| `app/views/clients/show.html.erb` | Hero banner (full-width) + tab nav + tab content (`max-w-4xl`) |
+| `app/views/clients/_overview_tab.html.erb` | Latest report snapshot, current-month status, HubSpot sync status, report link |
+| `app/views/clients/_reports_tab.html.erb` | Per-month generation/send status history |
+| `app/views/clients/_keywords_tab.html.erb` | Latest report's keyword rankings, paginated |
+| `app/views/clients/_sources_tab.html.erb` | Read-only Data sources summary; Edit links to the Edit practice form |
+| `app/views/clients/_form.html.erb` | Shared Add/Edit form: practice details, Data sources, read-only Reporting panel |
+| `app/views/clients/new.html.erb` | Thin wrapper around `_form` for `create` |
+| `app/views/clients/edit.html.erb` | Thin wrapper around `_form` for `update` |
+| `app/javascript/controllers/copy_controller.js` | Copy-to-clipboard for the report link and any other `data-controller="copy"` field |
+| `test/controllers/clients_controller_test.rb` | Search/filter/pagination, create/update incl. nested attributes, HubSpot sync enqueue, role gating, discard-not-delete |
+| `test/models/client_test.rb` | Onboarding-status default, conditional name validation, placeholder name, `search`/`by_status` scopes |
+| `test/models/client_service_link_test.rb` | Sync-enqueue conditions, sync-status reset on ID change |
+| `test/helpers/clients_helper_test.rb` | Every status-label/dot-class/error-message branch |
 
 ### Data
 
@@ -185,6 +274,8 @@ is what implements "blank means unchanged".
 | `Service` | Lookup table the service column keys against |
 | `MonthlyReport` | Read, not written, by the Dashboard and Report Log: `generation_status`, `attempt_count`, `generation_started_at`. See [report-generation](report-generation.md) |
 | `SendLog` | Read for the `held` status and its `error_message`. See [monthly-report](monthly-report.md) |
+| `Client` | `name`, `address`, `website_url`, `phone` (admin-editable); `onboarding_status`, `onboarded_at`, `ai_seo_enrolled` (HubSpot-owned, read-only on this form); `sitemap_url` (never set here — discovered from robots.txt during report generation) |
+| `ClientServiceLink` | One row per `Service::KEYS` per client; `external_id` (admin-editable); `last_synced_at`, `last_sync_error` (written only by `SyncClientFromHubspot`, HubSpot's row only) |
 
 Invariants:
 
@@ -193,6 +284,12 @@ Invariants:
 - `credential_status` uses `prefix: :credential` **because a bare `invalid` value would
   override Active Record's own `#invalid?`**.
 - `encrypted_credentials` is `encrypts`ed.
+- `clients.onboarding_status` defaults to `"pending"` at the DB level, so a manually-created
+  client (no HubSpot ID yet) always has a valid enum value rather than `nil`.
+- `Client#name` presence is validated **unless** a HubSpot-service `client_service_links`
+  row has a present `external_id` — see Gotchas.
+- `client_service_links` has a unique index on `(client_id, service)` — one row per service
+  per client, enforced in the database, not only in Ruby.
 
 ### Failure modes
 
@@ -203,13 +300,34 @@ Invariants:
 | Support user attempts a write | Redirect with permission message | Nothing |
 | Unknown service in the URL | Redirect to Connections, "Unknown service" | Nothing |
 | Service with no configurable fields | Redirect, "isn't configurable yet" | Nothing |
+| HubSpot sync fails (bad ID, no access, timeout, etc.) | Plain-language reason on the Overview tab, Edit form, and index row | `client_service_links.last_sync_error` |
+| Client created/edited with no name and no HubSpot ID | 422, "Name can't be blank" | Nothing |
 
 **No failed-login auditing of any kind.** Nothing records or limits repeated attempts.
 
+**A HubSpot sync failure is not otherwise surfaced anywhere** — no email, no Dashboard
+count, no entry in the "recent failures" view that doesn't exist yet (see
+[report-generation](report-generation.md)'s equivalent gap). An admin has to open the
+practice to see it.
+
 ### Gotchas
 
-- **Clients deliberately routes to Connections.** It is a placeholder, not a broken link —
-  don't "fix" it, build it.
+- **`Client#name` is conditionally required.** It's the one field this form doesn't always
+  demand — skip it and the HubSpot sync fills it in. If you're debugging "why did this save
+  with a blank-looking name", check `syncing_from_hubspot?` and the placeholder text
+  ("Syncing from HubSpot…") before assuming the validation is broken.
+- **There is no "sync now" endpoint.** Saving the form is the only trigger — a
+  `ClientServiceLink` callback (`after_commit`), not a controller action. A prior version
+  had a dedicated endpoint and button; it was removed as redundant once save-triggers-sync
+  landed. Don't re-add a duplicate control without removing the auto-sync-on-save first.
+- **Changing a HubSpot ID resets `last_synced_at`/`last_sync_error` before the new sync even
+  runs.** If you're testing this in the console, seed those two columns with
+  `update_columns` (not `update!`/`create!` alongside `external_id`) or the reset callback
+  will immediately wipe what you just set — see `test/models/client_service_link_test.rb`
+  for the pattern.
+- **No background worker runs by default in dev.** `Procfile.dev` includes a `jobs: bin/jobs`
+  line specifically so `bin/dev` starts one — without it, `SyncHubspotClientJob` (and every
+  other queued job) sits enqueued forever and nothing looks like it's happening.
 - **The Dashboard never queries adapters or triggers generation** — it only reads
   `MonthlyReport`/`SendLog`/`AgencyConnection` state that other code already wrote.
   "Generating" is real process state a run is in, not something the Dashboard causes.
@@ -233,10 +351,9 @@ Invariants:
 
 ### Not built yet
 
-- **Clients** — no UI to add a practice, set per-service IDs, or manage keywords. All
-  console or rake today.
+- **Managing tracked keywords** — still console-only (see [MSP-GUIDE](../MSP-GUIDE.md#tracked-keywords)); auto-discovered from SEMrush, so this is only for suppressing one.
 - **Admin user management** — no UI to create, disable or reset an account.
-- **Credential verification** — nothing ever sets `credential_status`.
+- **Credential verification** — nothing ever sets `credential_status`, including on `ClientServiceLink` for the four non-HubSpot services.
 - **No password reset, no MFA, no session expiry, no audit log.**
 
 ---
@@ -250,3 +367,8 @@ Invariants:
   blocked, not merely that `admin` is allowed.
 - **`support` is read-only** and must stay so.
 - **Never add a plaintext secret column.**
+- **Never make `onboarding_status`, `onboarded_at`, or `ai_seo_enrolled` editable on the
+  Clients form.** They are HubSpot's fields, confirmed with MSP (SOW #9) — a manual override
+  would silently get overwritten by the next sync, which is worse than not offering it. If a
+  real need to override HubSpot emerges, that's a product decision to raise, not a field to
+  quietly unlock.
