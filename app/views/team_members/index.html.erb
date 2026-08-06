@@ -1,7 +1,15 @@
 <% content_for :title, "Team — My Social Practice" %>
 
-<h1 class="text-2xl font-semibold tracking-tight text-slate-900">Team</h1>
-<p class="mt-1 text-sm text-slate-500">Who at MSP can see client data, edit connections, and trigger report runs.</p>
+<div class="flex items-start justify-between gap-6">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Team</h1>
+    <p class="mt-1 text-sm text-slate-500">Who at MSP can see client data, edit connections, and trigger report runs.</p>
+  </div>
+  <% if current_admin_user.can?(:users_invite) %>
+    <%= link_to "+ Invite member", new_team_member_path,
+          class: "shrink-0 rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
+  <% end %>
+</div>
 
 <div class="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
   <table class="w-full text-left text-sm">

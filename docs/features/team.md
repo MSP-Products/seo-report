@@ -8,8 +8,8 @@ related: [admin-panel]
 
 # Team
 
-> **Status:** partial — the team list is real and read-only; nothing writes yet ·
-> **Last verified:** 2026-08-06
+> **Status:** partial — the team list is real; inviting a member works, nothing else writes
+> yet · **Last verified:** 2026-08-06
 >
 > Lets authorized MSP staff invite and manage their own colleagues' accounts and access,
 > replacing developer-run console commands.
@@ -47,6 +47,14 @@ so a one-off exception never requires a new role.
    which permissions it grants.
 4. An Account Manager who visits `/team` directly is redirected away — this page isn't
    part of their role.
+5. A Super Admin or Admin clicks **+ Invite member**, enters an email, name, and role, and
+   submits.
+6. The account is created immediately with a random password. The next screen shows that
+   password **once** — there's no email delivery yet, so whoever invited them has to share
+   it directly. Leaving that screen means it's gone for good from the app's side.
+7. Only a Super Admin can invite someone in as a Super Admin — an Admin doesn't see that
+   option on the form, and submitting it anyway (e.g. by hand-crafting the request) is
+   rejected server-side too.
 
 ### When data is missing
 
@@ -56,8 +64,14 @@ source to degrade.
 ### FAQ
 
 **Q: Can I invite a team member yet?**
-A: Not yet. Accounts are still created by a developer, the same as before this module
-started. You can see who currently has access, though.
+A: Yes — click **+ Invite member** on the Team page. You'll see their password once on the
+next screen; make sure you copy it before navigating away, since there's no way to see it
+again from the app.
+
+**Q: I lost the password I was shown. Now what?**
+A: There's no way to recover it from this screen today — "Resend" (regenerating a fresh
+password for someone who hasn't logged in yet) is a later phase. For now, a developer
+would need to reset the account's password directly.
 
 ---
 
@@ -91,6 +105,19 @@ shouldn't: `PERMISSION_LABELS` (friendly copy for a `Permission#key`), role badg
 and the viewer-relative status/last-active labels (status depends on who's looking, not
 just the record, so it's a helper, not a model method).
 
+`TeamMembersController#new`/`#create` are the invite flow, gated by
+`require_permission!(:users_invite)`. `#create` delegates to `TeamMemberInviter`
+(`attrs:`, `actor:`), which generates a `SecureRandom.alphanumeric(16)` password, sets it
+as both `password` and the transient `generated_password`, and — the one place the
+Super-Admin-only rule is actually enforced — refuses to save if the target role is Super
+Admin and the inviting `actor` isn't one themselves. `CredentialDelivery` is the single,
+deliberately-empty seam real email/HubSpot delivery will eventually plug into.
+`AdminUser#assignable_roles` keeps the form's visible role options honest (hides "Super
+Admin" from anyone but a Super Admin) — cosmetic only, `TeamMemberInviter`'s check is the
+real boundary. On success, `#create` **renders** `created.html.erb` rather than
+redirecting, so the one-time password never has to survive a round-trip through anywhere
+else (a session flash, a redirect param) that could leak or persist it.
+
 ### Key files
 
 | Path | Role in this feature |
@@ -106,10 +133,15 @@ just the record, so it's a helper, not a model method).
 | `lib/tasks/admin_users.rake` | Updated to resolve `ADMIN_ROLE` to a `Role` record |
 | `app/controllers/application_controller.rb` | `require_permission!`, `touch_admin_user_last_active` — additive only |
 | `test/support/authentication_helpers.rb` | Shared `sign_in_as(role_key:)` test builder |
-| `app/controllers/team_members_controller.rb` | The team list — `index` only so far |
+| `app/controllers/team_members_controller.rb` | The team list, plus `new`/`create` for the invite flow |
 | `app/helpers/team_members_helper.rb` | Permission display labels, role badge classes, viewer-relative status/last-active labels |
 | `app/views/team_members/index.html.erb` | The team list and per-role permission summary cards |
+| `app/views/team_members/new.html.erb` | The invite form |
+| `app/views/team_members/created.html.erb` | The one-time credentials screen |
 | `app/views/shared/_admin_sidebar.html.erb` | Team now links to the real page instead of Connections |
+| `app/services/team_member_inviter.rb` | Creates the account, generates the password, enforces the Super-Admin-only assignment rule |
+| `app/services/credential_delivery.rb` | The swappable seam for real credential delivery, currently a no-op |
+| `app/models/admin_user.rb` | `assignable_roles` — keeps the invite form's visible role options honest |
 
 ### Data
 
@@ -127,7 +159,9 @@ just the record, so it's a helper, not a model method).
 | Failure | User sees | Recorded in |
 |---|---|---|
 | Not logged in | Redirect to login | Nothing |
-| Account Manager visits `/team` | Redirect to the dashboard | Nothing |
+| Account Manager visits `/team` or `/team/new` | Redirect to the dashboard | Nothing |
+| An Admin submits a Super Admin invite anyway | 422, form re-rendered with an error, nothing created | Nothing |
+| Invite form has any other validation error (blank email, etc.) | 422, form re-rendered | Nothing |
 
 ### Gotchas
 
@@ -144,9 +178,16 @@ just the record, so it's a helper, not a model method).
   adding them — someone edited the schema file directly. A database built by replaying
   migrations from scratch (rather than `db:schema:load`) was actually missing them.
 
+### Gotchas (continued)
+
+- **The generated password is never persisted anywhere except the hashed
+  `password_digest`.** `AdminUser#generated_password` is an `attr_accessor`, not a column —
+  it only survives for the lifetime of the request that created it. There is deliberately
+  no way to recover it later, from the database or otherwise.
+
 ### Not built yet
 
-- Any write UI — invite, manage, remove, resend. The list is read-only.
+- Manage, remove, resend. The team list and invite are the only write surface so far.
 - Enforcing Account Manager's client-assignment scope in Clients/Dashboard/Reports.
 - Custom role creation/editing (Super Admin capability, later phase).
 - Real credential delivery on invite (no mailer is wired anywhere in this app yet).

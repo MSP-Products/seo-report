@@ -1,0 +1,46 @@
+<% content_for :title, "Invite a team member — My Social Practice" %>
+
+<p class="mb-2 text-sm text-slate-500"><%= link_to "← Team", team_members_path, class: "hover:underline" %></p>
+
+<h1 class="text-2xl font-semibold tracking-tight text-slate-900">Invite a team member</h1>
+<p class="mt-1 text-sm text-slate-500">
+  They're added immediately with a generated password. There's no email delivery yet, so
+  you'll need to share the credentials with them yourself on the next screen.
+</p>
+
+<% if @admin_user.errors.any? %>
+  <div class="mt-4">
+    <%= render "shared/alert", type: "error", message: "Couldn't invite this member: #{@admin_user.errors.full_messages.to_sentence}." %>
+  </div>
+<% end %>
+
+<div class="mt-6 max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+  <%= form_with model: @admin_user, url: team_members_path, class: "space-y-5" do %>
+    <%= render "shared/form_group", label: "Email", field_name: "admin_user[email]", type: "email",
+          value: @admin_user.email, has_error: @admin_user.errors[:email].any? %>
+
+    <div class="grid grid-cols-2 gap-4">
+      <%= render "shared/form_group", label: "First name", field_name: "admin_user[first_name]", type: "text",
+            value: @admin_user.first_name %>
+      <%= render "shared/form_group", label: "Last name", field_name: "admin_user[last_name]", type: "text",
+            value: @admin_user.last_name %>
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="admin_user_role_id" class="text-sm font-medium text-gray-700">Role</label>
+      <select name="admin_user[role_id]" id="admin_user_role_id"
+        class="w-full rounded-lg border-[1.5px] border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-800 outline-none transition-all duration-150 focus:border-teal-600 focus:bg-white focus:ring-3 focus:ring-teal-600/15">
+        <% current_admin_user.assignable_roles.each do |role| %>
+          <option value="<%= role.id %>" <%= "selected" if @admin_user.role_id == role.id %>><%= role.name %></option>
+        <% end %>
+      </select>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button type="submit" class="rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark">
+        Invite member
+      </button>
+      <%= link_to "Cancel", team_members_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+    </div>
+  <% end %>
+</div>
