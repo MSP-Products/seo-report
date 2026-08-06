@@ -1,18 +1,18 @@
 ---
 title: Team
 slug: team
-status: planned
+status: partial
 last_verified: 2026-08-06
 related: [admin-panel]
 ---
 
 # Team
 
-> **Status:** planned · **Last verified:** 2026-08-06
+> **Status:** partial — the team list is real and read-only; nothing writes yet ·
+> **Last verified:** 2026-08-06
 >
 > Lets authorized MSP staff invite and manage their own colleagues' accounts and access,
-> replacing developer-run console commands. Nothing user-facing has shipped yet — this is
-> the data-model foundation only.
+> replacing developer-run console commands.
 
 ---
 
@@ -39,18 +39,25 @@ so a one-off exception never requires a new role.
 
 ### How it behaves
 
-Not built yet — see [Not built yet](#not-built-yet). No page exists; the sidebar's Team
-link still leads to Connections.
+1. A Super Admin or Admin clicks **Team** in the sidebar.
+2. The page lists every team member: name, email, role, last active time, and status
+   (**You** for the viewer's own row, **Active** once someone has logged in, **Invited**
+   if they haven't yet — though nothing can invite anyone yet, see below).
+3. Below the list, one summary card per role shows how many members hold it and exactly
+   which permissions it grants.
+4. An Account Manager who visits `/team` directly is redirected away — this page isn't
+   part of their role.
 
 ### When data is missing
 
-Not applicable yet — no user-facing behavior exists.
+Not applicable — every team member row reads real columns; there's no external data
+source to degrade.
 
 ### FAQ
 
 **Q: Can I invite a team member yet?**
 A: Not yet. Accounts are still created by a developer, the same as before this module
-started.
+started. You can see who currently has access, though.
 
 ---
 
@@ -77,6 +84,13 @@ This PR lays the schema and model foundation only:
   `Account Manager`. It's a one-off data migration, not schema, so it lives in
   `lib/tasks/team.rake` (`bin/rails team:backfill_roles`), never inside a migration.
 
+`TeamMembersController#index` is the first real page: `AdminUser.kept.includes(:role)`,
+gated by `require_permission!(:users_view)` (Super Admin and Admin have it by default;
+Account Manager doesn't). `TeamMembersHelper` owns the view-only concerns the models
+shouldn't: `PERMISSION_LABELS` (friendly copy for a `Permission#key`), role badge classes,
+and the viewer-relative status/last-active labels (status depends on who's looking, not
+just the record, so it's a helper, not a model method).
+
 ### Key files
 
 | Path | Role in this feature |
@@ -92,6 +106,10 @@ This PR lays the schema and model foundation only:
 | `lib/tasks/admin_users.rake` | Updated to resolve `ADMIN_ROLE` to a `Role` record |
 | `app/controllers/application_controller.rb` | `require_permission!`, `touch_admin_user_last_active` — additive only |
 | `test/support/authentication_helpers.rb` | Shared `sign_in_as(role_key:)` test builder |
+| `app/controllers/team_members_controller.rb` | The team list — `index` only so far |
+| `app/helpers/team_members_helper.rb` | Permission display labels, role badge classes, viewer-relative status/last-active labels |
+| `app/views/team_members/index.html.erb` | The team list and per-role permission summary cards |
+| `app/views/shared/_admin_sidebar.html.erb` | Team now links to the real page instead of Connections |
 
 ### Data
 
@@ -106,7 +124,10 @@ This PR lays the schema and model foundation only:
 
 ### Failure modes
 
-Not applicable yet — no user-facing surface exists.
+| Failure | User sees | Recorded in |
+|---|---|---|
+| Not logged in | Redirect to login | Nothing |
+| Account Manager visits `/team` | Redirect to the dashboard | Nothing |
 
 ### Gotchas
 
@@ -125,7 +146,7 @@ Not applicable yet — no user-facing surface exists.
 
 ### Not built yet
 
-- Any UI at all — invite, manage, remove, resend.
+- Any write UI — invite, manage, remove, resend. The list is read-only.
 - Enforcing Account Manager's client-assignment scope in Clients/Dashboard/Reports.
 - Custom role creation/editing (Super Admin capability, later phase).
 - Real credential delivery on invite (no mailer is wired anywhere in this app yet).
