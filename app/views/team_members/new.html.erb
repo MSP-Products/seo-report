@@ -15,7 +15,13 @@
 <% end %>
 
 <div class="mt-6 max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-  <%= form_with model: @admin_user, url: team_members_path, class: "space-y-5" do %>
+  <%# data-turbo="false": #create renders the one-time credentials screen directly on
+      success instead of redirecting, deliberately, so the generated password never has
+      to survive a redirect round-trip anywhere it could be logged or persisted. Turbo
+      Drive only knows how to handle a redirect or a turbo-stream response to a form
+      submission — a plain 200 HTML body leaves it stuck on the old page, so this form
+      opts out and submits as a normal full-page POST instead. %>
+  <%= form_with model: @admin_user, url: team_members_path, class: "space-y-5", data: { turbo: false } do %>
     <%= render "shared/form_group", label: "Email", field_name: "admin_user[email]", type: "email",
           value: @admin_user.email, has_error: @admin_user.errors[:email].any? %>
 
