@@ -8,8 +8,8 @@ related: [admin-panel]
 
 # Team
 
-> **Status:** partial — listing, inviting, and managing (role, individual permissions,
-> assigned clients) all work; removing and resending don't yet · **Last verified:** 2026-08-06
+> **Status:** partial — listing, inviting, managing, and removing all work; resending
+> doesn't yet · **Last verified:** 2026-08-06
 >
 > Lets authorized MSP staff invite and manage their own colleagues' accounts and access,
 > replacing developer-run console commands.
@@ -63,6 +63,11 @@ so a one-off exception never requires a new role.
    for.
 9. The same Super-Admin-only rule applies here too — an Admin can change someone's role to
    anything except Super Admin, on the form and server-side both.
+10. Clicking **Remove** on a row asks for confirmation, then removes that person — they
+    disappear from the list immediately and can no longer log in. Their row and any past
+    activity aren't deleted from the database, just hidden.
+11. The very last Super Admin can't be removed this way — the page reloads with an error
+    instead, so there's always at least one account able to manage roles and permissions.
 
 ### When data is missing
 
@@ -141,6 +146,16 @@ member isn't an Account Manager) leaves existing assignments untouched, while an
 array explicitly clears them — the view guarantees an empty submission is `[]` not absent
 via a leading hidden `client_ids[]` field, matching Rails' own checkbox-collection idiom.
 
+`TeamMembersController#destroy` is Remove, gated by `require_permission!(:users_remove)`.
+It's a one-liner calling `admin_user.discard` directly — no dedicated service, since
+wrapping a single gem call would just be a layer to hold one method (mirrors
+`ClientOffboardingsController`'s shape for the same reason). The last-Super-Admin guard
+lives entirely on the model (`AdminUser`'s `before_discard` callback, see PR1) and applies
+here automatically; the controller just surfaces whatever error it left on the record.
+`AdminUser.kept` already excludes discarded rows everywhere that matters — the index list,
+login, and `current_admin_user` — so removing someone is immediate and complete from the
+app's point of view without any row actually being deleted.
+
 ### Key files
 
 | Path | Role in this feature |
@@ -189,6 +204,7 @@ via a leading hidden `client_ids[]` field, matching Rails' own checkbox-collecti
 | Invite form has any other validation error (blank email, etc.) | 422, form re-rendered | Nothing |
 | An Admin tries to promote someone to Super Admin via Manage | 422, form re-rendered with an error | Nothing |
 | Manage form has any other validation error | 422, form re-rendered | Nothing |
+| Removing the last Super Admin | Redirect back to the list with an error, nothing removed | Nothing |
 
 ### Gotchas
 
@@ -216,7 +232,10 @@ via a leading hidden `client_ids[]` field, matching Rails' own checkbox-collecti
 
 ### Not built yet
 
-- Remove, resend.
+- Resend (regenerating a password for someone invited but not yet logged in).
+- Reactivating a removed member — `discard` provides `#undiscard` for free, but no UI calls
+  it, since nothing in the mockup this was built against shows a "removed" or "reactivate"
+  state.
 - Enforcing Account Manager's client-assignment scope in Clients/Dashboard/Reports.
 - Custom role creation/editing (Super Admin capability, later phase).
 - Real credential delivery on invite (no mailer is wired anywhere in this app yet).

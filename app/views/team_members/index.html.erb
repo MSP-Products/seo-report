@@ -48,9 +48,17 @@
             </span>
           </td>
           <td class="px-5 py-3 text-right">
-            <% if current_admin_user.can?(:users_edit) %>
-              <%= link_to "Manage", edit_team_member_path(member), class: "text-sm font-medium text-teal-primary hover:text-teal-dark" %>
-            <% end %>
+            <div class="flex items-center justify-end gap-3">
+              <% if current_admin_user.can?(:users_edit) %>
+                <%= link_to "Manage", edit_team_member_path(member), class: "text-sm font-medium text-teal-primary hover:text-teal-dark" %>
+              <% end %>
+              <% if current_admin_user.can?(:users_remove) %>
+                <%= button_to "Remove", team_member_path(member), method: :delete,
+                      form_class: "inline",
+                      data: { turbo_confirm: "Remove #{member.display_name} from the team?" },
+                      class: "text-sm font-medium text-red-600 hover:text-red-700" %>
+              <% end %>
+            </div>
           </td>
         </tr>
       <% end %>
