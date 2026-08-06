@@ -294,4 +294,53 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
 
     assert_select "button", text: "Remove", minimum: 1
   end
+
+  test "an Account Manager cannot resend an invite" do
+    sign_in_as(role_key: "account_manager")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "admin"))
+
+    post resend_team_member_path(member)
+
+    assert_redirected_to root_path
+  end
+
+  test "an Admin can resend a password for a member who hasn't logged in" do
+    sign_in_as(role_key: "admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "original-password",
+      role: Role.find_by!(key: "account_manager"))
+
+    post resend_team_member_path(member)
+
+    assert_response :success
+    assert_select "h1", text: "New password for #{member.display_name}"
+    password = css_select("#generated-password").first.text
+    assert member.reload.authenticate(password)
+  end
+
+  test "resend is refused for a member who has already logged in" do
+    sign_in_as(role_key: "admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "original-password",
+      role: Role.find_by!(key: "account_manager"))
+    member.touch_last_active
+
+    post resend_team_member_path(member)
+
+    assert_redirected_to team_members_path
+    assert member.reload.authenticate("original-password")
+  end
+
+  test "the Resend button only appears for a member who hasn't logged in" do
+    sign_in_as(role_key: "admin")
+    invited = AdminUser.create!(email: "invited-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+    active = AdminUser.create!(email: "active-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+    active.touch_last_active
+
+    get team_members_path
+
+    assert_select "form[action=?] button", resend_team_member_path(invited), text: "Resend"
+    assert_select "form[action=?] button", resend_team_member_path(active), text: "Resend", count: 0
+  end
 end

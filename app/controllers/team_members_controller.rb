@@ -1,6 +1,6 @@
 class TeamMembersController < ApplicationController
   before_action(only: [ :index ]) { require_permission!(:users_view) }
-  before_action(only: [ :new, :create ]) { require_permission!(:users_invite) }
+  before_action(only: [ :new, :create, :resend ]) { require_permission!(:users_invite) }
   before_action(only: [ :edit, :update ]) { require_permission!(:users_edit) }
   before_action(only: [ :destroy ]) { require_permission!(:users_remove) }
 
@@ -49,6 +49,16 @@ class TeamMembersController < ApplicationController
       redirect_to team_members_path, notice: "#{admin_user.display_name} removed."
     else
       redirect_to team_members_path, alert: admin_user.errors.full_messages.to_sentence
+    end
+  end
+
+  def resend
+    @admin_user = TeamMemberResender.new(admin_user: AdminUser.kept.find(params[:id])).call
+
+    if @admin_user.errors.empty?
+      render :resent
+    else
+      redirect_to team_members_path, alert: @admin_user.errors.full_messages.to_sentence
     end
   end
 end
