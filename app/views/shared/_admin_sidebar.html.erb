@@ -33,7 +33,7 @@
       </div>
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-medium text-slate-900"><%= current_admin_user.email %></p>
-        <p class="text-xs capitalize text-slate-500"><%= current_admin_user.role %></p>
+        <p class="text-xs capitalize text-slate-500"><%= current_admin_user.role.name %></p>
       </div>
       <%= button_to logout_path, method: :delete, class: "text-slate-400 hover:text-slate-600", title: "Log out" do %>
         <%= report_icon(:logout, css_class: "size-4") %>

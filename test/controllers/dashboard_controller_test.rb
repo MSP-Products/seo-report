@@ -8,7 +8,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders real client and connection data" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     Client.create!(name: "Bright Smile Dental #{SecureRandom.hex(4)}", onboarding_status: "active")
 
     get dashboard_path
@@ -19,7 +19,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "shows the generation run table once a report exists for the cycle" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     client = Client.create!(name: "Woodside Dental Care #{SecureRandom.hex(4)}", onboarding_status: "active")
     month = Date.current.beginning_of_month - 1.month
     client.monthly_reports.create!(report_month: month, generation_status: "ready", generated_at: Time.current)
@@ -31,7 +31,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "shows an active client with no report yet as not started, instead of omitting it" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     client = Client.create!(name: "Bayview Family Dentistry #{SecureRandom.hex(4)}", onboarding_status: "active")
 
     get dashboard_path
@@ -42,7 +42,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "shows the real held reason next to a held send, not a bare badge" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     client = Client.create!(name: "Cedar Park Family Dentistry #{SecureRandom.hex(4)}", onboarding_status: "active")
     month = Date.current.beginning_of_month - 1.month
     report = client.monthly_reports.create!(report_month: month, generation_status: "ready", generated_at: Time.current)
@@ -55,19 +55,11 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "root routes to the dashboard for a signed-in admin" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
 
     get root_path
 
     assert_response :success
     assert_select "h1", text: "Dashboard"
-  end
-
-  private
-
-  def sign_in_as(role:)
-    admin = AdminUser.create!(email: "admin-#{SecureRandom.hex(4)}@example.com", password: "password123", role: role)
-    post login_path, params: { email: admin.email, password: "password123" }
-    admin
   end
 end

@@ -12,6 +12,19 @@ WebMock.disable_net_connect!
 # doesn't conflict with this project's no-fixtures convention.
 Service::KEYS.each { |key| Service.find_or_create_by!(key: key) }
 
+# Same reasoning as the Service bootstrap above — schema-loaded test DB prep
+# skips the seed rows a migration would otherwise insert.
+Role::DEFAULT_PERMISSIONS.each_key do |role_key|
+  Role.find_or_create_by!(key: role_key) { |role| role.name = role_key.titleize }
+end
+Permission::KEYS.each { |key| Permission.find_or_create_by!(key: key) }
+Role::DEFAULT_PERMISSIONS.each do |role_key, permission_keys|
+  role = Role.find_by!(key: role_key)
+  permission_keys.each { |key| RolePermission.find_or_create_by!(role: role, permission_key: key) }
+end
+
+Dir[Rails.root.join("test/support/**/*.rb")].each { |f| require f }
+
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers, once the suite is large
@@ -29,4 +42,8 @@ module ActiveSupport
 
     # Add more helper methods to be used by all tests here...
   end
+end
+
+class ActionDispatch::IntegrationTest
+  include AuthenticationHelpers
 end

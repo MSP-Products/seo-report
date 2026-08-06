@@ -8,7 +8,7 @@ class SessionsController < ApplicationController
   def new; end
 
   def create
-    admin_user = AdminUser.find_by(email: session_params[:email]&.strip&.downcase)
+    admin_user = AdminUser.kept.find_by(email: session_params[:email]&.strip&.downcase)
 
     if admin_user&.authenticate(session_params[:password])
       session[:admin_user_id] = admin_user.id

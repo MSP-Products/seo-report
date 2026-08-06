@@ -8,6 +8,27 @@
 # guarantees it either way.
 Service::KEYS.each { |key| Service.find_or_create_by!(key: key) }
 
+# Same reasoning as Service::KEYS above, for the Team module's roles and
+# their default permission grants (db/migrate/20260806090001_create_roles.rb
+# and .../20260806090002_create_permissions.rb seed the rows themselves, but
+# only for a migration-replay build; role_permissions' default mapping is
+# business data and was never seeded by a migration at all — see CLAUDE.md's
+# "no data changes in a schema migration" rule).
+Role::DEFAULT_PERMISSIONS.each_key do |role_key|
+  Role.find_or_create_by!(key: role_key) { |role| role.name = role_key.titleize }
+end
+Permission::KEYS.each { |key| Permission.find_or_create_by!(key: key) }
+Role::DEFAULT_PERMISSIONS.each do |role_key, permission_keys|
+  role = Role.find_by!(key: role_key)
+  permission_keys.each { |key| RolePermission.find_or_create_by!(role: role, permission_key: key) }
+end
+
+# Reconciles any pre-existing admin_users row still on the legacy string role
+# column — a no-op on a freshly schema-loaded database (nothing to backfill),
+# but lets an existing dev database catch up via a plain `db:seed` instead of
+# requiring `bin/rails team:backfill_roles` to be remembered separately.
+AdminRoleBackfill.new.call
+
 # Demo data for the public report page, replicating the 3 reference Lovable prototypes
 # (seoreport1/2/3.lovable.app) so /reports/:access_token can be visually checked against
 # them. Re-running this file replaces the 3 demo clients (idempotent by name).
