@@ -8,7 +8,7 @@ class GhlLocationMatcherTest < ActiveSupport::TestCase
       onboarding_status: "active", website_url: "https://www.adamsdentalassociates.com/")
     AgencyConnection.create!(service: "ghl", encrypted_credentials: {
       access_token: "agency-access-token", refresh_token: "agency-refresh-token", company_id: "company-abc"
-    }.to_json, expires_at: 2.hours.from_now)
+    }.to_json, expires_at: 23.hours.from_now)
   end
 
   test "finds a location whose website matches the client's, ignoring scheme/www/trailing slash" do

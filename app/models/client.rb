@@ -19,11 +19,22 @@ class Client < ApplicationRecord
   has_many :sitemap_pages, dependent: :destroy
   accepts_nested_attributes_for :client_service_links
 
+  # Set by ClientsController#destroy/#restore before their save — offboarding
+  # and restoring are explicit admin overrides of onboarding_status, and
+  # without this, #sync_linked_services would immediately re-trigger the
+  # HubSpot sync and could clobber that override in the same request (e.g. a
+  # HubSpot company that's genuinely still active would undiscard and
+  # reactivate a practice the instant it was offboarded). The existing hourly
+  # EnqueueHubspotSyncJob still reconciles within the hour either way.
+  attr_accessor :skip_service_sync
+
   # A HubSpot company ID means the sync (triggered right after this saves,
-  # see ClientServiceLink#enqueue_hubspot_sync) is about to fill in name,
-  # address, and website_url — so don't force an admin to type a name by
-  # hand just to satisfy this validation before that happens.
+  # see #sync_linked_services) is about to fill in name, address, and
+  # website_url — so don't force an admin to type a name by hand just to
+  # satisfy this validation before that happens.
   before_validation :set_placeholder_name_for_hubspot_sync
+
+  after_commit :sync_linked_services
 
   # Validations
   validates :name, presence: true, unless: :syncing_from_hubspot?
@@ -69,6 +80,15 @@ class Client < ApplicationRecord
     client_service_links.find { |link| link.service == "hubspot" }
   end
 
+  # Linked and currently healthy — distinct from syncing_from_hubspot?, which
+  # only checks a company ID is set. A link with a company ID but a standing
+  # last_sync_error (e.g. a 404 on a deleted company) is not "successfully"
+  # linked, so the practice-details fields it would otherwise overwrite must
+  # stay editable by hand until the link is fixed.
+  def hubspot_synced?
+    hubspot_link&.external_id.present? && hubspot_link.last_sync_error.blank?
+  end
+
   # Shared by EnqueueMonthlyReportsJob (creates it queued, ahead of actually
   # running) and ReportGenerator (finds the same row when the job runs) —
   # one place decides is_first_report so it's never computed twice.
@@ -79,6 +99,29 @@ class Client < ApplicationRecord
   end
 
   private
+
+  # Re-verifies every service this practice is linked to on every save —
+  # not gated on which field changed, since one form submission can touch
+  # several links' external_id at once (accepts_nested_attributes_for), and
+  # a stale result on an untouched link is still worth refreshing. HubSpot
+  # gets its full sync (name/address/website/onboarding state, not just
+  # connectivity); every other linked service gets
+  # LinkedServiceConnectionTester's lightweight connection check.
+  #
+  # HubSpot's job runs even with a blank external_id — a cleared HubSpot ID
+  # still needs SyncClientFromHubspot#fetch_result's "not connected" guard to
+  # normalize onboarding_status (pending if kept, offboarded if discarded),
+  # unlike the other four services, which have nothing to check with no ID
+  # at all.
+  def sync_linked_services
+    return if skip_service_sync
+
+    client_service_links.each do |link|
+      next if link.external_id.blank? && !link.hubspot?
+
+      link.hubspot? ? SyncHubspotClientJob.perform_later(id) : TestClientServiceConnectionJob.perform_later(link.id)
+    end
+  end
 
   def syncing_from_hubspot?
     hubspot_link&.external_id.present?

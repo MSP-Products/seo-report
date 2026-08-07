@@ -23,10 +23,16 @@ module Adapters
       @report_month = report_month
     end
 
-    def call
+    # action: :perform for a full data pull, :check_connection for a
+    # lightweight "is this ID still valid" probe (LinkedServiceConnectionTester) —
+    # both go through the same credential check and error handling below, so
+    # a subclass only has to implement whichever actions it supports.
+    def call(action: :perform)
       return Result.failure("no credentials configured for #{self.class::SERVICE}") if credentials.blank?
 
-      perform
+      send(action)
+    rescue Faraday::ResourceNotFound => e
+      Result.failure("#{self.class::SERVICE} request failed: #{e.message}", not_found: true)
     rescue Faraday::Error => e
       Result.failure("#{self.class::SERVICE} request failed: #{e.message}")
     end
@@ -35,6 +41,10 @@ module Adapters
 
     def perform
       raise NotImplementedError, "#{self.class} must implement #perform"
+    end
+
+    def check_connection
+      raise NotImplementedError, "#{self.class} must implement #check_connection"
     end
 
     def client_service_link

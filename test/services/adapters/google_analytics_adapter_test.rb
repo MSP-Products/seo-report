@@ -81,5 +81,25 @@ module Adapters
           @private_key.public_key.verify(OpenSSL::Digest.new("SHA256"), signature, "#{header_b64}.#{payload_b64}")
       end
     end
+
+    test "check_connection requests only the sessions metric, with no channel breakdown" do
+      stub_request(:post, @runreport_url)
+        .with(body: hash_including("metrics" => [ { "name" => "sessions" } ], "dimensions" => []))
+        .to_return(status: 200, body: { rows: [] }.to_json)
+
+      result = GoogleAnalyticsAdapter.new(@client, report_month: @report_month).call(action: :check_connection)
+
+      assert result.success?
+      assert_requested(:post, @runreport_url, times: 1)
+    end
+
+    test "check_connection flags a deleted GA4 property as not_found" do
+      stub_request(:post, @runreport_url).to_return(status: 404, body: "not found")
+
+      result = GoogleAnalyticsAdapter.new(@client, report_month: @report_month).call(action: :check_connection)
+
+      assert_not result.success?
+      assert result.not_found
+    end
   end
 end

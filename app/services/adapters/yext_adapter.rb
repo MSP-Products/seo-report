@@ -34,6 +34,16 @@ module Adapters
       )
     end
 
+    # A direct entity lookup by ID — the lightest already-used call (see
+    # fetch_photos) that 404s on a deleted/wrong entity ID without running
+    # any analytics report.
+    def check_connection
+      return Result.failure("yext: no entity id configured for this client") if external_id.blank?
+
+      api_connection.get("/v2/accounts/me/entities/#{external_id}")
+      Result.success
+    end
+
     def fetch_citations
       impressions = run_report(
         metrics: [ "TOTAL_LISTINGS_IMPRESSIONS" ], dimensions: [ "LOCATION_IDS" ],

@@ -48,6 +48,25 @@ class ClientRowPresenterTest < ActiveSupport::TestCase
     assert_equal [ "Not linked" ], labels.map { |status| status[:label] }.uniq
   end
 
+  # Regression: the index used to color a service's badge by its own brand
+  # (e.g. HubSpot rose) whenever external_id was present, so a link actively
+  # failing looked identical to a healthy one. Color must represent
+  # connection state, not brand.
+  test "service_status_badge_class represents connection state, not the service's brand" do
+    assert_equal "bg-slate-300", presenter.service_status_badge_class("Not linked")
+    assert_equal "bg-amber-500", presenter.service_status_badge_class("Syncing…")
+    assert_equal "bg-emerald-500", presenter.service_status_badge_class("Linked")
+    assert_equal "bg-red-500", presenter.service_status_badge_class("Failed")
+  end
+
+  test "service_status_labels includes the matching badge_class for each row" do
+    link_hubspot(last_synced_at: 5.minutes.ago)
+
+    hubspot_status = presenter.service_status_labels.find { |status| status[:service] == "hubspot" }
+
+    assert_equal "bg-emerald-500", hubspot_status[:badge_class]
+  end
+
   test "hubspot_sync_label mirrors the hubspot service label" do
     link_hubspot(last_synced_at: 5.minutes.ago)
 

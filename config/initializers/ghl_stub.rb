@@ -31,7 +31,8 @@ if Rails.env.development? && ENV["GHL_STUB"] != "false"
   # to the real APIs (or fail cleanly if not configured).
   WebMock.disable_net_connect!(
     allow: [ "api.yextapis.com", "api.semrush.com", "api.hubapi.com",
-             "www.googleapis.com", "analyticsadmin.googleapis.com", "analyticsdata.googleapis.com" ]
+             "www.googleapis.com", "analyticsadmin.googleapis.com", "analyticsdata.googleapis.com",
+             "oauth2.googleapis.com" ]
   )
 
   GHL_COMPANY_ID = "stub-company-123"

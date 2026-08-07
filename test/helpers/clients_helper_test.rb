@@ -1,6 +1,22 @@
 require "test_helper"
 
 class ClientsHelperTest < ActionView::TestCase
+  # Regression: client_source_status_label previously never checked
+  # last_sync_error, so a link with a stale/wrong external_id (e.g. a 404 on
+  # a deleted HubSpot company) still showed "Linked" on the Sources tab even
+  # though the sync was actively failing.
+  test "client_source_status_label reports Sync failed over a present external_id" do
+    link = ClientServiceLink.new(service: "hubspot", external_id: "12334", last_sync_error: "not found")
+
+    assert_equal "Sync failed", client_source_status_label(link)
+  end
+
+  test "client_source_status_label reports Linked when there is no sync error" do
+    link = ClientServiceLink.new(service: "hubspot", external_id: "12334")
+
+    assert_equal "Linked", client_source_status_label(link)
+  end
+
   # Each matcher names its id and domain fields in its own service's terminology,
   # so these two helpers are the only thing keeping _service_outcome.html.erb from
   # branching per service. A wrong mapping renders a blank suggestion caption and a

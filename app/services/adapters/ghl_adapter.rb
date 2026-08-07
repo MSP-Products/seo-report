@@ -35,6 +35,16 @@ module Adapters
       )
     end
 
+    # Lists the location's calendars rather than fetching a month of events —
+    # the lightest already-used call that still 404s/errors on a bad or
+    # revoked location ID, without pulling real report data.
+    def check_connection
+      return Result.failure("ghl: no location id configured for this client") if external_id.blank?
+
+      fetch_calendar_ids
+      Result.success
+    end
+
     # GHL's /calendars/events has no "all events for this location" mode —
     # it requires filtering by one of calendarId/userId/groupId (confirmed
     # live: querying without one 422s with "Either of userId, calendarId or

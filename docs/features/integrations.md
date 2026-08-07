@@ -2,13 +2,13 @@
 title: The adapter layer
 slug: integrations
 status: shipped
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 related: [integration-yext, integration-semrush, integration-google-analytics, integration-hubspot, integration-ghl, integration-anthropic, report-generation]
 ---
 
 # The adapter layer
 
-> **Status:** shipped · **Last verified:** 2026-08-06
+> **Status:** shipped · **Last verified:** 2026-08-07
 >
 > The shared machinery every external service goes through: credentials, timeouts, retries,
 > and the contract that lets one dead API degrade one report section instead of failing the
@@ -83,9 +83,16 @@ credential or ID problem, not genuine inactivity.
 Every adapter subclasses `Adapters::Base`, declares `SERVICE`, and implements `#perform`.
 
 **Adapters return, never raise.** `Adapters::Result` is a
-`Data.define(:success?, :data, :error)` with `.success` and `.failure` constructors. This
-single decision is what makes graceful degradation possible — `ReportGenerator` collects a
-warning and carries on rather than aborting.
+`Data.define(:success?, :data, :error, :not_found)` with `.success` and `.failure`
+constructors. This single decision is what makes graceful degradation possible —
+`ReportGenerator` collects a warning and carries on rather than aborting. `not_found` defaults
+to `false` and is set only when the remote record itself is gone (an HTTP 404) — a permanent
+signal, unlike a timeout or 5xx, that a caller may want to treat differently. See
+`SyncClientFromHubspot`, which normalizes a practice's status on a 404 (or no company ID at
+all) rather than leaving its last-known state untouched the way it does for any other
+failure — to `pending` if the practice is kept, or to `offboarded` (staying discarded) if it
+already was, so a not-connected practice never gets silently undiscarded with no real HubSpot
+signal telling it to come back.
 
 `Base` owns four things:
 
@@ -93,13 +100,35 @@ warning and carries on rather than aborting.
    over `AgencyConnection#encrypted_credentials` (agency-wide). Both are
    ActiveRecord-encrypted JSON blobs, decrypted transparently.
 2. **The `#call` wrapper** — returns `Result.failure` when no credentials exist, otherwise
-   delegates to `#perform` and converts any `Faraday::Error` into `Result.failure`.
+   delegates to `#perform` (or `#check_connection`, see below) and converts a
+   `Faraday::ResourceNotFound` into `Result.failure(..., not_found: true)`, any other
+   `Faraday::Error` into a plain `Result.failure`.
 3. **`external_id`** — the practice's identifier in that service.
 4. **`month_range`** — via the `MonthlyRange` concern, shared with `ReportGenerator`.
 
 **Only `Faraday::Error` is caught.** Anything else — a `JSON::ParserError`, an
 `ArgumentError` from an enum — propagates and fails the run. That is deliberate: an API
-being down is normal, a parse error is a bug.
+being down is normal, a parse error is a bug. (SEMrush's `check_connection` is the one
+exception in this file, and calls that out explicitly — it 404s a bad project ID with a
+plain-text body, not JSON, so a naive `JSON.parse` would itself raise.)
+
+### Testing a connection without a full data pull
+
+`Base#call` takes an `action:` keyword (default `:perform`) so a second, lighter action can
+share the same credential check and error handling. `GhlAdapter`, `YextAdapter`,
+`SemrushAdapter`, and `GoogleAnalyticsAdapter` each implement `#check_connection` — the
+lightest already-used endpoint that still 404s on a bad or revoked ID (e.g. GHL lists
+calendars instead of pulling a month of events; Yext looks up the entity directly instead of
+running an analytics report), rather than a new, unverified one.
+
+`LinkedServiceConnectionTester` calls `action: :check_connection` daily for every already-linked
+`ClientServiceLink` across every kept practice (`TestClientServiceConnectionsJob`), and again
+immediately whenever a client saves with a linked service's `external_id` present
+(`Client#sync_linked_services` → `TestClientServiceConnectionJob`, one link at a time) — writing
+the outcome onto that link's `last_synced_at`/`last_sync_error`, the columns the Sources tab's
+status label reads. HubSpot is excluded from both: `SyncClientFromHubspot` already tests that
+connection, hourly and on every save, as a side effect of keeping `onboarding_status` current.
+See [jobs-and-schedules](../reference/jobs-and-schedules.md#testclientserviceconnectionsjob).
 
 ### Partial degradation within one adapter
 
@@ -146,7 +175,10 @@ own copy with the same timeouts but no retry middleware at all.
 | `app/models/agency_connection.rb` | Agency credentials, field definitions, display metadata |
 | `app/models/client_service_link.rb` | Per-practice `external_id` and override |
 | `app/models/service.rb` | The valid service keys, backing the FK constraints |
-| `app/services/report_generator.rb` | The only caller of any adapter |
+| `app/services/report_generator.rb` | The only caller of any adapter's `#perform` |
+| `app/services/linked_service_connection_tester.rb` | Daily/on-save `#check_connection` sweep over every linked, non-HubSpot link |
+| `app/jobs/test_client_service_connections_job.rb` | Daily fan-in wrapper — see [jobs-and-schedules](../reference/jobs-and-schedules.md) |
+| `app/jobs/test_client_service_connection_job.rb` | Per-link, on-save wrapper — see [jobs-and-schedules](../reference/jobs-and-schedules.md) |
 
 ### Data
 

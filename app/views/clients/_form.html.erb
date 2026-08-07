@@ -23,22 +23,28 @@
     <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Step 1</p>
     <h2 class="mt-0.5 text-base font-semibold text-slate-900">Practice details</h2>
     <p class="mt-1 text-sm text-slate-500">
-      Fill these in by hand, or enter the HubSpot company ID below and sync them automatically.
+      <% if client.hubspot_synced? %>
+        Name, website, and address are synced from HubSpot and can't be edited here — change them in HubSpot instead.
+      <% else %>
+        Fill these in by hand, or enter the HubSpot company ID below and sync them automatically.
+      <% end %>
     </p>
 
     <div class="mt-5 space-y-5">
       <div>
         <%= form.label :name, "Practice name", class: "block text-sm font-medium text-slate-700" %>
-        <%= form.text_field :name,
-              class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
-        <p class="mt-1.5 text-xs text-slate-500">Optional if you enter a HubSpot company ID below — it'll be filled in from there.</p>
+        <%= form.text_field :name, readonly: client.hubspot_synced?,
+              class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15 #{"cursor-not-allowed bg-slate-50 text-slate-500" if client.hubspot_synced?}" %>
+        <% unless client.hubspot_synced? %>
+          <p class="mt-1.5 text-xs text-slate-500">Optional if you enter a HubSpot company ID below — it'll be filled in from there.</p>
+        <% end %>
       </div>
 
       <div class="grid gap-5 sm:grid-cols-2">
         <div>
           <%= form.label :website_url, "Website URL", class: "block text-sm font-medium text-slate-700" %>
-          <%= form.url_field :website_url, placeholder: "https://",
-                class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
+          <%= form.url_field :website_url, placeholder: "https://", readonly: client.hubspot_synced?,
+                class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15 #{"cursor-not-allowed bg-slate-50 text-slate-500" if client.hubspot_synced?}" %>
         </div>
         <div>
           <%= form.label :phone, class: "block text-sm font-medium text-slate-700" %>
@@ -49,9 +55,11 @@
 
       <div>
         <%= form.label :address, class: "block text-sm font-medium text-slate-700" %>
-        <%= form.text_field :address,
-              class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
-        <p class="mt-1.5 text-xs text-slate-500">Shown in the report header. Synced from Yext when a location is linked.</p>
+        <%= form.text_field :address, readonly: client.hubspot_synced?,
+              class: "mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15 #{"cursor-not-allowed bg-slate-50 text-slate-500" if client.hubspot_synced?}" %>
+        <% unless client.hubspot_synced? %>
+          <p class="mt-1.5 text-xs text-slate-500">Shown in the report header. Synced from Yext when a location is linked.</p>
+        <% end %>
       </div>
     </div>
   </div>

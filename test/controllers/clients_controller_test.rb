@@ -1,6 +1,8 @@
 require "test_helper"
 
 class ClientsControllerTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
   test "redirects to login when not authenticated" do
     get clients_path
 
@@ -268,6 +270,27 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to clients_path
     assert client.reload.discarded?
+  end
+
+  # Regression: Client#sync_linked_services re-verifies every linked service
+  # on any save, including the offboard save itself — so without
+  # skip_service_sync, a HubSpot company that 404s would immediately revert
+  # the offboard back to "pending" (SyncClientFromHubspot#reset_to_pending)
+  # in the very same request cycle, before the admin even saw the redirect.
+  test "destroy stays offboarded even when the linked HubSpot company is gone" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Offboard Broken Link #{SecureRandom.hex(4)}", onboarding_status: "pending")
+    client.client_service_links.create!(service: "hubspot", external_id: "missing-company")
+    AgencyConnection.create!(service: "hubspot", encrypted_credentials: { access_token: "token" }.to_json)
+    stub_request(:get, "https://api.hubapi.com/crm/v3/objects/companies/missing-company")
+      .to_return(status: 404, body: "not found")
+
+    delete client_path(client)
+    perform_enqueued_jobs
+
+    client.reload
+    assert client.discarded?
+    assert_equal "offboarded", client.onboarding_status
   end
 
   test "restore brings an offboarded client back" do

@@ -9,6 +9,18 @@ class ClientRowPresenter
     "queued" => "bg-amber-500", "generating" => "bg-amber-500", "failed" => "bg-red-500"
   }.freeze
 
+  # Color represents connection state here, not the service's own brand —
+  # a badge that stayed HubSpot-rose while that sync was actively 404ing
+  # would look identical to a healthy one. "Syncing…" (linked, no result
+  # yet) gets amber rather than green or red, matching the in-flight color
+  # ClientsHelper#hubspot_sync_status_dot_class already uses.
+  SERVICE_STATUS_BADGE = {
+    "Not linked" => "bg-slate-300",
+    "Syncing…" => "bg-amber-500",
+    "Linked" => "bg-emerald-500",
+    "Failed" => "bg-red-500"
+  }.freeze
+
   delegate :name, :website_url, :onboarding_status, to: :client
 
   def initialize(client)
@@ -63,8 +75,13 @@ class ClientRowPresenter
   # shows the fuller "Synced 3 minutes ago" via ClientsHelper#hubspot_sync_status_label.
   def service_status_labels
     @service_status_labels ||= Service::KEYS.map do |service|
-      { service: service, label: service_status_label(service), link: service_link(service) }
+      label = service_status_label(service)
+      { service: service, label: label, link: service_link(service), badge_class: service_status_badge_class(label) }
     end
+  end
+
+  def service_status_badge_class(label)
+    SERVICE_STATUS_BADGE.fetch(label, "bg-slate-300")
   end
 
   # "Syncing…" is the fall-through, not a branch: a link with an external_id but

@@ -13,7 +13,7 @@ class SyncClientServicesJobTest < ActiveJob::TestCase
       onboarding_status: "active", website_url: "https://www.adamsdentalassociates.com/")
     AgencyConnection.create!(service: "ghl", encrypted_credentials: {
       access_token: "ghl-agency-token", refresh_token: "ghl-refresh-token", company_id: "company-abc"
-    }.to_json, expires_at: 2.hours.from_now)
+    }.to_json, expires_at: 23.hours.from_now)
     AgencyConnection.create!(service: "yext", encrypted_credentials: { api_key: "yext-agency-key" }.to_json)
     AgencyConnection.create!(service: "semrush", encrypted_credentials: { api_key: "semrush-agency-key" }.to_json)
   end

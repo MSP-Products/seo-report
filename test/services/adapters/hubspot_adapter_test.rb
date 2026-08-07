@@ -70,6 +70,18 @@ module Adapters
 
       assert_not result.success?
       assert_match(/hubspot/, result.error)
+      assert_not result.not_found
+    end
+
+    test "flags a 404 as not_found, unlike any other HTTP error" do
+      stub_request(:get, "https://api.hubapi.com/crm/v3/objects/companies/company-123")
+        .with(query: hash_including("properties"))
+        .to_return(status: 404, body: "not found")
+
+      result = HubspotAdapter.new(@client).call
+
+      assert_not result.success?
+      assert result.not_found
     end
 
     private

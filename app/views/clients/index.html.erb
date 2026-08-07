@@ -98,9 +98,8 @@
                 <% row.service_status_labels.each do |status| %>
                   <% service = status[:service] %>
                   <% display = AgencyConnection::DISPLAY.fetch(service) %>
-                  <% linked = status[:link]&.external_id&.present? %>
                   <div class="group relative">
-                    <span class="inline-flex items-center justify-center size-6 rounded text-xs font-semibold text-white cursor-help <%= linked ? display[:badge_class] : "bg-slate-300" %>">
+                    <span class="inline-flex items-center justify-center size-6 rounded text-xs font-semibold text-white cursor-help <%= status[:badge_class] %>">
                       <%= display[:letter] %>
                     </span>
                     <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
