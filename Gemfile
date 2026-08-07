@@ -38,7 +38,7 @@ gem "kamal", require: false
 gem "thruster", require: false
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-gem "image_processing", "~> 1.2"
+gem "image_processing", "~> 2.0"
 
 # HTTP client used by the external SEO data-source adapters (HubSpot, GHL, Yext, SEMrush)
 gem "faraday", "~> 2.12"
