@@ -13,12 +13,32 @@ class ReportGeneratorTest < ActiveSupport::TestCase
       override_credentials: { api_key: "yext-key" }.to_json)
     @client.client_service_links.create!(service: "semrush", external_id: "project-1",
       override_credentials: { api_key: "semrush-key" }.to_json)
+    @client.client_service_links.create!(service: "google_analytics", external_id: "384938446")
     @keyword = @client.client_keywords.create!(keyword: "dentist near me", intent: "T")
 
     stub_request(:get, "https://api.hubapi.com/crm/v3/objects/companies/company-1")
       .with(query: hash_including("properties"))
       .to_return(status: 200, body: { properties: { name: "Test Practice", active: "true", service_purchased: "AI SEO" } }.to_json)
 
+    @private_key = OpenSSL::PKey::RSA.generate(2048)
+    AgencyConnection.find_or_create_by!(service: "google_analytics") do |connection|
+      connection.encrypted_credentials = { client_email: "reports@msp.iam.gserviceaccount.com", private_key: @private_key.to_pem }.to_json
+    end
+    ga4_runreport_url = "https://analyticsdata.googleapis.com/v1beta/properties/384938446:runReport"
+    stub_request(:post, "https://oauth2.googleapis.com/token")
+      .to_return(status: 200, body: { access_token: "ga4-token", expires_in: 3600, token_type: "Bearer" }.to_json)
+    stub_request(:post, ga4_runreport_url)
+      .with(body: hash_including("dimensions" => []))
+      .to_return(status: 200, body: {
+        rows: [ { dimensionValues: [], metricValues: [ { value: "500" }, { value: "420" }, { value: "2.3" } ] } ]
+      }.to_json)
+    stub_request(:post, ga4_runreport_url)
+      .with(body: hash_including("dimensions" => [ { "name" => "sessionDefaultChannelGroup" } ]))
+      .to_return(status: 200, body: { rows: [] }.to_json)
+
+    stub_request(:get, "https://services.leadconnectorhq.com/calendars/")
+      .with(query: hash_including("locationId"))
+      .to_return(status: 200, body: { calendars: [ { id: "cal-1" } ] }.to_json)
     stub_request(:get, "https://services.leadconnectorhq.com/calendars/events")
       .with(query: hash_including("locationId"))
       .to_return(status: 200, body: { events: [ { id: "1" } ] }.to_json)
@@ -89,7 +109,7 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     assert_equal "connected", report.report_traffic.ghl_data_status
     assert_equal 1, report.report_traffic.appointments_booked
     assert_equal 500, report.report_traffic.estimated_revenue.to_i
-    assert_nil report.report_traffic.total_visits # GA4 stub always leaves this nil
+    assert_equal 500, report.report_traffic.total_visits
 
     assert_equal 900, report.report_citation.total_impressions
 
@@ -179,6 +199,95 @@ class ReportGeneratorTest < ActiveSupport::TestCase
     report = ReportGenerator.new(client: @client, month: @month).call
 
     assert_nil report.report_ai_visibility
+  end
+
+  test "fails the report when a GHL-linked client's GHL call fails" do
+    # A configured GHL link makes GHL mandatory for this client, unlike the
+    # not_connected case above — a failure here must not be degraded away.
+    stub_request(:get, "https://services.leadconnectorhq.com/calendars/events")
+      .with(query: hash_including("locationId"))
+      .to_return(status: 500)
+
+    assert_raises(ReportGenerator::AdapterFailureError) do
+      ReportGenerator.new(client: @client, month: @month).call
+    end
+
+    report = @client.monthly_reports.find_by(report_month: @month)
+    assert report.failed?
+    assert_match(/ghl:/, report.report_generation_logs.last.error_summary)
+  end
+
+  test "fails the report when an AI-SEO-enrolled client's Yext response has no AI visibility data" do
+    stub_request(:post, "https://api.yextapis.com/v2/accounts/me/analytics/reports")
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [
+        "SCOUT_AI_AVG_OVERALL_VISIBILITY_SCORE", "SCOUT_GOOGLE_RANK", "SCOUT_AI_RANK_SCORE",
+        "SCOUT_NEGATIVE_SENTIMENT_SCORE", "SCOUT_NEUTRAL_SENTIMENT_SCORE"
+      ]))
+      .to_return(status: 200, body: { response: { data: [] } }.to_json)
+
+    assert_raises(ReportGenerator::AdapterFailureError) do
+      ReportGenerator.new(client: @client, month: @month).call
+    end
+
+    report = @client.monthly_reports.find_by(report_month: @month)
+    assert report.failed?
+  end
+
+  test "fails the report when HubSpot sync fails" do
+    stub_request(:get, "https://api.hubapi.com/crm/v3/objects/companies/company-1")
+      .with(query: hash_including("properties"))
+      .to_return(status: 404)
+
+    assert_raises(ReportGenerator::AdapterFailureError) do
+      ReportGenerator.new(client: @client, month: @month).call
+    end
+
+    report = @client.monthly_reports.find_by(report_month: @month)
+    assert report.failed?
+    assert_match(/hubspot:/, report.report_generation_logs.last.error_summary)
+  end
+
+  test "fails the report when the Google Analytics call fails" do
+    stub_request(:post, "https://analyticsdata.googleapis.com/v1beta/properties/384938446:runReport")
+      .with(body: hash_including("dimensions" => []))
+      .to_return(status: 500)
+
+    assert_raises(ReportGenerator::AdapterFailureError) do
+      ReportGenerator.new(client: @client, month: @month).call
+    end
+
+    report = @client.monthly_reports.find_by(report_month: @month)
+    assert report.failed?
+    assert_match(/google_analytics:/, report.report_generation_logs.last.error_summary)
+  end
+
+  test "fails the report when Yext fails" do
+    stub_request(:post, "https://api.yextapis.com/v2/accounts/me/analytics/reports")
+      .with(query: hash_including("api_key" => "yext-key"), body: hash_including("metrics" => [ "TOTAL_LISTINGS_IMPRESSIONS" ]))
+      .to_return(status: 500)
+
+    assert_raises(ReportGenerator::AdapterFailureError) do
+      ReportGenerator.new(client: @client, month: @month).call
+    end
+
+    report = @client.monthly_reports.find_by(report_month: @month)
+    assert report.failed?
+    assert_match(/yext:/, report.report_generation_logs.last.error_summary)
+  end
+
+  test "fails the report when SEMrush fails" do
+    stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-1/tracking/")
+      .with(query: hash_including("key" => "semrush-key", "type" => "tracking_position_organic",
+        "action" => "report", "url" => "*.example.com/*"))
+      .to_return(status: 500)
+
+    assert_raises(ReportGenerator::AdapterFailureError) do
+      ReportGenerator.new(client: @client, month: @month).call
+    end
+
+    report = @client.monthly_reports.find_by(report_month: @month)
+    assert report.failed?
+    assert_match(/semrush:/, report.report_generation_logs.last.error_summary)
   end
 
   test "raises for the current month" do

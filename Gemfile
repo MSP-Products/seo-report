@@ -56,6 +56,10 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  # Stub external HTTP calls made by the adapter services [https://github.com/bblimke/webmock]
+  # Also used in development to stub GHL OAuth for local testing without real credentials
+  gem "webmock"
 end
 
 group :development do
@@ -67,9 +71,6 @@ group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
   gem "selenium-webdriver"
-
-  # Stub external HTTP calls made by the adapter services [https://github.com/bblimke/webmock]
-  gem "webmock"
 end
 
 gem "discard", "~> 2.0"
