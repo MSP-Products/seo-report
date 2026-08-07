@@ -310,7 +310,7 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "support role can view clients but not create, update, destroy, or restore" do
-    sign_in_as(role: "support")
+    sign_in_as(role: "account_manager")
     client = Client.create!(name: "Read Only Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
 
     get clients_path

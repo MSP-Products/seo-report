@@ -39,7 +39,7 @@ class Clients::HubspotSearchesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "support role is blocked" do
-    sign_in_as(role: "support")
+    sign_in_as(role: "account_manager")
 
     get hubspot_search_clients_path
 

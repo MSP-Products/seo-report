@@ -34,7 +34,7 @@ class Clients::SyncServicesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "support role is blocked" do
-    sign_in_as(role: "support")
+    sign_in_as(role: "account_manager")
 
     assert_no_enqueued_jobs only: SyncClientServicesJob do
       post client_sync_services_path(@client)

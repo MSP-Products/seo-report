@@ -8,7 +8,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "index lists all five services, including ones never configured" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
 
     get connections_path
 
@@ -18,7 +18,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "edit renders blank credential fields even when a value is already configured" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     AgencyConnection.create!(service: "hubspot", encrypted_credentials: { access_token: "super-secret-token" }.to_json)
 
     get edit_connection_path("hubspot")
@@ -28,7 +28,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "update saves a new credential and does not echo it back" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
 
     patch connection_path("hubspot"), params: { agency_connection: { access_token: "brand-new-token" } }
     follow_redirect!
@@ -39,7 +39,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "a blank submitted value leaves the existing credential untouched" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     AgencyConnection.create!(service: "hubspot", encrypted_credentials: { access_token: "keep-me" }.to_json)
 
     patch connection_path("hubspot"), params: { agency_connection: { access_token: "" } }
@@ -48,7 +48,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "support role can view but not edit or update" do
-    sign_in_as(role_key: "account_manager")
+    sign_in_as(role: "account_manager")
     AgencyConnection.create!(service: "hubspot", encrypted_credentials: { access_token: "keep-me" }.to_json)
 
     get connections_path
@@ -62,7 +62,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "rejects an unknown service" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
 
     get edit_connection_path("not-a-real-service")
 
@@ -70,7 +70,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "google_analytics is editable, with a textarea for the multi-line private key" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
 
     get connections_path
     assert_select "a", text: "Edit", count: 5 # every service, including google_analytics
@@ -83,7 +83,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "google_analytics edit never echoes back the stored private key" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     AgencyConnection.create!(service: "google_analytics", encrypted_credentials: {
       client_email: "msp-909@focus-hulling-504115-d8.iam.gserviceaccount.com",
       private_key: "-----BEGIN PRIVATE KEY-----\nsecret-key-material\n-----END PRIVATE KEY-----\n"

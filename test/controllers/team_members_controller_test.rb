@@ -8,7 +8,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "a Super Admin can view the team list" do
-    sign_in_as(role_key: "super_admin")
+    sign_in_as(role: "super_admin")
 
     get team_members_path
 
@@ -17,7 +17,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Admin can view the team list" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
 
     get team_members_path
 
@@ -25,7 +25,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Account Manager is redirected away from the team list" do
-    sign_in_as(role_key: "account_manager")
+    sign_in_as(role: "account_manager")
 
     get team_members_path
 
@@ -33,7 +33,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "lists every kept team member with their role" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     AdminUser.create!(email: "dana-#{SecureRandom.hex(4)}@example.com", password: "password123",
       first_name: "Dana", last_name: "Reyes", role: Role.find_by!(key: "account_manager"))
 
@@ -44,7 +44,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "does not list a discarded team member" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
       first_name: "Gone", last_name: "Away", role: Role.find_by!(key: "admin"))
     removed.discard
@@ -55,7 +55,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "shows the current viewer's own row as You" do
-    admin = sign_in_as(role_key: "admin")
+    admin = sign_in_as(role: "admin")
 
     get team_members_path
 
@@ -64,7 +64,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "shows a role summary card listing its permissions" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
 
     get team_members_path
 
@@ -73,7 +73,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Account Manager cannot reach the invite form" do
-    sign_in_as(role_key: "account_manager")
+    sign_in_as(role: "account_manager")
 
     get new_team_member_path
 
@@ -81,7 +81,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Admin can invite a new member and sees the generated password once" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     account_manager_role = Role.find_by!(key: "account_manager")
 
     post team_members_path, params: { admin_user: { email: "new-hire@example.com", first_name: "New",
@@ -96,7 +96,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the generated password never reappears once the invite screen is left" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     post team_members_path, params: { admin_user: { email: "new-hire2@example.com",
       role_id: Role.find_by!(key: "account_manager").id } }
     password = css_select("#generated-password").first.text
@@ -107,7 +107,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Admin cannot invite someone as Super Admin" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
 
     post team_members_path, params: { admin_user: { email: "wannabe@example.com", role_id: Role.super_admin.id } }
 
@@ -116,7 +116,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "a Super Admin can invite someone as Super Admin" do
-    sign_in_as(role_key: "super_admin")
+    sign_in_as(role: "super_admin")
 
     post team_members_path, params: { admin_user: { email: "future-super@example.com", role_id: Role.super_admin.id } }
 
@@ -125,7 +125,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the invite form only offers assignable roles to a plain Admin" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
 
     get new_team_member_path
 
@@ -134,7 +134,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Account Manager cannot reach the manage form" do
-    sign_in_as(role_key: "account_manager")
+    sign_in_as(role: "account_manager")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "admin"))
 
@@ -144,7 +144,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Admin can update a member's name" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       first_name: "Old", role: Role.find_by!(key: "account_manager"))
 
@@ -155,7 +155,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Admin does not see the individual-permissions section" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "account_manager"))
 
@@ -165,7 +165,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "a Super Admin sees and can change individual permissions" do
-    sign_in_as(role_key: "super_admin")
+    sign_in_as(role: "super_admin")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "account_manager"))
 
@@ -179,7 +179,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Admin's submitted permission_overrides are silently ignored" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "account_manager"))
 
@@ -191,7 +191,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the assigned-clients section only appears for an Account Manager" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     account_manager = AdminUser.create!(email: "am-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "account_manager"))
     admin_member = AdminUser.create!(email: "adm-#{SecureRandom.hex(4)}@example.com", password: "password123",
@@ -205,7 +205,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "assigning clients to an Account Manager through the form" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "account_manager"))
     client = Client.create!(name: "Assignable Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
@@ -216,7 +216,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Admin cannot promote a member to Super Admin through the manage form" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "admin"))
 
@@ -227,7 +227,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "Manage link only appears for a viewer who can edit members" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "account_manager"))
 
@@ -237,7 +237,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Account Manager cannot remove a team member" do
-    sign_in_as(role_key: "account_manager")
+    sign_in_as(role: "account_manager")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "admin"))
 
@@ -248,7 +248,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "an Admin can remove a team member, who then disappears from the list" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       first_name: "Gone", last_name: "Away", role: Role.find_by!(key: "account_manager"))
 
@@ -261,7 +261,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the last Super Admin cannot be removed" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     last = AdminUser.create!(email: "last-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.super_admin)
 
@@ -274,7 +274,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "a Super Admin becomes removable once a second one exists" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     first_super_admin = AdminUser.create!(email: "first-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.super_admin)
     AdminUser.create!(email: "second-#{SecureRandom.hex(4)}@example.com", password: "password123",
@@ -286,7 +286,7 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the Remove button only appears for a viewer who can remove members" do
-    sign_in_as(role_key: "admin")
+    sign_in_as(role: "admin")
     AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "account_manager"))
 
