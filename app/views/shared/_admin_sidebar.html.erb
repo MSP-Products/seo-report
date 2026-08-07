@@ -16,7 +16,8 @@
       [:dashboard, "Dashboard", dashboard_path, "dashboard"],
       [:clients, "Clients", connections_path, "clients"],
       [:report_log, "Report Log", report_log_path, "report_logs"],
-      [:connections, "Connections", connections_path, "connections"]
+      [:connections, "Connections", connections_path, "connections"],
+      [:team_members, "Team", team_members_path, "team_members"]
     ].each do |key, label, path, controller| %>
       <% active = controller_name == controller %>
       <%= link_to path, class: "flex items-center gap-3 rounded-lg px-3 py-2 text-sm #{active ? "bg-teal-primary/10 font-medium text-teal-dark" : "text-slate-600 hover:bg-slate-50"}" do %>

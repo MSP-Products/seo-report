@@ -1,0 +1,7 @@
+<% content_for :title, "New password — My Social Practice" %>
+
+<p class="mb-2 text-sm text-slate-500"><%= link_to "← Team", team_members_path, class: "hover:underline" %></p>
+
+<h1 class="text-2xl font-semibold tracking-tight text-slate-900">New password for <%= @admin_user.display_name %></h1>
+
+<%= render "team_members/credentials", admin_user: @admin_user %>

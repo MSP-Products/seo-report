@@ -53,6 +53,14 @@ class AdminUser < ApplicationRecord
     [ first_name, last_name ].compact_blank.join(" ").presence || email
   end
 
+  # Which roles this admin_user may assign to someone else (self included) —
+  # only a Super Admin may hand out the Super Admin role. Used by the invite
+  # and edit forms to keep the visible options honest; TeamMemberInviter and
+  # TeamMemberUpdater enforce the same rule server-side regardless.
+  def assignable_roles
+    role.key == Role::SUPER_ADMIN ? Role.all : Role.where.not(key: Role::SUPER_ADMIN)
+  end
+
   # Throttled write, not validated: an activity ping is not a business edit
   # worth firing validations/callbacks on for every request.
   def touch_last_active

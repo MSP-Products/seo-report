@@ -25,6 +25,10 @@ Rails.application.routes.draw do
 
   get "report-log", to: "report_logs#index", as: :report_log
 
+  resources :team_members, path: "team", only: [ :index, :new, :create, :edit, :update, :destroy ] do
+    member { post :resend }
+  end
+
   # Defines the root path route ("/")
   root "dashboard#index"
 end

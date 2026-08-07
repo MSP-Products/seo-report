@@ -1,0 +1,95 @@
+<% content_for :title, "Team — My Social Practice" %>
+
+<div class="flex items-start justify-between gap-6">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Team</h1>
+    <p class="mt-1 text-sm text-slate-500">Who at MSP can see client data, edit connections, and trigger report runs.</p>
+  </div>
+  <% if current_admin_user.can?(:users_invite) %>
+    <%= link_to "+ Invite member", new_team_member_path,
+          class: "shrink-0 rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
+  <% end %>
+</div>
+
+<div class="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <table class="w-full text-left text-sm">
+    <thead class="text-xs uppercase text-slate-500">
+      <tr>
+        <th class="px-5 py-3">Member</th>
+        <th class="px-5 py-3">Role</th>
+        <th class="px-5 py-3">Last active</th>
+        <th class="px-5 py-3">Status</th>
+        <th class="px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      <% @team_members.each do |member| %>
+        <tr>
+          <td class="px-5 py-3">
+            <div class="flex items-center gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-primary/10 text-sm font-semibold text-teal-dark">
+                <%= member_initials(member) %>
+              </div>
+              <div>
+                <p class="font-medium text-slate-900"><%= member.display_name %></p>
+                <p class="text-xs text-slate-500"><%= member.email %></p>
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-3">
+            <span class="rounded-full px-2 py-0.5 text-xs font-medium <%= role_badge_class(member.role) %>"><%= member.role.name %></span>
+          </td>
+          <td class="px-5 py-3 text-slate-600"><%= member_last_active_label(member) %></td>
+          <td class="px-5 py-3">
+            <% status = member_status_label(member, current_admin_user) %>
+            <span class="inline-flex items-center gap-1.5 text-slate-600">
+              <span class="size-1.5 rounded-full <%= status == "Invited" ? "bg-amber-500" : "bg-emerald-500" %>"></span>
+              <%= status %>
+            </span>
+          </td>
+          <td class="px-5 py-3 text-right">
+            <div class="flex items-center justify-end gap-3">
+              <% if member.invited? && current_admin_user.can?(:users_invite) %>
+                <%# data-turbo="false": #resend renders the new credentials screen directly
+                    on success instead of redirecting, for the same one-time-secret reason
+                    #create does (see new.html.erb) — Turbo Drive can't follow a plain 200
+                    HTML response to a form submission. %>
+                <%= button_to "Resend", resend_team_member_path(member), method: :post,
+                      form_class: "inline", data: { turbo: false },
+                      class: "text-sm font-medium text-cyan-primary hover:text-teal-dark" %>
+              <% end %>
+              <% if current_admin_user.can?(:users_edit) %>
+                <%= link_to "Manage", edit_team_member_path(member), class: "text-sm font-medium text-teal-primary hover:text-teal-dark" %>
+              <% end %>
+              <% if current_admin_user.can?(:users_remove) %>
+                <%= button_to "Remove", team_member_path(member), method: :delete,
+                      form_class: "inline",
+                      data: { turbo_confirm: "Remove #{member.display_name} from the team?" },
+                      class: "text-sm font-medium text-red-600 hover:text-red-700" %>
+              <% end %>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+  <% Role.includes(:permissions).order(:id).each do |role| %>
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex items-center gap-2">
+        <span class="rounded-full px-2 py-0.5 text-xs font-medium <%= role_badge_class(role) %>"><%= role.name %></span>
+        <span class="text-xs text-slate-500"><%= pluralize(role.admin_users.kept.count, "member") %></span>
+      </div>
+      <ul class="mt-3 space-y-1.5 text-xs text-slate-600">
+        <% role.permissions.each do |permission| %>
+          <li class="flex items-center gap-1.5">
+            <%= report_icon(:check, css_class: "size-3.5 shrink-0 text-emerald-600") %>
+            <%= permission_label(permission.key) %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+</div>
