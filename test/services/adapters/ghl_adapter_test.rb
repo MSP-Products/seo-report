@@ -43,6 +43,28 @@ module Adapters
       assert_match(/no credentials|location id/, result.error)
     end
 
+    test "check_connection lists calendars without fetching events or revenue" do
+      stub_request(:get, "https://services.leadconnectorhq.com/calendars/")
+        .with(query: hash_including("locationId" => "location-123"))
+        .to_return(status: 200, body: { calendars: [ { id: "cal-1" } ] }.to_json)
+
+      result = GhlAdapter.new(@client, report_month: @report_month).call(action: :check_connection)
+
+      assert result.success?
+      assert_not_requested :get, "https://services.leadconnectorhq.com/calendars/events"
+      assert_not_requested :get, "https://services.leadconnectorhq.com/opportunities/search"
+    end
+
+    test "check_connection flags a deleted location as not_found" do
+      stub_request(:get, "https://services.leadconnectorhq.com/calendars/")
+        .with(query: hash_including("locationId" => "location-123")).to_return(status: 404, body: "not found")
+
+      result = GhlAdapter.new(@client, report_month: @report_month).call(action: :check_connection)
+
+      assert_not result.success?
+      assert result.not_found
+    end
+
     test "a per-client override token is used as-is, without calling GHL's OAuth endpoints" do
       stub_request(:get, "https://services.leadconnectorhq.com/calendars/")
         .with(query: hash_including("locationId" => "location-123"), headers: { "Authorization" => "Bearer loc-token" })
@@ -63,7 +85,7 @@ module Adapters
       @client.client_service_links.create!(service: "ghl", external_id: "location-123")
       AgencyConnection.create!(service: "ghl", encrypted_credentials: {
         access_token: "agency-access-token", refresh_token: "agency-refresh-token", company_id: "company-abc"
-      }.to_json, expires_at: 2.hours.from_now)
+      }.to_json, expires_at: 23.hours.from_now)
 
       stub_request(:post, "https://services.leadconnectorhq.com/oauth/locationToken")
         .with(body: hash_including("companyId" => "company-abc", "locationId" => "location-123"))

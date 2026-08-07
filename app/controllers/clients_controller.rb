@@ -52,6 +52,7 @@ class ClientsController < ApplicationController
 
   def destroy
     client_name = @client.name
+    @client.skip_service_sync = true
     if @client.discarded?
       # Permanently delete if already offboarded
       @client.destroy!
@@ -68,7 +69,15 @@ class ClientsController < ApplicationController
   # kept-but-offboarded: it matches no status tab (the Offboarded tab lists
   # discarded rows only) and disappears from the list. "pending" is the honest
   # value — only a successful HubSpot sync may promote a practice to active.
+  #
+  # skip_service_sync: restoring is itself an explicit override of
+  # onboarding_status — without it, #sync_linked_services would immediately
+  # re-run the HubSpot sync in this same request and could undo the restore
+  # before the admin even sees it (e.g. a still-offboarded HubSpot record
+  # flips it right back). The existing hourly EnqueueHubspotSyncJob still
+  # reconciles within the hour either way.
   def restore
+    @client.skip_service_sync = true
     @client.update!(onboarding_status: :pending)
     @client.undiscard
     redirect_to client_path(@client), notice: "#{@client.name} restored. Note: HubSpot will sync in ~1 hour and may offboard again if still marked that way there."

@@ -91,6 +91,25 @@ module Adapters
       Result.success(rankings: rankings)
     end
 
+    # Reuses the same Position Tracking call #perform makes — SEMrush 404s a
+    # bad project ID with a plain-text "campaign not found" body, not a JSON
+    # error, so this checks the parse succeeds rather than relying on
+    # Base#call's Faraday::Error rescue to catch it.
+    def check_connection
+      return Result.failure("semrush: no project id configured for this client") if external_id.blank?
+
+      response = fetch_rankings
+      return Result.success if valid_rankings_response?(response.body)
+
+      Result.failure("semrush: #{response.body.to_s.strip.presence || "unexpected response"}")
+    end
+
+    def valid_rankings_response?(body)
+      JSON.parse(body).key?("data")
+    rescue JSON::ParserError
+      false
+    end
+
     # Phrases from parse_rankings/parse_keyword_overview are already
     # stripped+downcased, so the stored ClientKeyword#keyword and this
     # method's argument always match exactly — no re-normalizing needed at

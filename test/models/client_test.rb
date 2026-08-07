@@ -1,6 +1,8 @@
 require "test_helper"
 
 class ClientTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   test "defaults to pending onboarding_status when not specified" do
     client = Client.create!(name: "Default Status Practice #{SecureRandom.hex(4)}")
 
@@ -100,5 +102,81 @@ class ClientTest < ActiveSupport::TestCase
 
     assert_equal first_call.id, second_call.id
     assert second_call.is_first_report?
+  end
+
+  test "hubspot_synced? is false with no HubSpot link at all" do
+    client = Client.create!(name: "No Link Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+
+    assert_not client.hubspot_synced?
+  end
+
+  test "hubspot_synced? is false when the link has a standing sync error" do
+    client = Client.create!(name: "Broken Link Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    link = client.client_service_links.create!(service: "hubspot", external_id: "12334")
+    # update_columns, not update! — ClientServiceLink#reset_sync_status wipes
+    # last_sync_error on any external_id change, including on create, so a
+    # normal write can never leave it set on a freshly linked record.
+    link.update_columns(last_sync_error: "not found")
+
+    assert_not client.hubspot_synced?
+  end
+
+  test "hubspot_synced? is true once linked with no standing error" do
+    client = Client.create!(name: "Healthy Link Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    client.client_service_links.create!(service: "hubspot", external_id: "12334")
+
+    assert client.hubspot_synced?
+  end
+
+  test "sync_linked_services enqueues the full HubSpot sync for a linked HubSpot service" do
+    client = Client.new(name: "Sync Test Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    client.client_service_links.build(service: "hubspot", external_id: "company-123")
+
+    client.save!
+
+    assert_enqueued_with(job: SyncHubspotClientJob, args: [ client.id ])
+  end
+
+  test "sync_linked_services enqueues a lightweight connection check for a linked non-HubSpot service" do
+    client = Client.new(name: "Sync Test Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    link = client.client_service_links.build(service: "google_analytics", external_id: "384938446")
+
+    client.save!
+
+    assert_enqueued_with(job: TestClientServiceConnectionJob, args: [ link.id ])
+  end
+
+  test "sync_linked_services skips a service with a blank external_id" do
+    client = Client.new(name: "Sync Test Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    client.client_service_links.build(service: "ghl", external_id: "")
+
+    assert_no_enqueued_jobs { client.save! }
+  end
+
+  # Regression: the old trigger lived on ClientServiceLink and only fired
+  # when that specific link's external_id changed. Client#sync_linked_services
+  # replaces it — any client save re-verifies every already-linked service,
+  # not only the one field that was actually edited, since one form
+  # submission can touch several links at once.
+  test "sync_linked_services re-checks an untouched but already-linked service on any client save" do
+    client = Client.create!(name: "Sync Test Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    link = client.client_service_links.create!(service: "yext", external_id: "entity-123")
+    clear_enqueued_jobs
+
+    client.update!(phone: "555-0100")
+
+    assert_enqueued_with(job: TestClientServiceConnectionJob, args: [ link.id ])
+  end
+
+  test "sync_linked_services enqueues one job per linked service in a single save" do
+    client = Client.new(name: "Sync Test Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    hubspot_link = client.client_service_links.build(service: "hubspot", external_id: "company-123")
+    ghl_link = client.client_service_links.build(service: "ghl", external_id: "location-123")
+
+    client.save!
+
+    assert_enqueued_with(job: SyncHubspotClientJob, args: [ client.id ])
+    assert_enqueued_with(job: TestClientServiceConnectionJob, args: [ ghl_link.id ])
+    assert_not_equal hubspot_link.id, ghl_link.id
   end
 end

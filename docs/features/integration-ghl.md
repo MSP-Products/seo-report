@@ -2,14 +2,14 @@
 title: GoHighLevel integration
 slug: integration-ghl
 status: shipped
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 related: [integrations, monthly-report, report-generation]
 ---
 
 # GoHighLevel integration
 
 > **Status:** shipped — verified against a real GHL Marketplace app and a live sub-account
-> (Adams Dental Associates) · **Last verified:** 2026-08-06
+> (Adams Dental Associates) · **Last verified:** 2026-08-07
 >
 > GoHighLevel supplies appointments booked and estimated revenue — the two figures that
 > show a practice the money side of their SEO.
@@ -98,7 +98,7 @@ derived from the pipeline, not accounting data.
 A: Not currently — both come from the same integration and appear or disappear together.
 
 **Q: Do we need to reconnect GHL periodically?**
-A: No, in normal operation. The agency-wide grant refreshes itself automatically every hour
+A: No, in normal operation. The agency-wide grant refreshes itself automatically every 4 hours
 (`RefreshGhlTokenJob`, see [jobs-and-schedules](../reference/jobs-and-schedules.md)) and
 report generation also refreshes on demand if that job somehow missed a cycle. Reconnecting
 by hand is only needed if the grant is revoked on GHL's side, or a new scope is added to
@@ -255,13 +255,15 @@ and it is easy to get wrong when adding a third call:
 
 - **Agency access tokens last ~24h**; refresh tokens are long-lived and rotate on every
   use.
-- `GhlOauthClient::EXPIRY_BUFFER` is **90 minutes** — deliberately wider than
-  `RefreshGhlTokenJob`'s hourly cadence, so the job always catches a token before it
-  actually expires rather than leaving that entirely to the lazy refresh below.
+- `GhlOauthClient::EXPIRY_BUFFER` is **12 hours** — deliberately wider than
+  `RefreshGhlTokenJob`'s 4-hour cadence, so the job always catches a token before it
+  actually expires rather than leaving that entirely to the lazy refresh below. The wide
+  buffer is also what makes `last_verified_at` a meaningful "still healthy" signal: a real
+  refresh happens roughly every 12 hours, not only once near the token's actual ~24h expiry.
 - `GhlOauthClient#location_access_token!` (called by `GhlAdapter` during report generation)
   refreshes lazily if the stored token is stale, as a backstop — but `RefreshGhlTokenJob`
-  running hourly means this should rarely be the thing that actually triggers a refresh in
-  practice.
+  running every 4 hours means this should rarely be the thing that actually triggers a
+  refresh in practice.
 - A refresh failure (e.g. the grant was revoked in GHL) sets `credential_status: "expired"`
   and re-raises — surfaced on the Connections page, and it will fail generation for any
   practice linked to GHL until an admin reconnects.
@@ -400,7 +402,7 @@ no third `ghl_data_status` value is ever written (see
 | `app/services/ghl_oauth_client.rb` | The whole OAuth lifecycle: authorize URL, code exchange, refresh, location-token minting |
 | `app/controllers/connections/ghl_oauth_controller.rb` | `authorize`/`callback` actions |
 | `app/controllers/concerns/verifies_ghl_oauth_state.rb` | CSRF `state` guard, `require_editor!`, the `AuthorizationError` rescue |
-| `app/jobs/refresh_ghl_token_job.rb` | Hourly proactive refresh (see [jobs-and-schedules](../reference/jobs-and-schedules.md)) |
+| `app/jobs/refresh_ghl_token_job.rb` | Proactive refresh, every 4 hours (see [jobs-and-schedules](../reference/jobs-and-schedules.md)) |
 | `app/services/adapters/ghl_adapter.rb` | Both report-data calls |
 | `app/services/report_generator.rb` | `sync_traffic` — sets `not_connected` without calling, or raises on a linked call's failure |
 | `app/models/agency_connection.rb` | `oauth_managed?`, empty `CREDENTIAL_FIELDS["ghl"]`, the `status_label` exception for OAuth-managed services |
@@ -475,7 +477,7 @@ works unchanged; the OAuth grant is only the fallback when no override exists.
 - **Epoch values for `/calendars/events` are milliseconds**, hence the `* 1000`.
 - **The refresh token rotates every use.** Persisting the old one instead of the new one
   bricks the connection on the next refresh.
-- **`EXPIRY_BUFFER` (90 min) is intentionally wider than `RefreshGhlTokenJob`'s hourly
+- **`EXPIRY_BUFFER` (12 hours) is intentionally wider than `RefreshGhlTokenJob`'s 4-hour
   cadence** — if the job's schedule ever changes, this buffer needs to stay ahead of it.
 - **The adapter never returns a non-`connected` status** — that distinction is
   `ReportGenerator`'s, which is why `sync_traffic` has branching that looks redundant but

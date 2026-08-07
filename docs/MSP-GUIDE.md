@@ -144,13 +144,19 @@ The Connections page shows a coloured dot and a label per service:
 | Unverified | Saved, but not yet checked against the live service |
 | Not configured | No credential saved |
 
-**For every service except GoHighLevel, these statuses are not yet updated
+**For every service except GoHighLevel, these agency-wide statuses are not yet updated
 automatically.** Nothing currently sets them by testing the credential, so treat them as a
 note rather than live monitoring for HubSpot, Yext, SEMrush, and Google Analytics. **GHL is
 the exception:** its status is live — set on every connect and refreshed hourly in the
-background — because the OAuth connection genuinely is verified each time it renews. For
-everything else, the reliable way to know a service is working is to [generate a report and
-read the warnings](#check-whether-a-report-worked).
+background — because the OAuth connection genuinely is verified each time it renews.
+
+This page is about the one **agency-wide** credential per service — it says nothing about
+whether an individual *practice's* connection is working. For that, see the Not linked /
+Syncing / Linked / Sync failed status on each practice's Edit page, covered in
+[Connect a practice to the data sources](#connect-a-practice-to-the-data-sources) — that one
+*is* live for every service, checked automatically on a schedule and the moment you save. For
+the agency-wide credential itself, the reliable way to know it's working is to
+[generate a report and read the warnings](#check-whether-a-report-worked).
 
 ---
 
@@ -217,7 +223,7 @@ Once you save (whichever entry path you took), if a HubSpot company ID is presen
 
 **A practice cannot reach Active onboarding status unless this HubSpot sync succeeds.** If the HubSpot "Active" checkbox was never set, the sync will pull "Offboarded" — check HubSpot directly before assuming the sync is broken.
 
-**Re-syncing happens automatically:** Once a HubSpot ID is linked, `EnqueueHubspotSyncJob` runs daily and re-syncs the practice. Any changes to the HubSpot record flow through to the system automatically (within 24 hours, or immediately if you re-sync by hand on the Edit form).
+**Re-syncing happens automatically:** Once a HubSpot ID is linked, `EnqueueHubspotSyncJob` runs hourly and re-syncs the practice. Any changes to the HubSpot record flow through to the system automatically (within the hour, or immediately if you re-save the Edit form).
 
 **`website_url` must be the canonical domain** — it's used to find the practice's sitemap and to match keywords in SEMrush. If the practice is at `www.example.com/dental` , save just `https://example.com` so domain matching works across all services.
 
@@ -251,15 +257,31 @@ Skip the Sync services button and paste IDs directly:
 1. Find the ID (see [where each ID comes from](#where-each-id-comes-from))
 2. Paste into the field
 3. **Save practice**
-4. Status dots show: Not linked / Linked (or for HubSpot, Syncing / Synced / Sync failed)
+4. Status shows **Not linked** (gray) → **Syncing…** (amber, briefly, right after saving) →
+   **Linked** (green) once the first check succeeds, or **Sync failed** (red) if it doesn't —
+   the same four states for all five services, not just HubSpot. Hover the badge on the
+   Clients list, or read the status line on the Edit page, for the reason behind a failure.
+
+### Every service is checked automatically, not just when you save
+
+**The moment you save**, whichever service IDs you just entered or changed get checked
+immediately — HubSpot gets its full sync (see below); GoHighLevel, Yext, SEMrush, and Google
+Analytics each get a quick "is this ID still valid" check, not a full data pull. This also
+re-checks any *other* already-linked service on the same practice, even one you didn't touch,
+since a single save can carry several changes at once.
+
+**On top of that, every linked practice is re-checked on a schedule** even if nobody opens its
+Edit page: HubSpot hourly, the other four daily. A connection that broke on the *provider's*
+side (a deleted HubSpot company, a revoked GHL location, a GA4 property that lost its Viewer
+grant) surfaces as **Sync failed** on its own, without anyone needing to notice first.
 
 ### HubSpot-specific behavior
 
-HubSpot is the first field — the mandatory, single source of truth. Once you link it, all five services behave differently:
+HubSpot is the first field — the mandatory, single source of truth, and the one service that
+does more than a connection check on every sync:
 - **Must have HubSpot ID to reach Active status** (the onboarding status, date, and AI SEO enrollment come from there, nowhere else)
-- Links with a **green dot + "Synced *n* ago"** after the first sync
-- Re-syncs automatically every day
-- If sync fails, shows **red dot + error reason** — click to see what went wrong
+- Every sync re-pulls name/address/website/onboarding status/AI SEO enrollment from HubSpot, not just tests that the ID still resolves
+- **A HubSpot company that's been deleted reverts the practice to Pending**, not left stuck on its last-known Active/Offboarded state — the practice needs a valid company ID again before it can reach Active
 
 For GoHighLevel specifically,
 **Find GHL match** under that row and the system checks every sub-account in the agency's

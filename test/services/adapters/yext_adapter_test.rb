@@ -162,5 +162,25 @@ module Adapters
 
       assert_not result.success?
     end
+
+    test "check_connection looks up the entity directly without running any report" do
+      stub_request(:get, @entity_url).with(query: hash_including("api_key" => "yext-key"))
+        .to_return(status: 200, body: { response: {} }.to_json)
+
+      result = YextAdapter.new(@client, report_month: @report_month).call(action: :check_connection)
+
+      assert result.success?
+      assert_not_requested :post, @reports_url
+    end
+
+    test "check_connection flags a deleted entity as not_found" do
+      stub_request(:get, @entity_url).with(query: hash_including("api_key" => "yext-key"))
+        .to_return(status: 404, body: "not found")
+
+      result = YextAdapter.new(@client, report_month: @report_month).call(action: :check_connection)
+
+      assert_not result.success?
+      assert result.not_found
+    end
   end
 end

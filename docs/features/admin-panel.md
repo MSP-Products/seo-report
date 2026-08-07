@@ -2,7 +2,7 @@
 title: Admin panel
 slug: admin-panel
 status: partial
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 related: [integrations, report-generation]
 ---
 
@@ -10,7 +10,7 @@ related: [integrations, report-generation]
 
 > **Status:** partial — login, Dashboard, Connections, and Clients work; admin user
 > management and credential verification are still missing ·
-> **Last verified:** 2026-08-06
+> **Last verified:** 2026-08-07
 >
 > The internal, logged-in side of the system: who can get in, and what they see once
 > they're in.
@@ -222,13 +222,18 @@ in the same request as the practice's own fields — `Client#service_links_for_f
 one row per `Service::KEYS`, existing or a built stub, so every service always has an input.
 `Client#set_placeholder_name_for_hubspot_sync` (a `before_validation`) is what lets `name`
 stay blank when a HubSpot ID is present — it fills in a placeholder that the sync's own
-`client.update!` overwrites moments later. The actual sync trigger lives on
-`ClientServiceLink`, not the controller: `after_commit :enqueue_hubspot_sync` fires
-`SyncHubspotClientJob.perform_later` whenever its `service == "hubspot"` row saves with a
-present `external_id`, and a `before_save :reset_sync_status` clears `last_synced_at`/
-`last_sync_error` whenever that `external_id` changes, so a fresh sync doesn't leave the
-previous ID's result on screen. `SyncClientFromHubspot#record_attempt` is what writes
-`last_synced_at`/`last_sync_error` back onto the link after each attempt, success or not.
+`client.update!` overwrites moments later. The actual sync trigger lives on `Client`, not the
+controller: `after_commit :sync_linked_services` walks every one of the client's
+`client_service_links` after each save (nested attributes mean one submission can touch
+several at once) and, for each with a present `external_id`, enqueues `SyncHubspotClientJob`
+for the HubSpot link or `TestClientServiceConnectionJob` (a lightweight connection check, not
+a full data pull) for any other linked service — not gated on which specific field changed,
+so an untouched link's stale result still gets refreshed by the same save.
+`ClientServiceLink#before_save :reset_sync_status` clears `last_synced_at`/`last_sync_error`
+whenever a link's `external_id` changes, so the previous ID's result doesn't sit on screen
+until the re-verification completes. `SyncClientFromHubspot#record_attempt` and
+`LinkedServiceConnectionTester.record_attempt` are what write `last_synced_at`/
+`last_sync_error` back onto the link after each attempt, success or not.
 
 `Adapters::HubspotAdapter::PROPERTIES` names the exact HubSpot Company properties fetched
 — `name`, `address`, `website`, `active`, `gmb_seo_start_date`, `service_purchased` — and
@@ -286,7 +291,8 @@ error handling.
 | `app/models/service.rb` | `Service::KEYS` — the five service keys iterated on the Data sources form |
 | `app/models/agency_connection.rb` | `DISPLAY` — badge letter/colour reused for each Data sources row |
 | `app/services/sync_client_from_hubspot.rb` | `record_attempt` — writes `last_synced_at`/`last_sync_error` after every sync attempt |
-| `app/jobs/sync_hubspot_client_job.rb`, `app/jobs/enqueue_hubspot_sync_job.rb` | The immediate (per-save) and daily (per-cycle) HubSpot sync paths — see [integrations](integrations.md) |
+| `app/jobs/sync_hubspot_client_job.rb`, `app/jobs/enqueue_hubspot_sync_job.rb` | The immediate (per-save) and hourly (per-cycle) HubSpot sync paths — see [integrations](integrations.md) |
+| `app/jobs/test_client_service_connection_job.rb`, `app/jobs/test_client_service_connections_job.rb` | The immediate (per-save) and daily (per-cycle) connection checks for every other linked service |
 | `app/helpers/clients_helper.rb` | Status badge classes/labels for onboarding, reports, data sources, and HubSpot sync; `hubspot_sync_error_message`'s plain-language translation table |
 | `app/views/clients/index.html.erb` | Search, status chips, the practice table, pagination |
 | `app/views/clients/show.html.erb` | Hero banner (full-width) + tab nav + tab content (`max-w-4xl`) |

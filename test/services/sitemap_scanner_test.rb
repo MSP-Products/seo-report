@@ -1,6 +1,8 @@
 require "test_helper"
 
 class SitemapScannerTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
     @client = Client.create!(name: "Test Practice", website_url: "example.com", onboarding_status: "active")
   end
@@ -85,5 +87,18 @@ class SitemapScannerTest < ActiveSupport::TestCase
     assert_equal "Original Title", existing.title
     assert_in_delta Time.current, existing.last_seen_at, 5.seconds
     assert_not_requested :get, "https://example.com/" # never re-fetched for an already-known page
+  end
+
+  # Regression: mark_scan's client.update! used to re-trigger
+  # Client#sync_linked_services on every nightly scan, redundantly firing a
+  # full HubSpot sync and connection checks for every other linked service —
+  # unrelated to what a sitemap scan is even for. Same class of bug caught
+  # for real in SyncClientFromHubspot; fixed here the same way.
+  test "does not re-enqueue any service sync as a side effect of its own scan" do
+    @client.client_service_links.create!(service: "hubspot", external_id: "company-123")
+    stub_request(:get, "https://example.com/sitemap.xml").to_return(status: 500)
+    stub_request(:get, "https://example.com/").to_return(status: 500)
+
+    assert_no_enqueued_jobs { SitemapScanner.new(@client).call }
   end
 end

@@ -21,6 +21,13 @@ class SitemapScanner
 
   def initialize(client)
     @client = client
+    # mark_scan's client.update! below is this scan's own write-back, not a
+    # fresh save that should re-trigger anything — without this, it would
+    # redundantly re-enqueue a full HubSpot sync and connection checks for
+    # every other linked service on every nightly scan, for every client,
+    # via Client#sync_linked_services (see SyncClientFromHubspot, which hit
+    # this same class of bug for real before being caught and fixed).
+    @client.skip_service_sync = true
   end
 
   def call

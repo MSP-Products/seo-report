@@ -47,6 +47,16 @@ module Adapters
       )
     end
 
+    # A single-metric report over month_range — a bad/revoked property ID
+    # 403s or 404s the same runReport call #perform makes, without pulling
+    # the channel breakdown or a full month of real report data.
+    def check_connection
+      return Result.failure("google_analytics: no GA4 property configured for this client") if external_id.blank?
+
+      run_report(metrics: %w[sessions])
+      Result.success
+    end
+
     def fetch_overview
       row = run_report(metrics: %w[sessions totalUsers screenPageViewsPerSession]).dig("rows", 0)
       values = row&.fetch("metricValues", [])

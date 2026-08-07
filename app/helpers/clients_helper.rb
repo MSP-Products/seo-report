@@ -38,6 +38,7 @@ module ClientsHelper
   # sets credential_status automatically yet (see admin-panel.md).
   def client_source_status_label(link)
     return "Not linked" if link.external_id.blank?
+    return "Sync failed" if link.last_sync_error.present?
     return "Auth error" if link.credential_invalid?
     return "Expired" if link.credential_expired?
     return "Key expiring" if link.credential_expiring_soon?
@@ -47,7 +48,7 @@ module ClientsHelper
 
   def client_source_status_dot_class(link)
     return "bg-slate-300" if link.external_id.blank?
-    return "bg-red-500" if link.credential_invalid? || link.credential_expired?
+    return "bg-red-500" if link.last_sync_error.present? || link.credential_invalid? || link.credential_expired?
     return "bg-amber-500" if link.credential_expiring_soon?
 
     "bg-emerald-500"

@@ -133,5 +133,28 @@ module Adapters
 
       assert_not result.success?
     end
+
+    test "check_connection succeeds on a valid, parseable tracking response" do
+      stub_tracking({ data: {} }.to_json)
+
+      result = SemrushAdapter.new(@client, report_month: @report_month).call(action: :check_connection)
+
+      assert result.success?
+    end
+
+    # SEMrush 404s a bad project ID with a plain-text "campaign not found"
+    # body, not JSON — a naive JSON.parse on this would raise, so
+    # check_connection must catch the parse failure itself rather than
+    # relying on Base#call's Faraday::Error rescue.
+    test "check_connection fails on SEMrush's plain-text campaign-not-found body" do
+      stub_request(:get, "https://api.semrush.com/reports/v1/projects/project-123/tracking/")
+        .with(query: hash_including("key" => "semrush-key"))
+        .to_return(status: 200, body: "ERROR 50 :: CAMPAIGN NOT FOUND")
+
+      result = SemrushAdapter.new(@client, report_month: @report_month).call(action: :check_connection)
+
+      assert_not result.success?
+      assert_match(/CAMPAIGN NOT FOUND/, result.error)
+    end
   end
 end

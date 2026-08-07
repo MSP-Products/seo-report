@@ -2,14 +2,14 @@
 title: HubSpot integration
 slug: integration-hubspot
 status: shipped
-last_verified: 2026-08-04
+last_verified: 2026-08-07
 related: [integrations, report-generation]
 ---
 
 # HubSpot integration
 
 > **Status:** shipped — verified against a real MSP HubSpot portal. Onboarding status,
-> onboarding date, and AI SEO enrollment are all live · **Last verified:** 2026-08-04
+> onboarding date, and AI SEO enrollment are all live · **Last verified:** 2026-08-07
 >
 > HubSpot is the source of truth for a practice's own details, whether they are enrolled in
 > AI SEO, and which month is their first report.
@@ -133,12 +133,12 @@ falling back to "no earlier report exists" only when `onboarded_at` isn't known 
 | `app/services/adapters/hubspot_adapter.rb` | Fetches and maps the Company properties |
 | `app/services/sync_client_from_hubspot.rb` | Calls the adapter and writes the result onto `Client`; shared by generation and the hourly sync |
 | `app/services/report_generator.rb` | `sync_hubspot` — delegates to `SyncClientFromHubspot` during generation |
-| `app/jobs/enqueue_hubspot_sync_job.rb` | Hourly fan-out over every kept client with a HubSpot link |
+| `app/jobs/enqueue_hubspot_sync_job.rb` | Hourly fan-out over every client with a HubSpot link, any status, kept or discarded |
 | `app/jobs/sync_hubspot_client_job.rb` | Per-client wrapper around `SyncClientFromHubspot` |
-| `app/models/client.rb` | `find_or_create_monthly_report` — where `onboarded_at` decides `is_first_report` |
+| `app/models/client.rb` | `sync_linked_services`, `skip_service_sync`, `find_or_create_monthly_report` — where `onboarded_at` decides `is_first_report` |
 | `test/services/adapters/hubspot_adapter_test.rb` | Property mapping, including the offboarded/no-AI-SEO/no-onboarding-date cases |
-| `test/services/sync_client_from_hubspot_test.rb` | Writes on success, leaves the client untouched on failure |
-| `test/jobs/enqueue_hubspot_sync_job_test.rb` | Targets every kept client with a link, including `pending` ones |
+| `test/services/sync_client_from_hubspot_test.rb` | Writes on success, leaves the client untouched on an ordinary failure, normalizes to pending/offboarded when not connected |
+| `test/jobs/enqueue_hubspot_sync_job_test.rb` | Targets every linked client including `pending` and discarded ones |
 | `test/models/client_test.rb` | `is_first_report` from `onboarded_at`, including the backfill case that motivated sourcing it from HubSpot at all |
 
 ### Data
@@ -165,13 +165,19 @@ sync, a client whose HubSpot `active` flag just turned `true` would still show t
 stale `onboarding_status` locally at the exact moment targeting happens — and would only get
 picked up the report *after* next.
 
-`EnqueueHubspotSyncJob` closes that gap, and deliberately targets every kept client with a
-HubSpot link — not just currently-active ones — since a `pending` client going active is
-exactly the case it exists to catch. It runs **hourly** rather than daily: the targeting
-gap itself only ever needed a run sometime before the monthly 4am enqueue, but this job is
-also the general mechanism keeping practice details in sync with HubSpot everywhere in the
-app (Dashboard, Report Log), not only ahead of generation — so it runs often enough that
-"stale" never means more than an hour.
+`EnqueueHubspotSyncJob` closes that gap, and deliberately targets every client with a
+HubSpot link regardless of status — kept or discarded, connected or not, not just
+currently-active ones — since a `pending` client going active is one case it exists to
+catch, and a **discarded** client whose HubSpot company was deleted or unlinked
+(`SyncClientFromHubspot#sync_unverified_status`) is the other: without including discarded
+clients, that normalization could only ever be triggered by an admin happening to re-save
+the client's Edit form, since the immediate on-save check deliberately skips itself right
+after a manual offboard/restore (`Client#skip_service_sync`, so the admin's own action isn't
+invisibly undone in the same request). It runs **hourly**
+rather than daily: the targeting gap itself only ever needed a run sometime before the
+monthly 4am enqueue, but this job is also the general mechanism keeping practice details
+(and, now, discard state) in sync with HubSpot everywhere in the app, not only ahead of
+generation — so it runs often enough that "stale" never means more than an hour.
 
 ### Failure modes
 

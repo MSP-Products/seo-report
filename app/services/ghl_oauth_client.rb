@@ -39,11 +39,14 @@ class GhlOauthClient
   # locations.readonly is not used by GhlAdapter yet — added ahead of a
   # planned domain-based auto-match between GHL locations and Client records.
   SCOPES = %w[calendars.readonly calendars/events.readonly opportunities.readonly oauth.write oauth.readonly locations.readonly].freeze
-  # Wider than the strict minimum on purpose: RefreshGhlTokenJob runs hourly
-  # (config/recurring.yml), and this buffer must exceed that hour-long gap so
-  # the job always catches a token before it actually expires, rather than
-  # leaving that entirely to the lazy refresh in #location_access_token!.
-  EXPIRY_BUFFER = 90.minutes
+  # Wider than the strict minimum on purpose: RefreshGhlTokenJob runs every 4
+  # hours (config/recurring.yml), and this buffer must exceed that gap so the
+  # job always catches a token before it actually expires, rather than
+  # leaving that entirely to the lazy refresh in #location_access_token!. Also
+  # means a real refresh (and the last_verified_at bump that comes with it)
+  # happens roughly every 12 hours rather than only once near the ~24h token's
+  # expiry, so last_verified_at stays a meaningful "still healthy" signal.
+  EXPIRY_BUFFER = 12.hours
 
   def initialize
     @connection = AgencyConnection.find_or_initialize_by(service: "ghl")
@@ -93,7 +96,7 @@ class GhlOauthClient
     @connection.credentials["access_token"]
   end
 
-  # Called by RefreshGhlTokenJob's hourly schedule to keep the agency token
+  # Called by RefreshGhlTokenJob's every-4-hours schedule to keep the agency token
   # from ever going stale between monthly report runs. A no-op, not an error,
   # when there's no connection yet — the job shouldn't fail an agency that
   # simply hasn't connected GHL at all.
