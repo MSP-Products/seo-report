@@ -1,6 +1,7 @@
 class ClientsController < ApplicationController
   include FindsClient
 
+  before_action { require_permission!(:clients_view) }
   before_action(only: %i[ new create ]) { require_permission!(:clients_create) }
   before_action(only: %i[ edit update restore ]) { require_permission!(:clients_edit) }
   before_action(only: [ :destroy ]) { require_permission!(@client.discarded? ? :clients_delete : :clients_edit) }

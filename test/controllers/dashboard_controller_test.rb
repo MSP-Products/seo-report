@@ -54,6 +54,14 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Held — HubSpot token rejected/, response.body)
   end
 
+  test "an Account Manager can view the dashboard" do
+    sign_in_as(role_key: "account_manager")
+
+    get dashboard_path
+
+    assert_response :success
+  end
+
   test "root routes to the dashboard for a signed-in admin" do
     sign_in_as(role_key: "admin")
 

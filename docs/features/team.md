@@ -32,7 +32,7 @@ MSP staff only, once built. Three roles are planned:
 |---|---|
 | **Super Admin** | Everything Admin can, plus manage roles/permissions and delete clients |
 | **Admin** | Day-to-day management: clients, connections, reports, and inviting/editing/removing other users |
-| **Account Manager** | View and generate reports, but can't create/edit/delete clients or manage the team |
+| **Account Manager** | View clients, the dashboard, and reports; can't create/edit/delete clients, view Connections or the Report Log, or manage the team |
 
 ### How it behaves
 
@@ -209,6 +209,15 @@ app's point of view without any row actually being deleted.
   out, tables and all. Access control is role-only now: every Account Manager can view
   and generate reports for every client, and the only way to change what someone can do
   is to change their role.
+- **`clients_view`, `dashboard_view`, `connections_view`, and `report_logs_view` are wired
+  up** (`ClientsController`, `DashboardController`, `ConnectionsController`,
+  `ReportLogsController` each gate their `index`/`show` on the matching key). **`reports_view`
+  and `reports_generate` are not wired to anything yet** — there's no dedicated
+  report-viewing or report-generation-trigger controller today; a client's reports are just
+  a tab within `ClientsController#show`, already covered by `clients_view`, and report
+  generation only happens via `GenerateMonthlyReportJob`/a rake task, never a UI action. The
+  two permission keys exist and are granted correctly per role, they just have nothing to
+  gate yet — wire them the moment either surface is built.
 
 ### Not built yet
 

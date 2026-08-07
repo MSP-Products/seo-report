@@ -1,4 +1,6 @@
 class ReportLogsController < ApplicationController
+  before_action { require_permission!(:report_logs_view) }
+
   def index
     @month = MonthlyReport.parse_month_param(params[:month])
     @months = MonthlyReport.distinct.order(report_month: :desc).pluck(:report_month)

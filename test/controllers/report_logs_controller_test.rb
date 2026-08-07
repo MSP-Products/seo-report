@@ -7,6 +7,14 @@ class ReportLogsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to login_path
   end
 
+  test "an Account Manager cannot view the report log — it isn't in their role" do
+    sign_in_as(role_key: "account_manager")
+
+    get report_log_path
+
+    assert_redirected_to root_path
+  end
+
   test "lists a generated report with a link to view it" do
     sign_in_as(role_key: "admin")
     client = Client.create!(name: "Woodside Dental Care #{SecureRandom.hex(4)}", onboarding_status: "active")

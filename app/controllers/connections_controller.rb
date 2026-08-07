@@ -3,6 +3,7 @@
 # See AgencyConnection for the per-service field/display metadata and the
 # blank-means-unchanged credential update pattern used below.
 class ConnectionsController < ApplicationController
+  before_action { require_permission!(:connections_view) }
   before_action(only: [ :edit, :update ]) { require_permission!(:connections_edit) }
   before_action :set_connection, only: [ :edit, :update ]
   before_action :ensure_configurable!, only: [ :edit, :update ]
