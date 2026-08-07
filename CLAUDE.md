@@ -807,6 +807,13 @@ bundle, so `Object#stub` does not exist and `require "minitest/mock"` raises. Do
 inject a fake through a public seam, or drive the real code path with a WebMock stub, which is
 the house style anyway.
 
+**`assert_enqueued_with(job:, args:) { ... }` evaluates `args:` before the block runs, not
+after.** `assert_enqueued_with(job: SyncHubspotClientJob, args: [client.id]) { client.save! }`
+on a new, unsaved `client` captures `client.id` as `nil` at the moment the assertion is called
+— the block hasn't run yet — so the assertion checks against the wrong value and fails with a
+confusing diff. Save (or otherwise establish) the record first, *then* call
+`assert_enqueued_with` with no block, which checks against whatever is already enqueued.
+
 ### Current coverage gaps
 
 `test/services/` and `test/controllers/` are real. `test/models/`, `test/presenters/`,
@@ -1141,6 +1148,14 @@ CONVENTIONS.md §26 is the full list and it is binding. The ones easiest to brea
   and are **omitted entirely** rather than padded with filler.
 - **Degrade, don't fail:** a missing integration renders a placeholder (`"?"` for GHL, section
   omitted for AI visibility) — never a broken page.
+- **HubSpot is the source of truth for `Client#onboarding_status`, in both directions, even
+  across a discard.** Active in HubSpot → `active` (undiscarded if needed); not active →
+  `offboarded` (discarded); no working HubSpot connection at all (blank ID or a 404) →
+  normalizes to `pending` if the client is kept, or to `offboarded` (staying discarded) if it
+  already was — never silently undiscarded just because the connection is unverifiable. This
+  reconciliation runs hourly (`EnqueueHubspotSyncJob`, scoped to *every* linked client
+  regardless of discard state) and immediately on save, so a manual Offboard/Restore is only a
+  temporary override if HubSpot still disagrees with it — see `SyncClientFromHubspot`.
 
 ---
 
@@ -1214,6 +1229,35 @@ CONVENTIONS.md §26 is the full list and it is binding. The ones easiest to brea
   belongs above the `if Rails.env.production? ... return end` guard only if it's genuinely
   needed in every environment (like the `Service::KEYS` lookup-table seed); anything that looks
   like a fake client, keyword, or report belongs below it, never above.
+- **`after_commit` fires on every save — even one where no attribute actually changed** — and
+  Rails does not skip it for a no-op `update!`. Any service or job that writes to a model with
+  an `after_commit` callback, and can itself be *triggered by* that same callback, will loop
+  forever unless it explicitly opts out. This produced a real incident: `SyncClientFromHubspot`
+  wrote onto `Client` from inside a job that `Client#after_commit :sync_linked_services` itself
+  enqueues, and the write re-fired the callback every time, hammering the real HubSpot API in a
+  tight loop until caught live in dev logs. `SitemapScanner` had the identical latent risk.
+  Fix pattern: set a transient skip flag (`client.skip_service_sync = true`) before the
+  service's own internal writes, once, in `initialize` — see both files for the exact shape.
+  **When adding an `after_commit` to any model, grep for every other write site on that model
+  and confirm none of them can be reached from inside that callback's own effects.**
+- **GHL OAuth works locally against the real API — no stub, no HTTPS needed.** There used to
+  be a `GHL_STUB`-gated WebMock fake (deleted) built on the assumption that GHL requires an
+  `https` redirect URI, which localhost supposedly couldn't provide. That assumption was
+  wrong, confirmed by testing the real flow: `http://localhost:3000/connections/scheduler/callback`
+  is registered as an allowed redirect on the GHL Marketplace app, alongside production's, and
+  it works fine. Local HTTPS was tried and abandoned as unnecessary — don't rebuild it. If a
+  local `.env` doesn't have real `GHL_CLIENT_ID`/`GHL_CLIENT_SECRET`, "Connect to GoHighLevel"
+  will fail against the real API rather than silently faking success.
+- **The GHL callback route is `/connections/scheduler/*`, not `/connections/ghl/*`, on
+  purpose.** The redirect URI sent to GHL must never contain a HighLevel brand reference
+  (required for white-labeled Marketplace apps), so don't rename it back to match the
+  controller/model naming — see the comment above the `namespace :connections` block in
+  `config/routes.rb`.
+- **A status badge that only checks "is an ID configured" will lie during an active failure.**
+  `client_source_status_label` and the Clients index badges used to show "Linked" (or a
+  service's own brand colour) purely from `external_id.present?`, so a connection that was
+  actively failing (`last_sync_error` set) looked identical to a healthy one. Any status
+  indicator must branch on the last known outcome, not just whether something is configured.
 
 ---
 

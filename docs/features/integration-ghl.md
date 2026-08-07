@@ -329,20 +329,28 @@ JavaScript involved. See `app/views/clients/_form.html.erb`.
 `set_client` checks both (`params[:id] || params[:client_id]`), so every existing caller is
 unaffected and this one new controller works without its own loader.
 
+### Local dev testing — the real API, no stub
+
+**`http://localhost:3000/connections/scheduler/callback` is registered as an allowed redirect
+URI on the GHL Marketplace app, alongside production's.** There is no stub, and none is
+needed: GHL accepts a plain `http://localhost` redirect fine — the earlier assumption that it
+required `https` (and the ngrok-tunnel/fake-credential workarounds built on that assumption)
+was wrong, confirmed by testing the real flow end to end. `GhlOauthClient#authorize_url`
+always builds the real GHL consent URL; `VerifiesGhlOauthState#set_oauth_state` computes the
+redirect URI from whatever host the admin is actually browsing on
+(`request.base_url` + `connections_ghl_callback_path`), so it's automatically correct in every
+environment as long as that exact URL is on GHL's allowed-redirects list.
+
+To connect for real locally: enter this project's real `GHL_CLIENT_ID`/`GHL_CLIENT_SECRET` in
+`.env` (loaded by `foreman` via `bin/dev`), then click **Connect to GoHighLevel** on the
+Connections page — it redirects to GHL's real consent screen and back, same as production.
+
 ### Recovery: moving a GHL connection between environments
 
-Local dev has no OAuth redirect URI of its own registered with GHL — only production's
-stable Railway URL (and, transiently, an ngrok tunnel while actively testing) are. Day to
-day this doesn't matter: refreshing an existing token (`grant_type: "refresh_token"`) takes
-no `redirect_uri` at all, so a connected local dev environment keeps refreshing itself
-indefinitely with zero redirect-URI involvement. It only becomes a problem if local dev's
-refresh token goes fully invalid (revoked, or expired from long disuse) and needs a genuine
-**re**authorization — which localhost can't do on its own.
-
-The fix doesn't require registering a new redirect URI at all: the agency-level grant is the
-same GHL company regardless of which environment's database holds it, so a token pair
-obtained anywhere (production, which always has a valid registered redirect URI) can be
-copied directly into another environment's `AgencyConnection` row.
+The agency-level grant is the same GHL company regardless of which environment's database
+holds it, so a token pair obtained in one environment can be copied directly into another
+environment's `AgencyConnection` row — useful if an environment's refresh token goes invalid
+(revoked, or expired from long disuse) and reauthorizing there directly isn't convenient:
 
 ```bash
 # on the source environment (e.g. production, via Railway's console)
@@ -355,29 +363,6 @@ See `lib/tasks/ghl.rake`. **The printed JSON contains a live access_token/refres
 handle it like any other credential. `ghl:print_connection` should only ever be run directly
 by a human in their own terminal, never piped through a channel that might log or display
 it — that's exactly the mistake to avoid (see Gotchas).
-
-### The local-dev stub — fake GHL data is the default, and it looks real
-
-Because localhost can't complete the consent redirect (above), local dev **stubs GHL by
-default**. `config/initializers/ghl_stub.rb` intercepts every GHL endpoint with WebMock and
-returns canned data, and `GhlOauthClient#authorize_url` short-circuits the consent step by
-redirecting straight back to its own callback with a fake code. Everything downstream — the
-token exchange, `GhlAdapter`, `GhlLocationMatcher` — runs its real code path against those
-stubbed responses, so the wiring is genuinely exercised.
-
-```bash
-bin/dev                  # stubbed: "Connect to GoHighLevel" works with no credentials
-GHL_STUB=false bin/dev   # real GHL, needs credentials and a reachable redirect URI
-```
-
-**The thing to internalise: a stubbed "match found" is pixel-identical to a real one.** GHL
-behaviour confirmed in local dev proves the code path, not the integration — so never conclude
-from a green local run that the GHL connection itself works. Only `GHL_STUB=false` (or a
-deployed environment) tells you that.
-
-Both guards check the same variable and must stay in step: the initializer's, and
-`GhlOauthClient#stub_enabled?`. The stub never activates outside `Rails.env.development?`, so
-test and production are untouched — the test suite stubs GHL explicitly per test instead.
 
 ### Field mapping
 
