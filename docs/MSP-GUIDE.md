@@ -27,6 +27,7 @@ trying to do.
   - [Check this cycle's status](#check-this-cycles-status)
   - [Add a new practice](#add-a-new-practice)
   - [Connect a practice to the data sources](#connect-a-practice-to-the-data-sources)
+  - [Offboard, recover, or delete a practice](#offboard-recover-or-delete-a-practice)
 - **Needs a developer**
   - [Set up Google Analytics for a practice](#set-up-google-analytics-for-a-practice)
   - [Tracked keywords](#tracked-keywords)
@@ -298,6 +299,70 @@ section as "Online scheduler — Connected / Not connected".
 
 ---
 
+## Offboard, recover, or delete a practice
+
+When a practice ends their engagement you **offboard** them. That hides them from the working
+client list and stops their reports, but keeps every past report intact — so it is safe, and
+reversible.
+
+### Offboard a practice
+
+1. **Clients** → find the practice
+2. Click the **⋯** actions menu on its row → **Offboard**
+   (on a phone, the archive icon in the same place)
+3. Confirm
+
+They move to the **Offboarded** tab, disappear from **Active**, and stop being picked up when
+reports are generated. Their own page still opens, showing an "archived" notice and their full
+report history.
+
+### Recover a practice
+
+1. **Clients** → the **Offboarded** tab
+2. Find the practice → **⋯** → **Recover**
+3. Read the warning, then confirm
+
+The practice comes back as **Pending**, not Active. That is deliberate: only a successful
+HubSpot sync is allowed to make a practice Active.
+
+> **The warning matters.** HubSpot is the source of truth for whether a practice is active, and
+> it re-syncs about once an hour. **If the practice is still marked offboarded in HubSpot, that
+> sync will offboard them again** — your change here will look like it silently undid itself.
+> **Fix HubSpot first, then recover here.**
+
+### Delete a practice permanently
+
+1. Offboard the practice first if it isn't already — **you can only permanently delete from the
+   Offboarded tab.** There is deliberately no way to permanently delete a live practice in one
+   step.
+2. **Clients** → **Offboarded** tab → find the practice → **⋯** → **Delete permanently**
+3. Confirm
+
+**This cannot be undone.** It removes the practice, every report ever generated for them, and
+their report history. Their report links stop working immediately. Offboarding is what you want
+in almost every case; reach for this only when a practice was created in error or you have been
+asked to erase their data.
+
+### Which to use
+
+| Situation | Do this |
+|---|---|
+| Engagement ended | **Offboard** — keeps the history |
+| Offboarded by mistake, or they came back | Fix HubSpot, then **Recover** |
+| Created by mistake, duplicate row, or data must be erased | **Delete permanently** |
+| Just don't want them in your list this week | **Offboard** — never delete for tidiness |
+
+### Where they show up
+
+| Tab | Shows |
+|---|---|
+| **All** | Every practice, offboarded included |
+| **Active** | Live practices only |
+| **Pending** | Awaiting a successful HubSpot sync — including anything just recovered |
+| **Offboarded** | Offboarded practices only |
+
+---
+
 ## Set up Google Analytics for a practice
 
 GA4 doesn't use a simple API key. It uses a **Google Cloud service account** — a robot
@@ -559,3 +624,18 @@ It will appear from the next month's report onward.
 **The numbers in an old report look wrong.**
 That's by design. Reports are frozen snapshots of what was true when generated, not live
 views. They are not recalculated.
+
+**A practice I recovered went back to offboarded on its own.**
+HubSpot re-synced and overwrote it. HubSpot is the source of truth for whether a practice is
+active, so recovering here only sticks once the practice is marked active in HubSpot too. Fix it
+in HubSpot, then recover again — see
+[Offboard, recover, or delete a practice](#offboard-recover-or-delete-a-practice).
+
+**A practice I recovered isn't in the Active tab.**
+That's expected — a recovered practice comes back as **Pending**, because only a successful
+HubSpot sync may promote it to Active. It should move to Active within about an hour, once that
+sync runs. If it doesn't, check the HubSpot sync status on its Edit page.
+
+**A practice has vanished from the Clients list.**
+Check the **Offboarded** tab, then the **All** tab. The default view is Active only, so an
+offboarded practice — whether offboarded by hand or by a HubSpot sync — won't appear in it.
