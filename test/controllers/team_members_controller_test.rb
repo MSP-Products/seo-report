@@ -235,4 +235,63 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
 
     assert_select "a", text: "Manage", minimum: 1
   end
+
+  test "an Account Manager cannot remove a team member" do
+    sign_in_as(role_key: "account_manager")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "admin"))
+
+    delete team_member_path(member)
+
+    assert_redirected_to root_path
+    assert_not member.reload.discarded?
+  end
+
+  test "an Admin can remove a team member, who then disappears from the list" do
+    sign_in_as(role_key: "admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      first_name: "Gone", last_name: "Away", role: Role.find_by!(key: "account_manager"))
+
+    delete team_member_path(member)
+
+    assert_redirected_to team_members_path
+    assert member.reload.discarded?
+    follow_redirect!
+    assert_select "p", text: "Gone Away", count: 0
+  end
+
+  test "the last Super Admin cannot be removed" do
+    sign_in_as(role_key: "admin")
+    last = AdminUser.create!(email: "last-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.super_admin)
+
+    delete team_member_path(last)
+
+    assert_redirected_to team_members_path
+    assert_not last.reload.discarded?
+    follow_redirect!
+    assert_match(/Can&#39;t remove the last Super Admin/, response.body)
+  end
+
+  test "a Super Admin becomes removable once a second one exists" do
+    sign_in_as(role_key: "admin")
+    first_super_admin = AdminUser.create!(email: "first-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.super_admin)
+    AdminUser.create!(email: "second-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.super_admin)
+
+    delete team_member_path(first_super_admin)
+
+    assert first_super_admin.reload.discarded?
+  end
+
+  test "the Remove button only appears for a viewer who can remove members" do
+    sign_in_as(role_key: "admin")
+    AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+
+    get team_members_path
+
+    assert_select "button", text: "Remove", minimum: 1
+  end
 end
