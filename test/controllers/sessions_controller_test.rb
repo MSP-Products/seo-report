@@ -7,7 +7,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     @admin_user = AdminUser.create!(
       email: "admin@example.com",
       password: "password123",
-      role: "admin"
+      role: Role.find_by!(key: "admin")
     )
   end
 

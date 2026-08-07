@@ -10,19 +10,41 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_06_090006) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
+  create_table "admin_user_client_assignments", force: :cascade do |t|
+    t.bigint "admin_user_id", null: false
+    t.string "client_id", limit: 36, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_user_id", "client_id"], name: "idx_admin_user_client_assignments_unique", unique: true
+  end
+
+  create_table "admin_user_permissions", force: :cascade do |t|
+    t.bigint "admin_user_id", null: false
+    t.datetime "created_at", null: false
+    t.boolean "granted", null: false
+    t.string "permission_key", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_user_id", "permission_key"], name: "idx_admin_user_permissions_unique", unique: true
+  end
+
   create_table "admin_users", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.datetime "discarded_at"
     t.string "email", null: false
     t.string "first_name"
+    t.datetime "last_active_at"
     t.string "last_name"
     t.string "password_digest"
     t.string "role"
+    t.bigint "role_id"
     t.datetime "updated_at", null: false
+    t.index ["discarded_at"], name: "index_admin_users_on_discarded_at"
     t.index ["email"], name: "index_admin_users_on_email", unique: true
+    t.index ["role_id"], name: "index_admin_users_on_role_id"
   end
 
   create_table "agency_connections", force: :cascade do |t|
@@ -120,6 +142,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
     t.datetime "updated_at", null: false
     t.index ["access_token"], name: "index_monthly_reports_on_access_token", unique: true
     t.index ["client_id", "report_month"], name: "index_monthly_reports_on_client_id_and_report_month", unique: true
+  end
+
+  create_table "permissions", primary_key: "key", id: :string, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "report_ai_platform_scores", force: :cascade do |t|
@@ -229,6 +256,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
     t.index ["report_id"], name: "index_report_traffics_on_report_id", unique: true
   end
 
+  create_table "role_permissions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "permission_key", null: false
+    t.bigint "role_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["role_id", "permission_key"], name: "idx_role_permissions_unique", unique: true
+  end
+
+  create_table "roles", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_roles_on_key", unique: true
+  end
+
   create_table "send_logs", force: :cascade do |t|
     t.datetime "attempted_at", null: false
     t.text "error_message"
@@ -251,6 +294,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
     t.index ["client_id", "url"], name: "index_sitemap_pages_on_client_id_and_url", unique: true
   end
 
+  add_foreign_key "admin_user_client_assignments", "admin_users"
+  add_foreign_key "admin_user_client_assignments", "clients"
+  add_foreign_key "admin_user_permissions", "admin_users"
+  add_foreign_key "admin_user_permissions", "permissions", column: "permission_key", primary_key: "key"
+  add_foreign_key "admin_users", "roles"
   add_foreign_key "agency_connections", "services", column: "service", primary_key: "key"
   add_foreign_key "client_keywords", "clients"
   add_foreign_key "client_service_links", "clients"
@@ -270,6 +318,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_225128) do
   add_foreign_key "report_pages_published", "monthly_reports", column: "report_id"
   add_foreign_key "report_pages_published", "sitemap_pages"
   add_foreign_key "report_traffics", "monthly_reports", column: "report_id"
+  add_foreign_key "role_permissions", "permissions", column: "permission_key", primary_key: "key"
+  add_foreign_key "role_permissions", "roles"
   add_foreign_key "send_logs", "monthly_reports"
   add_foreign_key "sitemap_pages", "clients"
 end

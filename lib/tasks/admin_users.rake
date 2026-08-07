@@ -6,9 +6,9 @@ namespace :admin_users do
   desc "Create an admin account: ADMIN_EMAIL=... ADMIN_PASSWORD=... [ADMIN_ROLE=admin] bin/rails admin_users:create"
   task create: :environment do
     email = ENV.fetch("ADMIN_EMAIL")
-    role = ENV.fetch("ADMIN_ROLE", "admin")
+    role_key = ENV.fetch("ADMIN_ROLE", "admin")
 
-    admin = AdminUser.create!(email: email, password: ENV.fetch("ADMIN_PASSWORD"), role: role)
-    puts "Created #{admin.role} account: #{admin.email}"
+    admin = AdminUser.create!(email: email, password: ENV.fetch("ADMIN_PASSWORD"), role: Role.find_by!(key: role_key))
+    puts "Created #{admin.role.name} account: #{admin.email}"
   end
 end

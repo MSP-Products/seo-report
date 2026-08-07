@@ -8,7 +8,7 @@ class ReportLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "lists a generated report with a link to view it" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     client = Client.create!(name: "Woodside Dental Care #{SecureRandom.hex(4)}", onboarding_status: "active")
     report = client.monthly_reports.create!(report_month: Date.new(2026, 6, 1), generation_status: "ready",
       generated_at: Time.current)
@@ -22,7 +22,7 @@ class ReportLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "does not link a report that isn't ready yet" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     client = Client.create!(name: "Bayview Family Dentistry #{SecureRandom.hex(4)}", onboarding_status: "active")
     report = client.monthly_reports.create!(report_month: Date.new(2026, 6, 1), generation_status: "queued")
 
@@ -33,7 +33,7 @@ class ReportLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "filters to one month when given" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     client = Client.create!(name: "Cedar Park Family Dentistry #{SecureRandom.hex(4)}", onboarding_status: "active")
     client.monthly_reports.create!(report_month: Date.new(2026, 5, 1), generation_status: "ready", generated_at: Time.current)
     client.monthly_reports.create!(report_month: Date.new(2026, 6, 1), generation_status: "ready", generated_at: Time.current)
@@ -46,7 +46,7 @@ class ReportLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "filters to one status when given" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     failed_client = Client.create!(name: "Summit Oral Surgery #{SecureRandom.hex(4)}", onboarding_status: "active")
     queued_client = Client.create!(name: "Clear Creek Orthodontics #{SecureRandom.hex(4)}", onboarding_status: "active")
     failed_client.monthly_reports.create!(report_month: Date.new(2026, 6, 1), generation_status: "failed", attempt_count: 2)
@@ -60,7 +60,7 @@ class ReportLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "status chips show real counts across the filtered month" do
-    sign_in_as(role: "admin")
+    sign_in_as(role_key: "admin")
     ready_client = Client.create!(name: "Riverside Family Dental #{SecureRandom.hex(4)}", onboarding_status: "active")
     failed_client = Client.create!(name: "Evergreen Dental Studio #{SecureRandom.hex(4)}", onboarding_status: "active")
     ready_client.monthly_reports.create!(report_month: Date.new(2026, 6, 1), generation_status: "ready", generated_at: Time.current)
@@ -71,13 +71,5 @@ class ReportLogsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a", text: /Ready 1/
     assert_select "a", text: /Failed 1/
-  end
-
-  private
-
-  def sign_in_as(role:)
-    admin = AdminUser.create!(email: "admin-#{SecureRandom.hex(4)}@example.com", password: "password123", role: role)
-    post login_path, params: { email: admin.email, password: "password123" }
-    admin
   end
 end
