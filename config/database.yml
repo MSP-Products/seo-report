@@ -14,8 +14,19 @@ default: &default
   port: 5432
 
 development:
-  <<: *default
-  database: msp_seo_report_development
+  primary:
+    <<: *default
+    database: msp_seo_report_development
+    # macOS-only: libpq's GSS encryption negotiation over TCP loads Kerberos
+    # frameworks that aren't fork-safe, crashing Solid Queue's forked
+    # dispatcher/worker processes with a segfault in pg's connect_start.
+    # Not needed for a local trust-auth Postgres, so disable it in dev.
+    gssencmode: disable
+  queue:
+    <<: *default
+    database: msp_seo_report_development
+    migrations_paths: db/queue_migrate
+    gssencmode: disable
 
 # Warning: The database defined as "test" will be erased and
 # re-generated from your development database when you run "rake".
@@ -23,6 +34,9 @@ development:
 test:
   <<: *default
   database: msp_seo_report_test
+  # Same macOS-only fork-safety segfault as development (see above) — the
+  # test runner forks/threads too, so it needs this just as much.
+  gssencmode: disable
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is

@@ -1,0 +1,10 @@
+<% content_for :title, "Edit #{@client.name} — My Social Practice" %>
+
+<div class="mb-6">
+  <%= link_to "← #{@client.name}", client_path(@client), class: "text-sm text-slate-500 hover:text-slate-700" %>
+  <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Edit practice</h1>
+</div>
+
+<div class="max-w-2xl">
+  <%= render "clients/form", client: @client %>
+</div>

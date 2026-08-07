@@ -2,13 +2,13 @@
 title: The adapter layer
 slug: integrations
 status: shipped
-last_verified: 2026-08-02
+last_verified: 2026-08-06
 related: [integration-yext, integration-semrush, integration-google-analytics, integration-hubspot, integration-ghl, integration-anthropic, report-generation]
 ---
 
 # The adapter layer
 
-> **Status:** shipped · **Last verified:** 2026-08-02
+> **Status:** shipped · **Last verified:** 2026-08-06
 >
 > The shared machinery every external service goes through: credentials, timeouts, retries,
 > and the contract that lets one dead API degrade one report section instead of failing the
@@ -26,7 +26,7 @@ related: [integration-yext, integration-semrush, integration-google-analytics, i
 | **SEMrush** | Keyword rankings | Yes | [integration-semrush](integration-semrush.md) |
 | **Google Analytics** | Website traffic | Yes | [integration-google-analytics](integration-google-analytics.md) |
 | **HubSpot** | Practice details, AI SEO enrolment | **No** | [integration-hubspot](integration-hubspot.md) |
-| **GoHighLevel** | Appointments, revenue | **No** | [integration-ghl](integration-ghl.md) |
+| **GoHighLevel** | Appointments, revenue | Yes | [integration-ghl](integration-ghl.md) |
 | **Anthropic** | The written highlight banners | Yes | [integration-anthropic](integration-anthropic.md) |
 
 The first five share the adapter contract below. **Anthropic does not** — it predates the
@@ -184,12 +184,13 @@ Invariants:
 
 ### Not built yet
 
-- **`credential_status` is never set.** Nothing verifies a credential and records its
-  health, so the Connections page labels are decorative.
+- **`credential_status` is never set for most services.** GoHighLevel is the one exception
+  — its agency-wide OAuth grant (see [integration-ghl](integration-ghl.md)) writes
+  `credential_status`/`expires_at`/`last_verified_at` for real on every connect and refresh.
+  Every other service still leaves these Connections-page labels decorative.
 - **No per-practice credential UI.** `external_id` and `override_credentials` are set only
   via `reports:seed_real_client` or the console.
-- **HubSpot and GoHighLevel are unverified** against live accounts.
-- **GHL agency-wide OAuth** is blocked on Marketplace access.
+- **HubSpot is unverified** against a live account.
 - **Anthropic is not folded into the shared plumbing.**
 
 ---

@@ -75,6 +75,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_090006) do
     t.datetime "created_at", null: false
     t.string "credential_status"
     t.string "external_id"
+    t.string "last_sync_error"
+    t.datetime "last_synced_at"
     t.datetime "last_verified_at"
     t.text "override_credentials"
     t.string "service", null: false
@@ -92,7 +94,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_090006) do
     t.string "logo_url"
     t.string "name", null: false
     t.date "onboarded_at"
-    t.string "onboarding_status"
+    t.string "onboarding_status", default: "pending"
     t.string "page_scan_method"
     t.string "phone"
     t.string "sitemap_url"
@@ -279,6 +281,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_090006) do
     t.string "status", null: false
   end
 
+  create_table "service_sync_logs", force: :cascade do |t|
+    t.string "client_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "duration_ms", null: false
+    t.text "error_message"
+    t.string "service", null: false
+    t.string "status"
+    t.datetime "updated_at", null: false
+    t.index ["service", "created_at"], name: "index_service_sync_logs_on_service_and_created_at"
+  end
+
   create_table "services", primary_key: "key", id: :string, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -321,5 +334,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_090006) do
   add_foreign_key "role_permissions", "permissions", column: "permission_key", primary_key: "key"
   add_foreign_key "role_permissions", "roles"
   add_foreign_key "send_logs", "monthly_reports"
+  add_foreign_key "service_sync_logs", "clients"
   add_foreign_key "sitemap_pages", "clients"
+  add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
 end

@@ -571,10 +571,15 @@ Adapters **return, never raise**:
 Result = Data.define(:success?, :data, :error)
 ```
 
-This is deliberate: one dead API degrades one report section into a placeholder rather than
-failing the whole run. Preserve that property. `ReportGenerator` collects `warnings` per adapter
-and only marks an attempt `"failed"` on an unexpected exception — a real bug — which it logs and
-then **re-raises** (`report_generator.rb:37-40`). Never swallow.
+This is deliberate: `ReportGenerator` (not the adapter) decides what a failure means for that
+client. HubSpot, Google Analytics, Yext, and SEMrush are mandatory for every client — a failure
+there raises `ReportGenerator::AdapterFailureError`, aborting the whole run, since a properly
+onboarded client is assumed to have all four working. GHL and AI SEO are the two opt-in
+exceptions: not configured / not enrolled degrades to an omitted section as before, but once a
+client *is* opted into one of them, a failure there is mandatory too — see
+`ReportGenerator#sync_traffic`/`#sync_ai_visibility`. Either way, a failure is logged
+(`report_generation_logs`) and then **re-raised** (`report_generator.rb`'s top-level `rescue`).
+Never swallow.
 
 ---
 
@@ -792,6 +797,15 @@ The report domain is month-based, so be deliberate:
 - Rendered-output tests may use **fixed** dates (`Date.new(2026, 6, 1)`) when the asserted string
   contains the date.
 - Use `travel_to` for anything asserting behaviour *at* a month boundary. Never `sleep`.
+- **To test elapsed-time code, advance the clock — don't sleep.** A WebMock stub body can call
+  `travel`, which models a slow API exactly (`sync_services_checker_test.rb` does this). But
+  `travel` **truncates sub-second precision**, so wrap the assertion in `freeze_time` first or the
+  measured delta lands short of the whole number you expect.
+
+**Minitest 6 has no `minitest/mock`** — it moved to a separate gem that this project doesn't
+bundle, so `Object#stub` does not exist and `require "minitest/mock"` raises. Don't reach for it:
+inject a fake through a public seam, or drive the real code path with a WebMock stub, which is
+the house style anyway.
 
 ### Current coverage gaps
 
@@ -1132,6 +1146,36 @@ CONVENTIONS.md §26 is the full list and it is binding. The ones easiest to brea
 
 ## Known gotchas
 
+- **`bin/rails` failing with a Gemfile or Bundler error is almost always PATH, not the Gemfile.**
+  The symptom is alarming and misleading: `` `windows` is not a valid platform `` or
+  `Could not find 'bundler' (2.5.22)`, which reads like the Gemfile is wrong. It isn't — that's
+  macOS's system Ruby 2.6 at `/usr/bin/ruby` answering instead of this project's 3.3.7. Check
+  `which ruby` first. `/etc/zprofile` runs `path_helper`, which rebuilds `PATH` with `/usr/bin`
+  ahead of rbenv's shims, and it runs *after* `~/.zshenv`, so an export there loses the race.
+  Prefix the command instead:
+
+  ```bash
+  PATH="$HOME/.rbenv/shims:$PATH" bin/ci
+  ```
+
+  **Do not "fix" the Gemfile's `platforms: %i[ windows jruby ]`** — `windows` is correct for
+  Bundler 2.5+ and rewriting it to `mswin mingw x64_mingw` is a regression that hides the real
+  cause.
+- **A Stimulus value named `value` really does need `data-<identifier>-value-value`.** The
+  attribute is `data-<identifier>-<valueName>-value`, so the doubled suffix is correct, not a
+  typo — deleting one half silently disables the controller with no console error. Avoid the trap
+  by never naming a value `value`: name it for what it holds (`externalId` →
+  `data-apply-suggestion-external-id-value`).
+- **`.limit(n).average(:col)` silently ignores the limit** (same for `sum`/`minimum`/`maximum`).
+  SQL applies `LIMIT` to the aggregate's single output row, not to the rows being aggregated, so
+  you get the average of *everything*. Wrap the window in a subquery —
+  `from(scope.limit(n), :table_name).average(:col)`, as `ServiceSyncLog.average_duration_for`
+  does. There is no error; the number is just quietly wrong.
+- **Adding a non-RESTful member action means editing two `before_action` lists, not one.** A new
+  action like `restore` has to be added to the loader (`FindsClient`'s `set_client`) *and* to
+  `require_editor!`. Miss the first and it crashes on `nil`; miss the second and a `support` user
+  can perform a write. Both failures are invisible until someone clicks the button, so the
+  role-gate test must assert the block.
 - **`enum` values that collide with Active Record methods need a prefix.**
   `AgencyConnection`'s `credential_status` uses `prefix: :credential` precisely because a bare
   `invalid` value would override `#invalid?` (validation state). Check for collisions when adding
@@ -1174,6 +1218,32 @@ CONVENTIONS.md §26 is the full list and it is binding. The ones easiest to brea
 ---
 
 ## Definition of done
+
+**Rule zero: run it before you claim it.** "Done", "working", and "complete" mean *observed*,
+not *written*. If you have not run `bin/ci` since your last edit, the change is not done, and
+saying otherwise is a false report — not optimism.
+
+This rule is written from a real session that produced four user-facing bugs, each of which any
+of the checks below would have caught before the user hit it: a `really_destroy!` call to a
+method the `discard` gem doesn't have; a `restore` action crashing on `nil` because its name was
+missing from a `before_action` list; that same action left outside `require_editor!`, so a
+read-only user could reach it; and a working Stimulus attribute "fixed" into a dead button. All
+four were reported as finished. Concretely:
+
+- **Never report a result you did not observe.** No "this should work", no "the feature is
+  complete" from having written it. If something is unverified, the sentence to write is "I have
+  not run this yet."
+- **A blocked toolchain is the first bug to fix, not a reason to skip verification.** If
+  `bin/rails` won't boot, fix that before writing more code — do not keep implementing and hope.
+  See [Known gotchas](#known-gotchas) for the rbenv/PATH failure that looks like a broken Gemfile.
+- **Verify a method exists on a gem before calling it.** One `grep` in the installed gem, or one
+  runner call, beats a plausible guess. `discard` offers `discard`/`undiscard`; a hard delete is
+  plain `destroy!`.
+- **A render delta means opening the page.** Stimulus wiring, Turbo streams, and data attributes
+  fail silently — the HTML looks fine and nothing raises. Assert the exact rendered attribute in a
+  test *and* click it.
+- **Don't "clean up" something you haven't traced.** An odd-looking name may be load-bearing;
+  confirm the convention before renaming it.
 
 1. `bin/ci` passes (rubocop, bundler-audit, importmap audit, brakeman, tests, seeds).
 2. Tests cover the change at the layer it lives in ([Testing](#testing)) — external calls stubbed

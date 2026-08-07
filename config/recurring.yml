@@ -19,6 +19,9 @@ production:
   enqueue_hubspot_sync:
     class: EnqueueHubspotSyncJob
     schedule: every hour at minute 45
+  refresh_ghl_token:
+    class: RefreshGhlTokenJob
+    schedule: every hour
   enqueue_monthly_reports:
     class: EnqueueMonthlyReportsJob
     schedule: every 1st of the month at 4am

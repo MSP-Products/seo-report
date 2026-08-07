@@ -19,7 +19,6 @@
         <th class="px-5 py-3">Role</th>
         <th class="px-5 py-3">Last active</th>
         <th class="px-5 py-3">Status</th>
-        <th class="px-5 py-3"></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-slate-100">
@@ -46,28 +45,6 @@
               <span class="size-1.5 rounded-full <%= status == "Invited" ? "bg-amber-500" : "bg-emerald-500" %>"></span>
               <%= status %>
             </span>
-          </td>
-          <td class="px-5 py-3 text-right">
-            <div class="flex items-center justify-end gap-3">
-              <% if member.invited? && current_admin_user.can?(:users_invite) %>
-                <%# data-turbo="false": #resend renders the new credentials screen directly
-                    on success instead of redirecting, for the same one-time-secret reason
-                    #create does (see new.html.erb) — Turbo Drive can't follow a plain 200
-                    HTML response to a form submission. %>
-                <%= button_to "Resend", resend_team_member_path(member), method: :post,
-                      form_class: "inline", data: { turbo: false },
-                      class: "text-sm font-medium text-cyan-primary hover:text-teal-dark" %>
-              <% end %>
-              <% if current_admin_user.can?(:users_edit) %>
-                <%= link_to "Manage", edit_team_member_path(member), class: "text-sm font-medium text-teal-primary hover:text-teal-dark" %>
-              <% end %>
-              <% if current_admin_user.can?(:users_remove) %>
-                <%= button_to "Remove", team_member_path(member), method: :delete,
-                      form_class: "inline",
-                      data: { turbo_confirm: "Remove #{member.display_name} from the team?" },
-                      class: "text-sm font-medium text-red-600 hover:text-red-700" %>
-              <% end %>
-            </div>
           </td>
         </tr>
       <% end %>
