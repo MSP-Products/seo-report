@@ -8,12 +8,11 @@
 # guarantees it either way.
 Service::KEYS.each { |key| Service.find_or_create_by!(key: key) }
 
-# Same reasoning as Service::KEYS above, for the Team module's roles and
-# their default permission grants (db/migrate/20260806090001_create_roles.rb
-# and .../20260806090002_create_permissions.rb seed the rows themselves, but
-# only for a migration-replay build; role_permissions' default mapping is
-# business data and was never seeded by a migration at all — see CLAUDE.md's
-# "no data changes in a schema migration" rule).
+# Same reasoning as Service::KEYS above, for the Team module's roles, their
+# permissions, and their default permission grants — 20260806090001_create_roles.rb,
+# .../20260806090002_create_permissions.rb, and .../20260807120000_seed_role_permissions.rb
+# all seed these rows too, but only for a migration-replay build. Repeating it
+# here (idempotent) guarantees it either way, matching Service::KEYS above.
 Role::DEFAULT_PERMISSIONS.each_key do |role_key|
   Role.find_or_create_by!(key: role_key) { |role| role.name = role_key.titleize }
 end

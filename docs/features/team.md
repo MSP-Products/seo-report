@@ -142,7 +142,8 @@ app's point of view without any row actually being deleted.
 | `app/models/role.rb` | The role entity, and `DEFAULT_PERMISSIONS` — the single source of truth for each built-in role's default grants |
 | `app/models/permission.rb` | Fixed lookup of every gateable capability (`KEYS`) |
 | `app/models/role_permission.rb` | A role's default permission grants |
-| `app/models/admin_user.rb` | `can?`, `admin?`/`support?` (legacy-compatible), `invited?`, `display_name`, last-Super-Admin guards |
+| `db/migrate/20260807120000_seed_role_permissions.rb` | Seeds `role_permissions` for a full migration replay; `db/seeds.rb` seeds the same mapping independently for the schema-load-then-seed path — see Gotchas |
+| `app/models/admin_user.rb` | `can?`, `invited?`, `display_name`, last-Super-Admin guards |
 | `app/services/admin_role_backfill.rb` | Maps legacy string roles onto the new role system |
 | `lib/tasks/team.rake` | `team:backfill_roles` — the required manual deploy step before the eventual `role_id` NOT NULL migration |
 | `lib/tasks/admin_users.rake` | Updated to resolve `ADMIN_ROLE` to a `Role` record |
@@ -195,6 +196,15 @@ app's point of view without any row actually being deleted.
 - **`db/schema.rb` on `main` already had `first_name`/`last_name`** with no migration ever
   adding them — someone edited the schema file directly. A database built by replaying
   migrations from scratch (rather than `db:schema:load`) was actually missing them.
+- **`role_permissions` is seeded in two places on purpose, not one.**
+  `db/migrate/20260807120000_seed_role_permissions.rb` seeds it for a full migration
+  replay (mirroring `CreateRoles`/`CreatePermissions`), but `db/prepare` on a fresh boot
+  uses `db:schema:load`, which never runs a migration's body — so `db/seeds.rb` still
+  independently, idempotently seeds the exact same mapping for that path. Deleting the
+  `db/seeds.rb` block because "the migration does it now" would silently break a fresh
+  production database, since `db:prepare` would take the schema-load path there and the
+  migration would never run. Keep both in sync; this is deliberately belt-and-suspenders,
+  the same way `Role`/`Permission`'s own rows already were before this migration existed.
 
 - **The generated password is never persisted anywhere except the hashed
   `password_digest`.** `AdminUser#generated_password` is an `attr_accessor`, not a column —
