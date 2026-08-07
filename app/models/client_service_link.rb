@@ -26,7 +26,16 @@ class ClientServiceLink < ApplicationRecord
   # (see SyncClientFromHubspot), so entering or changing it here re-syncs
   # immediately rather than waiting for the daily EnqueueHubspotSyncJob run.
   before_save :reset_sync_status, if: -> { hubspot? && external_id_changed? }
-  after_commit :enqueue_hubspot_sync, on: [ :create, :update ], if: :sync_hubspot_now?
+  # previously_new_record? || saved_change_to_external_id? guards the :update
+  # case specifically because SyncClientFromHubspot#record_attempt writes
+  # last_synced_at/last_sync_error back onto this same record after every
+  # sync — without that guard, that write-back would itself re-trigger this
+  # callback forever. (Two separate after_commit :enqueue_hubspot_sync
+  # declarations, one per on:, don't work here — ActiveSupport::Callbacks
+  # dedupes registrations by filter name, so the second silently replaces
+  # the first instead of adding to it. One callback, one combined condition.)
+  after_commit :enqueue_hubspot_sync, on: [ :create, :update ],
+    if: -> { sync_hubspot_now? && (previously_new_record? || saved_change_to_external_id?) }
 
   # Per-client credential override (same JSON-blob shape as AgencyConnection#credentials).
   # Blank when the client uses the agency-wide connection for this service.
@@ -34,6 +43,11 @@ class ClientServiceLink < ApplicationRecord
     return nil if override_credentials.blank?
 
     JSON.parse(override_credentials)
+  end
+
+  # Whether this link has ever been synced successfully (HubSpot-specific).
+  def synced_recently?
+    last_synced_at.present?
   end
 
   private

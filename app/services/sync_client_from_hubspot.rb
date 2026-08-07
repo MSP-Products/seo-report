@@ -16,6 +16,12 @@ class SyncClientFromHubspot
     return result unless result.success?
 
     client.update!(result.data.slice(:name, :address, :website_url, :onboarding_status, :onboarded_at, :ai_seo_enrolled).compact)
+
+    # Soft-delete if HubSpot shows the client as offboarded
+    client.discard if client.onboarding_status == "offboarded" && !client.discarded?
+    # Restore if they become active again in HubSpot
+    client.undiscard if client.onboarding_status != "offboarded" && client.discarded?
+
     result
   end
 

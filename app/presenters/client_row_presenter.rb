@@ -45,23 +45,48 @@ class ClientRowPresenter
     client.ai_seo_enrolled?
   end
 
-  def hubspot_link
-    client.hubspot_link
+  def service_links
+    @service_links ||= Service::KEYS.index_with do |service|
+      client.client_service_links.find { |link| link.service == service }
+    end
   end
 
-  # Short form for the index's tight grid column — the detail edit page
-  # shows the full "Synced 3 minutes ago" via ClientsHelper#hubspot_sync_status_label.
-  def hubspot_sync_label
-    return "Not linked" if hubspot_link.nil? || hubspot_link.external_id.blank?
-    return "Sync failed" if hubspot_link.last_sync_error.present?
-    return "Synced" if hubspot_link.last_synced_at.present?
+  def service_link(service)
+    service_links[service]
+  end
+
+  def hubspot_link
+    service_link("hubspot")
+  end
+
+  # One badge per service for the index's tight grid column. The detail edit page
+  # shows the fuller "Synced 3 minutes ago" via ClientsHelper#hubspot_sync_status_label.
+  def service_status_labels
+    @service_status_labels ||= Service::KEYS.map do |service|
+      { service: service, label: service_status_label(service), link: service_link(service) }
+    end
+  end
+
+  # "Syncing…" is the fall-through, not a branch: a link with an external_id but
+  # neither a success nor an error timestamp is one whose first sync is still in
+  # flight (ClientServiceLink#reset_sync_status clears both when the ID changes).
+  def service_status_label(service)
+    link = service_link(service)
+
+    return "Not linked" if link.nil? || link.external_id.blank?
+    return "Failed" if link.last_sync_error.present?
+    return "Linked" if link.last_synced_at.present?
 
     "Syncing…"
   end
 
+  def hubspot_sync_label
+    service_status_label("hubspot")
+  end
+
   def delivery_label
     return "Stopped" if client.offboarded?
-    return "Waiting" if latest_report.nil?
+    return "Setup complete" if latest_report.nil?
     return "Failed ×#{latest_report.attempt_count}" if latest_report.effective_status == "failed" && latest_report.attempt_count > 1
 
     latest_report.effective_status.capitalize

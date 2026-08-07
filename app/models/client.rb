@@ -33,6 +33,24 @@ class Client < ApplicationRecord
   scope :search, ->(q) { where("name ILIKE ?", "%#{sanitize_sql_like(q)}%") if q.present? }
   scope :by_status, ->(status) { where(onboarding_status: status) if status.present? }
 
+  # Counts behind the Clients index's status tabs, keyed by tab ("all" plus each
+  # onboarding_status). Lives here rather than in the view because CLAUDE.md
+  # forbids DB queries in ERB, and it folds what were five separate count
+  # queries into two.
+  #
+  # "offboarded" counts *discarded* rows: offboarding soft-deletes, so those
+  # practices are outside the kept scope the other tabs read from.
+  def self.status_counts(query)
+    kept_by_status = kept.search(query).group(:onboarding_status).count
+    discarded_count = discarded.search(query).count
+
+    counts = onboarding_statuses.keys.index_with do |status|
+      status == "offboarded" ? discarded_count : kept_by_status.fetch(status, 0)
+    end
+
+    counts.merge("all" => kept_by_status.values.sum + discarded_count)
+  end
+
   # One row per known service, in the Edit practice form — existing links
   # for the ones already linked, an unsaved stub for the rest, so every
   # service always has an input to fill in.

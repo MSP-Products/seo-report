@@ -5,6 +5,10 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Turbo Stream broadcasts (see SyncClientServicesJob) ride this — the
+  # first broadcast in the app, so nothing mounted it before now.
+  mount ActionCable.server => "/cable"
+
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
@@ -38,10 +42,24 @@ Rails.application.routes.draw do
   # ID present triggers its own sync (ClientServiceLink#enqueue_hubspot_sync),
   # so there's no separate "sync now" endpoint.
   resources :clients do
-    # Suggests a GHL location match by domain (see GhlLocationMatcher) — never
-    # persists anything itself, just re-renders Edit practice with a
-    # suggestion for the admin to confirm by saving.
-    resource :ghl_location_match, only: [ :create ], controller: "clients/ghl_location_matches"
+    # Suggests a GHL/Yext/SEMrush match by domain for every currently-unlinked
+    # service (see SyncServicesChecker) — never persists anything itself,
+    # just re-renders Edit practice with suggestions for the admin to
+    # confirm by saving.
+    resource :sync_services, only: [ :create ], controller: "clients/sync_services"
+
+    member do
+      # Restore a soft-deleted (offboarded) client — with warning that
+      # HubSpot sync in ~1 hour may re-delete it if still marked offboarded there
+      post :restore
+    end
+
+    collection do
+      # Search-and-import entry point for adding a practice (see
+      # HubspotCompanySearcher) — picking a result pre-fills the New client
+      # form; nothing is created until that form is actually submitted.
+      get "hubspot_search", to: "clients/hubspot_searches#index"
+    end
   end
 
   get "dashboard", to: "dashboard#index"

@@ -17,7 +17,7 @@ class Service < ApplicationRecord
   # (reference data the FK constraints depend on existing) — this constant is
   # for other Ruby code that needs the list, e.g. the test suite bootstrapping
   # a schema-loaded (not fully migrated) test database.
-  KEYS = %w[semrush yext google_analytics ghl hubspot].freeze
+  KEYS = %w[hubspot ghl yext semrush google_analytics].freeze
 
   validates :key, presence: true
 end

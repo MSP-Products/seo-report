@@ -53,4 +53,16 @@ class ClientServiceLinkTest < ActiveSupport::TestCase
 
     assert_in_delta synced_at.to_i, link.reload.last_synced_at.to_i, 1
   end
+
+  test "does not re-enqueue a sync when saved without changing the company id" do
+    link = @client.client_service_links.create!(service: "hubspot", external_id: "company-123")
+    clear_enqueued_jobs
+
+    # Mirrors what SyncClientFromHubspot#record_attempt does after every sync
+    # attempt — this must not re-trigger enqueue_hubspot_sync, or every sync
+    # would enqueue another sync forever.
+    assert_no_enqueued_jobs only: SyncHubspotClientJob do
+      link.update!(last_synced_at: Time.current)
+    end
+  end
 end

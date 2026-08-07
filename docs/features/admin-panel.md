@@ -143,6 +143,39 @@ status) double-counting the same report:
 automatically.** Nothing tests a credential and records its state, so they are decorative
 today. The reliable check is to generate a report and read its warnings.
 
+### Client lifecycle: Offboarding and recovery
+
+When a practice ends their engagement, they can be **offboarded** (soft-deleted) rather than
+permanently removed. Offboarded clients are hidden from the active client list and don't
+generate reports, but their history remains queryable if they ever return.
+
+**Offboarding a client:**
+1. Go to **Clients** → find the practice
+2. Click the **Actions menu** (three dots) → **Offboard** (desktop) or the archive icon (mobile)
+3. Confirm the dialog
+4. The client moves to the "Offboarded" tab on the Clients list and disappears from Active
+5. Their report history remains visible on the client's own page
+
+**Recovering an offboarded client:**
+1. Go to **Clients** → click the **Offboarded** tab
+2. Find the practice
+3. Click the **Actions menu** → **Recover**
+4. A warning dialog explains that HubSpot will automatically sync in ~1 hour and may re-offboard them if they're still marked that way in HubSpot (protecting against accidental recovery of practices HubSpot thinks are offboarded)
+5. If you proceed, the client re-appears in the Active tab
+
+**Permanently deleting a client:**
+1. Go to **Clients** → **Offboarded** tab (can only delete offboarded clients, never active ones)
+2. Find the practice
+3. Click the **Actions menu** → **Delete permanently**
+4. Confirm the dialog — this **cannot be undone**
+5. The client, all their reports, and all their history are permanently removed
+
+**Why soft-delete first?** Separating offboarding (hidden, reversible) from permanent deletion
+(irreversible) protects against accidents. You can offboard a client without fear, recover them
+at any time, and only permanently delete if you're certain they're never coming back.
+
+---
+
 ### FAQ
 
 **Q: How do I get an account?**
@@ -265,7 +298,8 @@ error handling.
 | `app/views/clients/new.html.erb` | Thin wrapper around `_form` for `create` |
 | `app/views/clients/edit.html.erb` | Thin wrapper around `_form` for `update` |
 | `app/javascript/controllers/copy_controller.js` | Copy-to-clipboard for the report link and any other `data-controller="copy"` field |
-| `app/controllers/clients/ghl_location_matches_controller.rb` | The **Find GHL match** action — see [integration-ghl](integration-ghl.md#location-auto-match-by-domain) |
+| `app/javascript/controllers/client_menu_controller.js` | The per-row actions menu on the index (View / Edit / Offboard, or Recover / Delete permanently for an offboarded practice) |
+| `app/controllers/clients/sync_services_controller.rb` | The **Sync services** action, which replaced the GHL-only Find GHL match — see [client-onboarding](client-onboarding.md) |
 | `app/services/ghl_location_matcher.rb` | The domain-matching logic itself |
 | `app/javascript/controllers/apply_suggestion_controller.js` | Click-to-fill the suggested location ID into the field above |
 | `test/controllers/clients_controller_test.rb` | Search/filter/pagination, create/update incl. nested attributes, HubSpot sync enqueue, role gating, discard-not-delete |
