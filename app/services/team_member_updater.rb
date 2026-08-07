@@ -28,15 +28,25 @@ class TeamMemberUpdater
 
   attr_reader :admin_user, :attrs, :actor, :permission_overrides, :client_ids
 
-  # Same enforcement point as TeamMemberInviter — only a Super Admin may
-  # assign the Super Admin role. The last-Super-Admin case (can't move
-  # *away* from Super Admin) is a separate, model-level guard.
+  # Only a Super Admin may change anything involving the Super Admin role —
+  # promoting someone into it *or* demoting someone out of it. Checking only
+  # the destination (as this used to) left demotion wide open: an Admin
+  # could not promote themselves to Super Admin, but could freely demote an
+  # existing Super Admin down to Admin, which is just privilege escalation
+  # by a different door. The last-Super-Admin case (can't move the *only*
+  # Super Admin away from that role at all) is a separate, model-level guard.
   def blocked_super_admin_assignment?
-    return false unless admin_user.role_id == Role.super_admin.id
+    return false unless admin_user.role_id_changed?
+    return false unless touches_super_admin_role?
     return false if actor.role_id == Role.super_admin.id
 
-    admin_user.errors.add(:role_id, "can only be assigned by a Super Admin")
+    admin_user.errors.add(:role_id, "can only be changed by a Super Admin")
     true
+  end
+
+  def touches_super_admin_role?
+    super_admin_id = Role.super_admin.id
+    admin_user.role_id == super_admin_id || admin_user.role_id_was == super_admin_id
   end
 
   # A checkbox means "should this permission be effectively granted" — so a

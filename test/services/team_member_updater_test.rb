@@ -33,8 +33,36 @@ class TeamMemberUpdaterTest < ActiveSupport::TestCase
 
     result = TeamMemberUpdater.new(admin_user: member, attrs: { role_id: Role.super_admin.id }, actor: actor).call
 
-    assert_includes result.errors[:role_id], "can only be assigned by a Super Admin"
+    assert_includes result.errors[:role_id], "can only be changed by a Super Admin"
     assert_not_equal Role.super_admin, member.reload.role
+  end
+
+  test "an Admin cannot demote a Super Admin, even when a second Super Admin exists" do
+    actor = AdminUser.create!(email: "actor-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "admin"))
+    AdminUser.create!(email: "other-super-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.super_admin)
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.super_admin)
+
+    result = TeamMemberUpdater.new(admin_user: member, attrs: { role_id: Role.find_by!(key: "admin").id },
+      actor: actor).call
+
+    assert_includes result.errors[:role_id], "can only be changed by a Super Admin"
+    assert_equal Role.super_admin, member.reload.role
+  end
+
+  test "a Super Admin can demote another Super Admin when a second one exists" do
+    actor = AdminUser.create!(email: "actor-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.super_admin)
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com",
+      password: "password123", role: Role.super_admin)
+
+    result = TeamMemberUpdater.new(admin_user: member, attrs: { role_id: Role.find_by!(key: "admin").id },
+      actor: actor).call
+
+    assert result.errors.empty?
+    assert_equal Role.find_by!(key: "admin"), member.reload.role
   end
 
   test "checking a permission the role already grants stores no override" do
@@ -150,11 +178,11 @@ class TeamMemberUpdaterTest < ActiveSupport::TestCase
     assert_not member.reload.can?(:connections_edit)
   end
 
-  test "the last Super Admin's role cannot be changed away" do
-    actor = AdminUser.create!(email: "actor-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "admin"))
-    last = AdminUser.create!(email: "last-#{SecureRandom.hex(4)}@example.com", password: "password123",
+  test "the last Super Admin's role cannot be changed away, even by a Super Admin actor" do
+    created = AdminUser.create!(email: "actor-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.super_admin)
+    actor = AdminUser.find(created.id)
+    last = AdminUser.find(created.id)
 
     result = TeamMemberUpdater.new(admin_user: last, attrs: { role_id: Role.find_by!(key: "admin").id },
       actor: actor).call
