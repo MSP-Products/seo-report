@@ -66,7 +66,13 @@ Rails.application.routes.draw do
 
   get "report-log", to: "report_logs#index", as: :report_log
 
-  resources :team_members, path: "team", only: [ :index, :new, :create, :edit, :update, :destroy ]
+  resources :team_members, path: "team", only: [ :index, :new, :create, :edit, :update, :destroy ] do
+    member do
+      # Undoes a soft-removal (discard). Destroy handles the reverse
+      # direction: it's soft the first time, permanent once already removed.
+      post :restore
+    end
+  end
 
   # Defines the root path route ("/")
   root "dashboard#index"

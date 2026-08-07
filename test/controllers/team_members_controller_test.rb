@@ -233,4 +233,105 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
 
     assert_select "button", text: "Remove", minimum: 1
   end
+
+  test "the removed tab lists only removed members" do
+    sign_in_as(role_key: "admin")
+    AdminUser.create!(email: "active-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      first_name: "Still", last_name: "Here", role: Role.find_by!(key: "account_manager"))
+    removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      first_name: "Gone", last_name: "Away", role: Role.find_by!(key: "account_manager"))
+    removed.discard
+
+    get team_members_path(status: "removed")
+
+    assert_select "p", text: "Gone Away"
+    assert_select "p", text: "Still Here", count: 0
+  end
+
+  test "the all tab lists both active and removed members" do
+    sign_in_as(role_key: "admin")
+    AdminUser.create!(email: "active-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      first_name: "Still", last_name: "Here", role: Role.find_by!(key: "account_manager"))
+    removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      first_name: "Gone", last_name: "Away", role: Role.find_by!(key: "account_manager"))
+    removed.discard
+
+    get team_members_path(status: "all")
+
+    assert_select "p", text: "Still Here"
+    assert_select "p", text: "Gone Away"
+  end
+
+  test "an Admin can restore a removed member" do
+    sign_in_as(role_key: "admin")
+    removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+    removed.discard
+
+    post restore_team_member_path(removed)
+
+    assert_redirected_to team_members_path(status: "removed")
+    assert_not removed.reload.discarded?
+  end
+
+  test "an Account Manager cannot restore a removed member" do
+    sign_in_as(role_key: "account_manager")
+    removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "admin"))
+    removed.discard
+
+    post restore_team_member_path(removed)
+
+    assert_redirected_to root_path
+    assert removed.reload.discarded?
+  end
+
+  test "destroy permanently deletes a member who is already removed" do
+    sign_in_as(role_key: "admin")
+    removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+    removed.discard
+
+    delete team_member_path(removed)
+
+    assert_redirected_to team_members_path(status: "removed")
+    assert_nil AdminUser.find_by(id: removed.id)
+  end
+
+  test "an Account Manager cannot permanently delete an already-removed member" do
+    sign_in_as(role_key: "account_manager")
+    removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "admin"))
+    removed.discard
+
+    delete team_member_path(removed)
+
+    assert_redirected_to root_path
+    assert_not_nil AdminUser.find_by(id: removed.id)
+  end
+
+  test "a discarded Super Admin can be permanently deleted once a second one exists" do
+    sign_in_as(role_key: "admin")
+    AdminUser.create!(email: "keeper-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.super_admin)
+    removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.super_admin)
+    removed.discard
+
+    delete team_member_path(removed)
+
+    assert_nil AdminUser.find_by(id: removed.id)
+  end
+
+  test "Restore and Delete permanently only appear for a viewer who can remove members" do
+    sign_in_as(role_key: "admin")
+    removed = AdminUser.create!(email: "gone-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+    removed.discard
+
+    get team_members_path(status: "removed")
+
+    assert_select "button", text: "Restore", minimum: 1
+    assert_select "button", text: "Delete permanently", minimum: 1
+  end
 end

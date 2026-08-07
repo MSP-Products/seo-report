@@ -56,10 +56,15 @@ MSP staff only, once built. Three roles are planned:
 9. The same Super-Admin-only rule applies here too — an Admin can change someone's role to
    anything except Super Admin, on the form and server-side both.
 10. Clicking **Remove** on a row asks for confirmation, then removes that person — they
-    disappear from the list immediately and can no longer log in. Their row and any past
-    activity aren't deleted from the database, just hidden.
+    disappear from the default (Active) list immediately and can no longer log in. Their
+    row and any past activity aren't deleted from the database, just hidden.
 11. The very last Super Admin can't be removed this way — the page reloads with an error
     instead, so there's always at least one account able to manage roles and permissions.
+12. Three tabs above the list — **Active** (the default), **Removed**, and **All** — each
+    with a live count, cover both accidental and intentional removal. A removed member's
+    row shows **Restore** (undoes the removal — they're active again immediately) and
+    **Delete permanently** (genuinely erases the row and everything about them from the
+    database — there's no undo, and the same confirmation dialog says so).
 
 ### When data is missing
 
@@ -125,15 +130,26 @@ else (a session flash, a redirect param) that could leak or persist it.
 `#update` delegates to `TeamMemberUpdater` (`admin_user:`, `attrs:`, `actor:`), same
 Super-Admin-only guard as the inviter.
 
-`TeamMembersController#destroy` is Remove, gated by `require_permission!(:users_remove)`.
-It's a one-liner calling `admin_user.discard` directly — no dedicated service, since
-wrapping a single gem call would just be a layer to hold one method (mirrors
-`ClientOffboardingsController`'s shape for the same reason). The last-Super-Admin guard
-lives entirely on the model (`AdminUser`'s `before_discard` callback, see PR1) and applies
-here automatically; the controller just surfaces whatever error it left on the record.
-`AdminUser.kept` already excludes discarded rows everywhere that matters — the index list,
-login, and `current_admin_user` — so removing someone is immediate and complete from the
-app's point of view without any row actually being deleted.
+`TeamMembersController#destroy` and `#restore` are Remove/Restore, both gated by
+`require_permission!(:users_remove)` — undoing a removal needs the same permission as
+doing one. `#destroy` mirrors `ClientsController#destroy`'s exact shape: soft the first
+time (`admin_user.discard`, no dedicated service — wrapping one gem call would just be a
+layer to hold one method, same reasoning as `ClientOffboardingsController`) and permanent
+the second time, reachable only once the row is already discarded (`admin_user.destroy!`
+— a real `DELETE`, no FK anywhere in the schema references `admin_users`, so this always
+succeeds cleanly). The last-Super-Admin guard only applies to the soft path — it lives
+entirely on the model (`AdminUser`'s `before_discard` callback, see PR1) and never blocks
+permanently deleting an *already*-discarded Super Admin, which is safe by construction: a
+row can only be soft-removed while it wasn't the last kept one, so hard-deleting it later
+can't make the invariant (at least one kept Super Admin) false. `#restore` is a one-line
+`admin_user.undiscard` — nothing else needs to change since undiscard only touches
+`discarded_at`.
+
+`TeamMembersController#index` takes a `status` param (`active` — the default, `removed`,
+or `all`) driving three tabs with live counts, the same pattern `ClientsController#index`
+already established for its own status tabs. `AdminUser.kept`/`.discarded` (from the
+`discard` gem, no model code needed) back the `active`/`removed` scopes; `all` is a plain
+`AdminUser.all`, since `discard` adds no default scope.
 
 ### Key files
 
@@ -149,9 +165,10 @@ app's point of view without any row actually being deleted.
 | `lib/tasks/admin_users.rake` | Updated to resolve `ADMIN_ROLE` to a `Role` record |
 | `app/controllers/application_controller.rb` | `require_permission!`, `touch_admin_user_last_active` — additive only |
 | `test/support/authentication_helpers.rb` | Shared `sign_in_as(role_key:)` test builder |
-| `app/controllers/team_members_controller.rb` | The team list, plus `new`/`create` for the invite flow |
+| `app/controllers/team_members_controller.rb` | The team list (with its status tabs), invite, manage, remove/restore/permanently-delete |
 | `app/helpers/team_members_helper.rb` | Permission display labels, role badge classes, viewer-relative status/last-active labels |
-| `app/views/team_members/index.html.erb` | The team list and per-role permission summary cards |
+| `app/views/team_members/index.html.erb` | The team list, its Active/Removed/All tabs, and per-role permission summary cards |
+| `config/routes.rb` | `member { post :restore }` on `team_members` |
 | `app/views/team_members/new.html.erb` | The invite form |
 | `app/views/team_members/created.html.erb` | The one-time credentials screen |
 | `app/views/shared/_admin_sidebar.html.erb` | Team now links to the real page instead of Connections |
@@ -181,6 +198,7 @@ app's point of view without any row actually being deleted.
 | An Admin tries to promote someone to Super Admin via Manage | 422, form re-rendered with an error | Nothing |
 | Manage form has any other validation error | 422, form re-rendered | Nothing |
 | Removing the last Super Admin | Redirect back to the list with an error, nothing removed | Nothing |
+| A viewer lacking `users_remove` tries to restore or permanently delete | Redirect away, nothing changed | Nothing |
 
 ### Gotchas
 
@@ -232,9 +250,6 @@ app's point of view without any row actually being deleted.
 ### Not built yet
 
 - Resend (regenerating a password for someone invited but not yet logged in).
-- Reactivating a removed member — `discard` provides `#undiscard` for free, but no UI calls
-  it, since nothing in the mockup this was built against shows a "removed" or "reactivate"
-  state.
 - Custom role creation/editing (Super Admin capability, later phase).
 - Real credential delivery on invite (no mailer is wired anywhere in this app yet).
 - The `role_id` `NOT NULL` constraint and dropping the legacy `role` column.

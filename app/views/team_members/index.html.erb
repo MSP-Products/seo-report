@@ -11,7 +11,15 @@
   <% end %>
 </div>
 
-<div class="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+<!-- Tabs -->
+<nav class="mt-6 flex gap-1 border-b border-slate-200 overflow-x-auto">
+  <% [ [ "active", "Active" ], [ "removed", "Removed" ], [ "all", "All" ] ].each do |value, label| %>
+    <%= link_to "#{label} #{@status_counts[value]}", team_members_path(status: value),
+          class: "shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium #{@status == value ? "border-teal-primary text-teal-dark" : "border-transparent text-slate-500 hover:text-slate-700"}" %>
+  <% end %>
+</nav>
+
+<div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
   <table class="w-full text-left text-sm">
     <thead class="text-xs uppercase text-slate-500">
       <tr>
@@ -41,22 +49,42 @@
           </td>
           <td class="px-5 py-3 text-slate-600"><%= member_last_active_label(member) %></td>
           <td class="px-5 py-3">
-            <% status = member_status_label(member, current_admin_user) %>
-            <span class="inline-flex items-center gap-1.5 text-slate-600">
-              <span class="size-1.5 rounded-full <%= status == "Invited" ? "bg-amber-500" : "bg-emerald-500" %>"></span>
-              <%= status %>
-            </span>
+            <% if member.discarded? %>
+              <span class="inline-flex items-center gap-1.5 text-slate-600">
+                <span class="size-1.5 rounded-full bg-slate-400"></span>
+                Removed
+              </span>
+            <% else %>
+              <% status = member_status_label(member, current_admin_user) %>
+              <span class="inline-flex items-center gap-1.5 text-slate-600">
+                <span class="size-1.5 rounded-full <%= status == "Invited" ? "bg-amber-500" : "bg-emerald-500" %>"></span>
+                <%= status %>
+              </span>
+            <% end %>
           </td>
           <td class="px-5 py-3 text-right">
             <div class="flex items-center justify-end gap-3">
-              <% if current_admin_user.can?(:users_edit) %>
-                <%= link_to "Manage", edit_team_member_path(member), class: "text-sm font-medium text-teal-primary hover:text-teal-dark" %>
-              <% end %>
-              <% if current_admin_user.can?(:users_remove) %>
-                <%= button_to "Remove", team_member_path(member), method: :delete,
-                      form_class: "inline",
-                      data: { turbo_confirm: "Remove #{member.display_name} from the team?" },
-                      class: "text-sm font-medium text-red-600 hover:text-red-700" %>
+              <% if member.discarded? %>
+                <% if current_admin_user.can?(:users_remove) %>
+                  <%= button_to "Restore", restore_team_member_path(member), method: :post,
+                        form_class: "inline",
+                        data: { turbo_confirm: "Restore #{member.display_name} to the team?" },
+                        class: "text-sm font-medium text-teal-primary hover:text-teal-dark" %>
+                  <%= button_to "Delete permanently", team_member_path(member), method: :delete,
+                        form_class: "inline",
+                        data: { turbo_confirm: "Permanently delete #{member.display_name}? This cannot be undone." },
+                        class: "text-sm font-medium text-red-600 hover:text-red-700" %>
+                <% end %>
+              <% else %>
+                <% if current_admin_user.can?(:users_edit) %>
+                  <%= link_to "Manage", edit_team_member_path(member), class: "text-sm font-medium text-teal-primary hover:text-teal-dark" %>
+                <% end %>
+                <% if current_admin_user.can?(:users_remove) %>
+                  <%= button_to "Remove", team_member_path(member), method: :delete,
+                        form_class: "inline",
+                        data: { turbo_confirm: "Remove #{member.display_name} from the team?" },
+                        class: "text-sm font-medium text-red-600 hover:text-red-700" %>
+                <% end %>
               <% end %>
             </div>
           </td>
