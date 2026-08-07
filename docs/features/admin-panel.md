@@ -208,7 +208,8 @@ calls `#authenticate`; success stores `session[:admin_user_id]`.
 
 `ApplicationController` applies `before_action :authenticate_admin!` app-wide, so every
 controller is protected unless it opts out — `ReportsController` and the login actions do.
-`require_editor!` is the write gate, opted into per controller with `only:`.
+`require_permission!(:some_permission_key)` is the write gate, opted into per action —
+see [team](team.md) for the full role/permission model it checks against.
 
 **Connections** is a five-row list built by mapping over `AgencyConnection.services.keys`
 and using `find_or_initialize_by`, so unsaved services still render. `#update` merges only
@@ -243,7 +244,7 @@ error handling.
 
 | Path | Role in this feature |
 |---|---|
-| `app/controllers/application_controller.rb` | `authenticate_admin!`, `require_editor!`, `current_admin_user` |
+| `app/controllers/application_controller.rb` | `authenticate_admin!`, `require_permission!`, `current_admin_user` |
 | `app/controllers/sessions_controller.rb` | Login and logout |
 | `app/controllers/connections_controller.rb` | The credentials list and form |
 | `app/models/admin_user.rb` | `has_secure_password`, role enum, email normalisation |
@@ -411,9 +412,11 @@ practice to see it.
 - **Never render a stored credential back to the browser.** The blank-field behaviour is a
   security property, and there is a test asserting the secret does not appear in the
   response body — keep it for any new credential surface.
-- **Every mutating action needs `require_editor!`.** The test must prove `support` is
-  blocked, not merely that `admin` is allowed.
-- **`support` is read-only** and must stay so.
+- **Every mutating action needs `require_permission!(:some_permission_key)`.** The test
+  must prove an Account Manager (or whichever role lacks that permission) is blocked, not
+  merely that a role with it is allowed. See [team](team.md) for the role/permission model.
+- **An Account Manager is view-only for Clients and Connections by default** (no
+  `clients_create`/`clients_edit`/`clients_delete`/`connections_edit`) and must stay so.
 - **Never add a plaintext secret column.**
 - **Never make `onboarding_status`, `onboarded_at`, or `ai_seo_enrolled` editable on the
   Clients form.** They are HubSpot's fields, confirmed with MSP (SOW #9) — a manual override

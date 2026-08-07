@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clients::HubspotSearchesController < ApplicationController
-  before_action :require_editor!
+  before_action { require_permission!(:clients_create) }
 
   def index
     @query = params[:q]

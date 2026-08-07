@@ -33,8 +33,8 @@ class Clients::SyncServicesControllerTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[target=service_outcome_semrush]"
   end
 
-  test "support role is blocked" do
-    sign_in_as(role: "support")
+  test "an Account Manager is blocked" do
+    sign_in_as(role: "account_manager")
 
     assert_no_enqueued_jobs only: SyncClientServicesJob do
       post client_sync_services_path(@client)

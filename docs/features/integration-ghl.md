@@ -399,7 +399,7 @@ no third `ghl_data_status` value is ever written (see
 |---|---|
 | `app/services/ghl_oauth_client.rb` | The whole OAuth lifecycle: authorize URL, code exchange, refresh, location-token minting |
 | `app/controllers/connections/ghl_oauth_controller.rb` | `authorize`/`callback` actions |
-| `app/controllers/concerns/verifies_ghl_oauth_state.rb` | CSRF `state` guard, `require_editor!`, the `AuthorizationError` rescue |
+| `app/controllers/concerns/verifies_ghl_oauth_state.rb` | CSRF `state` guard, `require_permission!(:connections_edit)`, the `AuthorizationError` rescue |
 | `app/jobs/refresh_ghl_token_job.rb` | Hourly proactive refresh (see [jobs-and-schedules](../reference/jobs-and-schedules.md)) |
 | `app/services/adapters/ghl_adapter.rb` | Both report-data calls |
 | `app/services/report_generator.rb` | `sync_traffic` — sets `not_connected` without calling, or raises on a linked call's failure |

@@ -21,19 +21,6 @@ class AdminUser < ApplicationRecord
   before_validation :downcase_email
   before_discard :block_if_last_super_admin!
 
-  # Legacy compatibility only — ClientsController's and ConnectionsController's
-  # require_editor! still call #admin? unchanged. Must keep returning exactly
-  # what the old enum-backed admin?/support? returned for every migrated
-  # account (admin/Super Admin & Admin -> admin? true; support/Account
-  # Manager -> support? true).
-  def admin?
-    role.key.in?([ Role::SUPER_ADMIN, Role::ADMIN ])
-  end
-
-  def support?
-    role.key == Role::ACCOUNT_MANAGER
-  end
-
   def can?(permission_key)
     permission_keys.include?(permission_key.to_s)
   end

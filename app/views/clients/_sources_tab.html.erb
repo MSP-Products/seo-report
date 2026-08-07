@@ -5,7 +5,7 @@
       <h2 class="text-sm font-medium text-slate-900">Data sources for this practice</h2>
       <p class="mt-1 text-xs text-slate-500">Inherits the agency connection unless an override is set.</p>
     </div>
-    <% if current_admin_user.admin? %>
+    <% if current_admin_user.can?(:clients_edit) %>
       <%= link_to "Edit", edit_client_path(client), class: "shrink-0 text-sm font-medium text-teal-dark hover:underline" %>
     <% end %>
   </div>

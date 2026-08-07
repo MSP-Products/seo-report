@@ -10,8 +10,8 @@ module Connections
       assert_redirected_to login_path
     end
 
-    test "support role is blocked from both authorize and callback" do
-      sign_in_as(role: "support")
+    test "an Account Manager is blocked from both authorize and callback" do
+      sign_in_as(role: "account_manager")
 
       get connections_ghl_authorize_path
       assert_redirected_to root_path

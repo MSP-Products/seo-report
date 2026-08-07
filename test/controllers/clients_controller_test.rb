@@ -299,7 +299,7 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
   # destroy is soft for a live practice and permanent only for an already-offboarded
   # one, so the same button can't skip the reversible step.
   test "destroy permanently deletes a client that is already offboarded" do
-    sign_in_as(role: "admin")
+    sign_in_as(role: "super_admin")
     client = Client.create!(name: "Gone For Good #{SecureRandom.hex(4)}", onboarding_status: "active")
     client.discard
 
@@ -309,8 +309,22 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
     assert_nil Client.find_by(id: client.id)
   end
 
-  test "support role can view clients but not create, update, destroy, or restore" do
-    sign_in_as(role: "support")
+  # Only clients_delete permits the permanent-delete branch of destroy — a plain
+  # Admin has every other client permission but not that one (Role::DEFAULT_PERMISSIONS),
+  # so they can offboard a client but never permanently erase one.
+  test "an Admin can offboard a client but not permanently delete an already-offboarded one" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Protected From Deletion #{SecureRandom.hex(4)}", onboarding_status: "active")
+    client.discard
+
+    delete client_path(client)
+
+    assert_redirected_to root_path
+    assert_not_nil Client.find_by(id: client.id)
+  end
+
+  test "an Account Manager can view clients but not create, update, destroy, or restore" do
+    sign_in_as(role: "account_manager")
     client = Client.create!(name: "Read Only Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
 
     get clients_path

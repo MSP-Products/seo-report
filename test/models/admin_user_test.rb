@@ -1,18 +1,7 @@
 require "test_helper"
 
 class AdminUserTest < ActiveSupport::TestCase
-  test "admin? is true for Super Admin and Admin, false for Account Manager" do
-    assert AdminUser.new(role: Role.find_by!(key: "super_admin")).admin?
-    assert AdminUser.new(role: Role.find_by!(key: "admin")).admin?
-    assert_not AdminUser.new(role: Role.find_by!(key: "account_manager")).admin?
-  end
-
-  test "support? is true only for Account Manager" do
-    assert AdminUser.new(role: Role.find_by!(key: "account_manager")).support?
-    assert_not AdminUser.new(role: Role.find_by!(key: "admin")).support?
-  end
-
-  test "can? reflects the role's default permissions with no overrides" do
+  test "can? reflects the role's default permissions" do
     account_manager = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
       role: Role.find_by!(key: "account_manager"))
 

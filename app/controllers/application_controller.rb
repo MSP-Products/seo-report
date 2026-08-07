@@ -26,16 +26,7 @@ class ApplicationController < ActionController::Base
     current_admin_user&.touch_last_active
   end
 
-  # Guards mutating actions — "support" admins can view everything but not
-  # change it. Controllers opt in with `before_action :require_editor!, only: [...]`.
-  def require_editor!
-    unless current_admin_user&.admin?
-      redirect_to request.referer || root_path, alert: "You don't have permission to do that."
-    end
-  end
-
-  # Guards a mutating action by permission key rather than the binary
-  # admin/support split above. Controllers opt in with
+  # Guards a mutating action by permission key. Controllers opt in with
   # `before_action { require_permission!(:some_key) }`.
   def require_permission!(permission_key)
     unless current_admin_user&.can?(permission_key)

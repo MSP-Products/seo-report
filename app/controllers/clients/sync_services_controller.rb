@@ -3,7 +3,7 @@
 class Clients::SyncServicesController < ApplicationController
   include FindsClient
 
-  before_action :require_editor!
+  before_action { require_permission!(:clients_edit) }
   before_action :set_client
 
   # A plain 200 render here would be a no-op in the browser — Turbo Drive

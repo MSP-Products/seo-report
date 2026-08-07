@@ -167,7 +167,7 @@ Start from what you want to change, not from the tree.
 | The **AI summary copy** | `app/services/highlight_generator.rb` |
 | A **column, validation, enum, or scope** | `app/models/<model>.rb` + a new migration |
 | A **URL** | `config/routes.rb` |
-| **Who can do what** | `app/controllers/concerns/` (auth), `AdminUser#admin?` |
+| **Who can do what** | `app/controllers/concerns/` (auth), `AdminUser#can?` |
 | An **icon** | `ICON_INNER` in `app/helpers/reports_helper.rb` |
 | A **colour, font, or token** | `app/assets/tailwind/application.css` |
 | **Admin chrome** (sidebar, nav) | `app/views/shared/_admin_sidebar.html.erb` |
@@ -453,7 +453,7 @@ end
 ```
 
 **[ApplicationController](app/controllers/application_controller.rb)** — `current_admin_user`,
-`authenticate_admin!`, and `require_editor!` move to
+`authenticate_admin!`, and `require_permission!` move to
 `app/controllers/concerns/authentication.rb`, which `ApplicationController` includes. The rule
 applies to the base class too; being shared is what makes it a concern, not what exempts it.
 
@@ -898,9 +898,11 @@ trust boundaries**, and both are unusual:
   not appear in the response body. Any new credential surface needs the same test.
 - **`encrypts` for anything secret at rest** — `AgencyConnection#encrypted_credentials`,
   `ClientServiceLink#override_credentials`. Never add a plaintext secret column.
-- **Every mutating admin action goes through a role gate.** `require_editor!` restricts writes to
-  `admin`; `support` is read-only. New destructive actions must opt in, and the test must prove
-  `support` is blocked (not just that `admin` is allowed).
+- **Every mutating admin action goes through a permission gate.**
+  `require_permission!(:some_permission_key)` (see [team](docs/features/team.md) for the
+  full role/permission model) restricts writes to whichever roles' default permissions
+  include that key. New destructive actions must opt in, and the test must prove a role
+  that lacks the permission is blocked (not just that a role with it is allowed).
 - **Strong params everywhere**, no `params[:x]` straight into a model.
 - **No secret in a URL, ever** — the report token is the one exception, and it's why the report
   layout is `noindex,nofollow`.
@@ -1173,9 +1175,10 @@ CONVENTIONS.md §26 is the full list and it is binding. The ones easiest to brea
   does. There is no error; the number is just quietly wrong.
 - **Adding a non-RESTful member action means editing two `before_action` lists, not one.** A new
   action like `restore` has to be added to the loader (`FindsClient`'s `set_client`) *and* to
-  `require_editor!`. Miss the first and it crashes on `nil`; miss the second and a `support` user
-  can perform a write. Both failures are invisible until someone clicks the button, so the
-  role-gate test must assert the block.
+  whichever `require_permission!(:some_key)` before_action block should gate it. Miss the
+  first and it crashes on `nil`; miss the second and a role that shouldn't be able to can
+  perform a write. Both failures are invisible until someone clicks the button, so the
+  permission-gate test must assert the block.
 - **`enum` values that collide with Active Record methods need a prefix.**
   `AgencyConnection`'s `credential_status` uses `prefix: :credential` precisely because a bare
   `invalid` value would override `#invalid?` (validation state). Check for collisions when adding

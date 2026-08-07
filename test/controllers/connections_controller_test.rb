@@ -47,7 +47,7 @@ class ConnectionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "keep-me", AgencyConnection.find_by(service: "hubspot").credentials["access_token"]
   end
 
-  test "support role can view but not edit or update" do
+  test "an Account Manager can view but not edit or update" do
     sign_in_as(role_key: "account_manager")
     AgencyConnection.create!(service: "hubspot", encrypted_credentials: { access_token: "keep-me" }.to_json)
 

@@ -91,10 +91,12 @@ This PR lays the schema and model foundation only:
 - `Permission` — a fixed lookup table (same shape as `Service`) of every capability the
   system can gate.
 - `RolePermission` — a role's default permission grants.
-- `AdminUser#admin?`/`#support?` are now computed from the new role system instead of the
-  old `role` enum, but return identical results for every migrated account, so
-  `ClientsController`'s and `ConnectionsController`'s `require_editor!` needed no changes.
-  `AdminUser#can?(permission_key)` is the new, permission-level check.
+- `AdminUser#can?(permission_key)` is the permission-level check every gate now uses.
+  `ClientsController`, `ConnectionsController`, and the GHL OAuth flow originally kept
+  their old binary `admin?`/`support?`-backed `require_editor!` gate unchanged for a
+  transition period, computed from the new role system to return identical results for
+  every migrated account; both `require_editor!` and `admin?`/`support?` were later
+  deleted once every call site had moved to `can?` (see "Changing this feature").
 - `AdminRoleBackfill` maps existing `admin`/`support` string roles onto `Super Admin`/
   `Account Manager`. It's a one-off data migration, not schema, so it lives in
   `lib/tasks/team.rake` (`bin/rails team:backfill_roles`), never inside a migration.
@@ -224,6 +226,11 @@ app's point of view without any row actually being deleted.
 
 - **Never bundle a `NOT NULL` constraint into the same PR as the backfill it depends on** —
   see Gotchas. Add it only once the backfill is confirmed run everywhere.
-- **`AdminUser#admin?`/`#support?` must keep returning identical results** for every
-  existing account. `ClientsController` and `ConnectionsController` depend on this being
-  true without needing any changes of their own.
+- **`AdminUser#admin?`/`#support?` and `require_editor!` no longer exist.** Every mutating
+  controller action across the app — `ClientsController`, `ConnectionsController`, the GHL
+  OAuth flow, `Clients::SyncServicesController`, `Clients::HubspotSearchesController` — now
+  gates on `require_permission!(:some_permission_key)` instead. A new mutating action or
+  controller must be gated the same way; there is no binary admin/support fallback to reach
+  for anymore.
+- **Don't re-add per-user permission overrides or per-client assignment** without a fresh
+  ask from the client — see Gotchas for why they were built and then removed.

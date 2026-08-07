@@ -7,7 +7,7 @@ module VerifiesGhlOauthState
   extend ActiveSupport::Concern
 
   included do
-    before_action :require_editor!, only: [ :authorize, :callback ]
+    before_action(only: [ :authorize, :callback ]) { require_permission!(:connections_edit) }
     before_action :set_oauth_state, only: :authorize
     before_action :verify_oauth_state!, only: :callback
 

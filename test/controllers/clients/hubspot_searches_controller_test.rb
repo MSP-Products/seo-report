@@ -38,8 +38,8 @@ class Clients::HubspotSearchesControllerTest < ActionDispatch::IntegrationTest
     assert_not_requested :post, SEARCH_URL
   end
 
-  test "support role is blocked" do
-    sign_in_as(role: "support")
+  test "an Account Manager is blocked" do
+    sign_in_as(role: "account_manager")
 
     get hubspot_search_clients_path
 
