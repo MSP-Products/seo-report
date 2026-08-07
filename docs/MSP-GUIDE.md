@@ -177,54 +177,90 @@ send is held, the Dashboard is showing what's actually in the database right now
 
 ## Add a new practice
 
-**Go to Clients → Add client.** You have two ways to fill it in, and you can mix them:
+**Go to Clients → Add client → pick your entry point:**
 
-1. **Enter the HubSpot company ID** (in Data sources, at the bottom) and leave the rest
-   blank. Saving immediately pulls the practice's name, address, website, onboarding
-   status, and AI SEO enrolment from HubSpot — you don't have to type any of it. The
-   practice is created right away with a placeholder name ("Syncing from HubSpot…") that's
-   replaced the moment the sync completes, usually within a few seconds.
-2. **Type the details in by hand** — name, website, phone, address — and save without a
-   HubSpot ID. The practice is created as **Pending**.
+### Entry point 1: Import from HubSpot (recommended)
 
-**A practice only reaches Active once a HubSpot sync has succeeded for it.**
-`onboarding_status`, `onboarded_at`, and AI SEO enrolment are owned by HubSpot — they are
-not fields you set on this form, they're read-only, and they stay "Pending" / unset until a
-real HubSpot company record has been linked and synced at least once. This is deliberate:
-it stops a practice from silently drifting out of sync with what HubSpot actually says
-about them. Once a HubSpot ID is linked, it re-syncs automatically once a day after that
-too, so this isn't a one-time action.
+1. Click **Add client** dropdown → **Import from HubSpot**
+2. Search for the practice by name or domain
+3. Pick it from the results (HubSpot company name shown with domain)
+4. Click **"Use this"** → opens the New form with:
+   - Practice name pre-filled from HubSpot
+   - **HubSpot service ID pre-filled** (but NOT synced yet — just pre-filled)
+5. (Optional) Fill in remaining details: website, phone, address
+6. Click **"Add client"** → **This is when the sync happens**:
+   - Creates the practice
+   - Enqueues `SyncHubspotClientJob` immediately
+   - Shows "Syncing…" on the Edit page while it fetches onboarding_status, onboarded_at, and AI SEO enrollment from HubSpot
 
-**What it actually reads off the HubSpot Company record:**
+HubSpot's Search API returns real-time results, so this is the fastest way to onboard a new practice — no typing.
 
-| HubSpot property | Goes to |
-|---|---|
-| Company name | Practice name |
-| Address | Practice address |
-| Website | Website URL |
-| Active (checkbox) | Onboarding status — checked → **Active**, unchecked → **Offboarded** |
-| GMB SEO Start Date | Onboarded on |
-| Services Purchased | AI SEO enrolled — checked if this multi-select includes **"AI SEO"** |
+### Entry point 2: Add manually
 
-If the "Active" checkbox has never been set on the HubSpot side, that practice can't
-show as Active here either — check that property in HubSpot first before assuming the
-sync is broken.
+1. Click **Add client** dropdown → **Add manually**
+2. Type practice name (required), website, phone, address (optional)
+3. Save → practice created as **Pending** with a blank HubSpot ID field
 
-**`website_url`** is used to find their sitemap and to match their SEMrush rankings, so it
-must be the real site.
+This path is for practices not yet in HubSpot, or ones where you know the other service IDs but need to set up HubSpot later.
+
+### Both paths: HubSpot sync happens immediately on save
+
+Once you save (whichever entry path you took), if a HubSpot company ID is present, `SyncHubspotClientJob` enqueues immediately:
+
+1. Fetches: Company name, Address, Website, Active checkbox, GMB SEO Start Date, Services Purchased multi-select
+2. Updates the practice record with name/address/website if they came from HubSpot
+3. Maps HubSpot's **Active** checkbox → **Onboarding status** (`Active` if checked, `Offboarded` if unchecked)
+4. Maps **GMB SEO Start Date** → **Onboarded on** date
+5. Maps **Services Purchased** → **AI SEO enrolled** (true if the multi-select includes the exact text **"AI SEO"**)
+6. Edit form shows **green dot** + **"Synced *n* ago"** once complete
+
+**A practice cannot reach Active onboarding status unless this HubSpot sync succeeds.** If the HubSpot "Active" checkbox was never set, the sync will pull "Offboarded" — check HubSpot directly before assuming the sync is broken.
+
+**Re-syncing happens automatically:** Once a HubSpot ID is linked, `EnqueueHubspotSyncJob` runs daily and re-syncs the practice. Any changes to the HubSpot record flow through to the system automatically (within 24 hours, or immediately if you re-sync by hand on the Edit form).
+
+**`website_url` must be the canonical domain** — it's used to find the practice's sitemap and to match keywords in SEMrush. If the practice is at `www.example.com/dental` , save just `https://example.com` so domain matching works across all services.
 
 ---
 
 ## Connect a practice to the data sources
 
-**Go to the practice's page → Edit practice.** The Data sources section lists all five
-services — HubSpot, GoHighLevel, Yext, SEMrush, Google Analytics — each with one ID field.
-See [where each ID comes from](#where-each-id-comes-from). Paste in the ID and **Save
-practice**; a status dot next to each field shows Not linked / Linked (or, for HubSpot
-specifically, Syncing… / Synced / Sync failed, since that one is a live sync rather than
-just an ID used at report time — see "Add a new practice" above).
+**Go to the practice's Edit page.** The Data sources section has five services, and you have
+two ways to fill them:
 
-**For GoHighLevel specifically, you don't have to already know the location ID.** Click
+### Option A: Auto-match by domain (recommended for new practices)
+
+**Click the "Sync services" button** (appears after you save the practice):
+
+1. System checks GoHighLevel, Yext, and SEMrush simultaneously for domain matches
+2. Each service shows an animated spinner with a countdown timer (estimated from real past checks)
+3. As each completes (usually 2–3 seconds per service):
+   - **Match found:** Shows company name, domain, and ID in a card. Click **"Use this"** to fill the field, or **"×"** to dismiss it
+   - **No match found:** "No match found matching this practice's website."
+   - **API error:** "Couldn't reach this service — try again in a moment."
+4. Click **"Save practice"** to persist all filled IDs
+
+**The timer is real:** It's the average from your last 3–4 checks of that same service, so it gets more accurate as you add more practices.
+
+**Unsaved changes warning:** If you navigate away during editing, the browser warns you (you can still click back).
+
+### Option B: Enter IDs by hand
+
+Skip the Sync services button and paste IDs directly:
+
+1. Find the ID (see [where each ID comes from](#where-each-id-comes-from))
+2. Paste into the field
+3. **Save practice**
+4. Status dots show: Not linked / Linked (or for HubSpot, Syncing / Synced / Sync failed)
+
+### HubSpot-specific behavior
+
+HubSpot is the first field — the mandatory, single source of truth. Once you link it, all five services behave differently:
+- **Must have HubSpot ID to reach Active status** (the onboarding status, date, and AI SEO enrollment come from there, nowhere else)
+- Links with a **green dot + "Synced *n* ago"** after the first sync
+- Re-syncs automatically every day
+- If sync fails, shows **red dot + error reason** — click to see what went wrong
+
+For GoHighLevel specifically,
 **Find GHL match** under that row and the system checks every sub-account in the agency's
 connected GHL account for one whose own website matches this practice's — if it finds one,
 it shows the match (name, website, location ID) for you to review. Nothing is linked yet at

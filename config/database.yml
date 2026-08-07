@@ -34,6 +34,9 @@ development:
 test:
   <<: *default
   database: msp_seo_report_test
+  # Same macOS-only fork-safety segfault as development (see above) — the
+  # test runner forks/threads too, so it needs this just as much.
+  gssencmode: disable
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is

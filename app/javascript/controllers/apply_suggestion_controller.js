@@ -8,6 +8,15 @@ export default class extends Controller {
   static values = { value: String }
 
   apply() {
-    this.element.closest(".flex-wrap").querySelector("input[type=text]").value = this.valueValue
+    // Go up to the service row (px-4 py-3) and find the input field there
+    const row = this.element.closest(".px-4.py-3")
+    if (row) {
+      const input = row.querySelector("input[type=text]")
+      if (input) input.value = this.valueValue
+    }
+
+    // Remove the suggestion div after applying
+    const outcome = this.element.closest('[id^="service_outcome_"]')
+    if (outcome) outcome.remove()
   }
 }

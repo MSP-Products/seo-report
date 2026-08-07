@@ -3,11 +3,11 @@
   <%# A standalone form, deliberately OUTSIDE the main form below — nesting a
       second <form> inside it is invalid HTML, and browsers resolve that by
       silently closing the outer form early (breaking Save practice
-      entirely), not by keeping both intact. The "Find GHL match" button
+      entirely), not by keeping both intact. The "Sync services" button
       references this one by id via the form="" attribute instead. %>
-  <%= form_with url: client_ghl_location_match_path(client), method: :post, id: "ghl_location_match_form" do %><% end %>
+  <%= form_with url: client_sync_services_path(client), method: :post, id: "sync_services_form" do %><% end %>
 <% end %>
-<%= form_with model: client, class: "space-y-4" do |form| %>
+<%= form_with model: client, class: "space-y-4", data: { controller: "unsaved-changes", "unsaved-changes-target": "form" } do |form| %>
   <% if client.errors.any? %>
     <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
       <p class="font-medium"><%= pluralize(client.errors.count, "error") %> prevented this practice from saving:</p>
@@ -64,6 +64,15 @@
       practice's data can be pulled, or override credentials if the client has their own account.
     </p>
 
+    <% if client.persisted? %>
+      <%= turbo_stream_from client, :sync_services %>
+      <p class="mt-3 flex items-center gap-2">
+        <%= button_tag "Sync services", type: "submit", form: "sync_services_form",
+              class: "shrink-0 cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" %>
+        <span class="text-xs text-slate-500">Checks GoHighLevel, Yext, and SEMrush for a match by domain — only for services not yet linked below.</span>
+      </p>
+    <% end %>
+
     <div class="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
       <%= form.fields_for :client_service_links, client.service_links_for_form do |lf| %>
         <% display = AgencyConnection::DISPLAY.fetch(lf.object.service) %>
@@ -96,29 +105,8 @@
               <% end %>
             </p>
           <% end %>
-          <% if lf.object.service == "ghl" && client.persisted? %>
-            <p class="mt-2 pl-12 text-xs">
-              <%= button_tag "Find GHL match", type: "submit", form: "ghl_location_match_form",
-                    class: "cursor-pointer font-medium text-teal-dark hover:underline" %>
-            </p>
-            <% if @ghl_suggested_match %>
-              <p class="mt-2 pl-12 text-xs text-slate-500">
-                Suggested match: <span class="font-medium text-slate-700"><%= @ghl_suggested_match.name %></span>
-                (<%= @ghl_suggested_match.website %>) →
-                <code><%= @ghl_suggested_match.location_id %></code>
-                <button type="button" data-controller="apply-suggestion"
-                        data-apply-suggestion-value-value="<%= @ghl_suggested_match.location_id %>"
-                        data-action="apply-suggestion#apply"
-                        class="cursor-pointer font-medium text-teal-dark hover:underline">
-                  Use this
-                </button>
-                — review, then click Save practice below to confirm.
-              </p>
-            <% elsif @ghl_suggested_match == false %>
-              <p class="mt-2 pl-12 text-xs text-slate-500">
-                No GHL location found matching this practice's website.
-              </p>
-            <% end %>
+          <% if %w[ghl yext semrush].include?(lf.object.service) && client.persisted? %>
+            <%= render "clients/service_outcome", service: lf.object.service, outcome: nil %>
           <% end %>
         </div>
       <% end %>
@@ -136,6 +124,16 @@
         here so you can see what the report will render — change them in the source system, not
         in this panel.
       </p>
+
+      <% unless client.hubspot_link&.external_id.present? %>
+        <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span class="font-medium">No HubSpot company linked.</span>
+          Onboarding status, onboarding date, and AI SEO enrollment can only ever come from
+          HubSpot, so this practice can't reach Active until one is linked —
+          <%= link_to "search HubSpot", hubspot_search_clients_path, class: "font-medium underline" %>
+          or add a company ID above.
+        </p>
+      <% end %>
 
       <dl class="mt-4 divide-y divide-slate-100 text-sm">
         <div class="flex items-center justify-between gap-4 py-3">
@@ -188,16 +186,9 @@
     </div>
   <% end %>
 
-  <div class="flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <%= form.submit client.new_record? ? "Add client" : "Save practice",
-            class: "cursor-pointer rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
-      <%= link_to "Cancel", client.new_record? ? clients_path : client_path(client), class: "text-sm text-slate-500 hover:text-slate-700" %>
-    </div>
-    <% if client.persisted? %>
-      <%= button_to "Offboard", client_path(client), method: :delete,
-            data: { turbo_confirm: "Offboard #{client.name}? This hides them everywhere but keeps their history." },
-            class: "cursor-pointer text-sm font-medium text-red-600 hover:text-red-700 hover:underline" %>
-    <% end %>
+  <div class="flex items-center gap-3">
+    <%= form.submit client.new_record? ? "Add client" : "Save practice",
+          class: "cursor-pointer rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
+    <%= link_to "Cancel", client.new_record? ? clients_path : client_path(client), class: "text-sm text-slate-500 hover:text-slate-700" %>
   </div>
 <% end %>

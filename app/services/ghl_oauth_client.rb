@@ -50,6 +50,13 @@ class GhlOauthClient
   end
 
   def authorize_url(redirect_uri:, state:)
+    # In development with stub mode on, skip GHL's real OAuth flow and return the
+    # callback directly with a fake code — the whole OAuth exchange happens instantly
+    # without leaving the browser, and all subsequent GHL API calls hit WebMock stubs.
+    if stub_enabled?
+      return "#{redirect_uri}?code=stub-code-#{SecureRandom.hex(16)}&state=#{state}"
+    end
+
     query = URI.encode_www_form(
       response_type: "code", client_id: client_id, redirect_uri: redirect_uri,
       scope: SCOPES.join(" "), state: state, user_type: "Company"
@@ -97,6 +104,10 @@ class GhlOauthClient
   end
 
   private
+
+  def stub_enabled?
+    Rails.env.development? && ENV["GHL_STUB"] != "false"
+  end
 
   def connected?
     @connection.credentials["refresh_token"].present?

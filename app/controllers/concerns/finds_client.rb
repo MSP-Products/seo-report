@@ -15,8 +15,10 @@ module FindsClient
   # params[:client_id] covers a nested singular resource (e.g.
   # Clients::GhlLocationMatchesController) whose parent id arrives under that
   # key instead of :id — inert for every other caller, which always has :id.
+  # Allows viewing offboarded (soft-deleted) clients too — they're hidden from
+  # the index by Client.kept, but admins should still see their details.
   def set_client
-    @client = Client.kept.find(params[:id] || params[:client_id])
+    @client = Client.find(params[:id] || params[:client_id])
   end
 
   # onboarding_status/onboarded_at/ai_seo_enrolled are excluded: SyncClientFromHubspot

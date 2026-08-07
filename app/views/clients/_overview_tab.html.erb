@@ -17,7 +17,56 @@
   <% if hubspot_link&.last_sync_error.present? %>
     <p class="mt-1 text-xs text-red-600"><%= hubspot_sync_error_message(hubspot_link) %></p>
   <% end %>
+
+  <% if hubspot_link&.external_id.present? && hubspot_link.synced_recently? %>
+    <div class="mt-3 rounded-lg bg-teal-50 px-3 py-2">
+      <p class="text-xs text-teal-800">
+        <span class="font-medium">Practice info is synced with HubSpot.</span> Onboarding status, onboarded date, and AI SEO enrollment are pulled from HubSpot and updated automatically. <strong>Edit these in HubSpot, not here</strong> — changes sync within 24 hours (or refresh manually above).
+      </p>
+    </div>
+  <% end %>
 </div>
+
+<% if client.name.present? || client.website_url.present? || client.address.present? || client.phone.present? || client.onboarding_status.present? %>
+  <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <h2 class="text-sm font-medium text-slate-900">HubSpot-synced fields</h2>
+    <dl class="mt-4 space-y-3 text-sm">
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-slate-500">Practice name</dt>
+        <dd class="font-medium text-slate-900"><%= client.name %></dd>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-slate-500">Website</dt>
+        <dd class="break-all text-slate-700"><%= link_to client.website_url, client.website_url, target: "_blank", rel: "noopener noreferrer", class: "text-teal-primary hover:underline" %></dd>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-slate-500">Address</dt>
+        <dd class="text-slate-900"><%= client.address || "—" %></dd>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-slate-500">Phone</dt>
+        <dd class="font-mono text-slate-900"><%= client.phone || "—" %></dd>
+      </div>
+      <div class="border-t border-slate-200 pt-3">
+        <div class="flex items-center justify-between gap-4">
+          <dt class="text-slate-500">Onboarding status</dt>
+          <dd class="rounded-full px-2 py-0.5 font-medium <%= client_status_badge_class(client) %>"><%= client.onboarding_status.capitalize %></dd>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-slate-500">Onboarded on</dt>
+        <dd class="font-mono text-slate-900"><%= client.onboarded_at&.strftime("%b %-d, %Y") || "—" %></dd>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-slate-500">AI SEO enrolled</dt>
+        <dd class="<%= client.ai_seo_enrolled? ? "text-emerald-700" : "text-slate-600" %>"><%= client.ai_seo_enrolled? ? "Yes" : "No" %></dd>
+      </div>
+    </dl>
+    <p class="mt-3 text-xs text-slate-500">
+      <em>These fields are read-only and managed by HubSpot. Edit them in HubSpot, then they'll appear here automatically.</em>
+    </p>
+  </div>
+<% end %>
 
 <% if latest_ready_report %>
   <% presenter = ReportPresenter.new(latest_ready_report) %>

@@ -93,6 +93,25 @@ module ClientsHelper
     message || "HubSpot sync failed — try again, or check the company ID."
   end
 
+  # GhlLocationMatcher::Match/YextEntityMatcher::Match/SemrushProjectMatcher::Match
+  # each name their id/domain fields for their own service's own terminology
+  # (location_id vs. entity_id vs. project_campaign_id, website vs. domain) —
+  # this maps service key to the right field to read for the Sync services
+  # suggestion caption, so _form.html.erb doesn't need to branch per service.
+  SERVICE_MATCH_FIELDS = {
+    "ghl" => { id: :location_id, detail: :website },
+    "yext" => { id: :entity_id, detail: :website },
+    "semrush" => { id: :project_campaign_id, detail: :domain }
+  }.freeze
+
+  def service_match_id(service, match)
+    match.public_send(SERVICE_MATCH_FIELDS.fetch(service)[:id])
+  end
+
+  def service_match_detail(service, match)
+    match.public_send(SERVICE_MATCH_FIELDS.fetch(service)[:detail])
+  end
+
   private
 
   def first_report_badge?(report)

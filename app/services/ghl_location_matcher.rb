@@ -7,6 +7,8 @@
 # this isn't an Adapters::Base subclass — closer in shape to GhlOauthClient
 # itself than to GhlAdapter.
 class GhlLocationMatcher
+  include NormalizesDomain
+
   Match = Data.define(:location_id, :name, :website)
 
   BASE_URL = "https://services.leadconnectorhq.com"
@@ -18,10 +20,10 @@ class GhlLocationMatcher
   end
 
   def call
-    target = normalize(@client.website_url)
+    target = normalize_domain(@client.website_url)
     return nil if target.blank?
 
-    each_location.find { |location| normalize(location["website"]) == target }
+    each_location.find { |location| normalize_domain(location["website"]) == target }
       &.then { |location| Match.new(location_id: location["id"], name: location["name"], website: location["website"]) }
   end
 
@@ -51,12 +53,5 @@ class GhlLocationMatcher
   def connection
     token = GhlOauthClient.new.agency_access_token!
     Adapters::ConnectionBuilder.build(BASE_URL, headers: { "Authorization" => "Bearer #{token}", "Version" => API_VERSION })
-  end
-
-  # Same strip-scheme/strip-www/strip-trailing-slash shape as
-  # SemrushAdapter#tracked_url_mask — not extracted into a shared helper,
-  # since this is only the second occurrence (rule of three).
-  def normalize(url)
-    url.to_s.sub(%r{\Ahttps?://}, "").sub(/\Awww\./, "").sub(%r{/\z}, "").downcase
   end
 end

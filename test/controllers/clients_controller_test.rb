@@ -74,6 +74,16 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name=?]", "client[name]"
   end
 
+  test "new pre-fills the name and HubSpot company id when coming from a HubSpot search result" do
+    sign_in_as(role: "admin")
+
+    get new_client_path(hubspot_company_id: "18628823830", hubspot_name: "Adams Dental Associates")
+
+    assert_response :success
+    assert_select "input[name=?][value=?]", "client[name]", "Adams Dental Associates"
+    assert_select "input[value=?]", "18628823830"
+  end
+
   test "create adds a client with just a name" do
     sign_in_as(role: "admin")
 

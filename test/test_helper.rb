@@ -26,6 +26,15 @@ module ActiveSupport
     # parallelization's speed actually matters more than its fragility here.
     parallelize(workers: :number_of_processors, threshold: 200)
 
+    # Each parallel worker gets its own database, rebuilt from schema.rb
+    # (structure only) fresh on every run — the top-level Service::KEYS seed
+    # above only ever reaches the primary connection, not these, so without
+    # this every worker's tests fail on the services foreign key the moment
+    # parallelization actually kicks in (the whole point of this line).
+    parallelize_setup do |_worker|
+      Service::KEYS.each { |key| Service.find_or_create_by!(key: key) }
+    end
+
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
 

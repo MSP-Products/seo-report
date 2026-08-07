@@ -1,6 +1,28 @@
 <% content_for :title, "#{@client.name} — My Social Practice" %>
 
-<%= link_to "← Clients", clients_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+<style>
+  .offboard-btn {
+    background-color: #FEE2E2;
+    color: #B91C1C;
+    transition-property: background-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  .offboard-btn:hover {
+    background-color: #FECACA;
+  }
+</style>
+
+<% status = @client.discarded? ? "offboarded" : @client.onboarding_status %>
+<%= link_to "← Clients", clients_path(status: status), class: "text-sm text-slate-500 hover:text-slate-700" %>
+
+<% if @client.discarded? %>
+  <div class="mb-4 mt-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+    <p class="text-sm text-slate-600">
+      <span class="font-medium">This practice is archived.</span> It's no longer included in monthly reports or the active client list, but you can still view its history here.
+    </p>
+  </div>
+<% end %>
 
 <div class="mb-6 mt-2 rounded-2xl bg-gradient-to-br from-teal-dark via-teal-primary to-cyan-primary p-6 shadow-sm">
   <div class="flex flex-wrap items-start justify-between gap-4">
@@ -9,11 +31,32 @@
     </span>
     <% if current_admin_user.admin? %>
       <div class="flex items-center gap-2">
-        <%= link_to "Edit practice", edit_client_path(@client),
-              class: "rounded-lg bg-white px-4 py-2 text-sm font-medium text-teal-dark hover:bg-slate-50" %>
-        <%= button_to "Offboard", client_path(@client), method: :delete,
-              data: { turbo_confirm: "Offboard #{@client.name}? This hides them everywhere but keeps their history." },
-              class: "rounded-lg bg-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/25" %>
+        <% if !@client.discarded? %>
+          <%= link_to "Edit practice", edit_client_path(@client),
+                class: "rounded-lg bg-white px-4 py-2 text-sm font-medium text-teal-dark hover:bg-slate-50" %>
+          <%= button_to "Offboard", client_path(@client), method: :delete,
+                data: { turbo_confirm: "Offboard #{@client.name}? This hides them everywhere but keeps their history." },
+                class: "offboard-btn cursor-pointer rounded-lg px-4 py-2 text-sm font-medium" %>
+        <% else %>
+          <%= button_to "Recover", restore_client_path(@client), method: :post,
+                data: { turbo_confirm: "⚠️ Warning: Recovering #{@client.name} will make them visible again.\n\nHubSpot will automatically sync in ~1 hour. If they're still marked as offboarded in HubSpot, they will be hidden again.\n\nThis action is not recommended unless you've updated their status in HubSpot first.\n\nProceed?" },
+                class: "cursor-pointer rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200" %>
+          <style>
+            .permanent-delete-btn {
+              background-color: #FEE2E2;
+              color: #B91C1C;
+              transition-property: background-color;
+              transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+              transition-duration: 150ms;
+            }
+            .permanent-delete-btn:hover {
+              background-color: #FECACA;
+            }
+          </style>
+          <%= button_to "Permanently Delete", client_path(@client), method: :delete,
+                data: { turbo_confirm: "Permanently delete #{@client.name}? This cannot be undone." },
+                class: "permanent-delete-btn cursor-pointer rounded-lg px-4 py-2 text-sm font-medium" %>
+        <% end %>
       </div>
     <% end %>
   </div>
