@@ -33,19 +33,6 @@ Rails.application.configure do
   # (see config/database.yml's development: queue: entry).
   config.solid_queue.connects_to = { database: { writing: :queue } }
 
-  # Allow ngrok dev tunnels through Rails' Host Authorization middleware —
-  # needed to test GHL's OAuth redirect locally (GHL requires an https
-  # redirect_uri, which localhost can't provide). Wildcarded since the free
-  # tier's subdomain changes on every restart. Dev-only; production's
-  # config.hosts is a separate, already-known gap (see CLAUDE.md).
-  config.hosts << /[a-z0-9-]+\.ngrok-free\.(app|dev)/
-
-  # Provide stub GHL OAuth credentials in development so the token exchange
-  # can be mocked via the ghl_stub initializer (see config/initializers/ghl_stub.rb).
-  # These are fake values that match the stubs; they're only used locally.
-  ENV["GHL_CLIENT_ID"] ||= "stub-client-id-for-local-dev"
-  ENV["GHL_CLIENT_SECRET"] ||= "stub-client-secret-for-local-dev"
-
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 

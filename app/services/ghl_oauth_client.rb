@@ -53,13 +53,6 @@ class GhlOauthClient
   end
 
   def authorize_url(redirect_uri:, state:)
-    # In development with stub mode on, skip GHL's real OAuth flow and return the
-    # callback directly with a fake code — the whole OAuth exchange happens instantly
-    # without leaving the browser, and all subsequent GHL API calls hit WebMock stubs.
-    if stub_enabled?
-      return "#{redirect_uri}?code=stub-code-#{SecureRandom.hex(16)}&state=#{state}"
-    end
-
     query = URI.encode_www_form(
       response_type: "code", client_id: client_id, redirect_uri: redirect_uri,
       scope: SCOPES.join(" "), state: state, user_type: "Company"
@@ -107,19 +100,6 @@ class GhlOauthClient
   end
 
   private
-
-  # On by default in development, because GHL's OAuth consent redirect can't
-  # complete against localhost — without the stub, nothing downstream of
-  # "Connect to GoHighLevel" is reachable locally at all. Opt out with
-  # GHL_STUB=false to work against a real connection.
-  #
-  # Be aware when reading local results: a stubbed "match found" is
-  # indistinguishable in the UI from a real one, so GHL behaviour verified
-  # locally proves the code path, not the integration.
-  # Kept in step with config/initializers/ghl_stub.rb's identical guard.
-  def stub_enabled?
-    Rails.env.development? && ENV["GHL_STUB"] != "false"
-  end
 
   def connected?
     @connection.credentials["refresh_token"].present?

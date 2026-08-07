@@ -232,6 +232,7 @@ Callbacks are hooks that run at specific points in an object's lifecycle (before
 - Don't use `before_destroy` to prevent deletion — use `dependent: :restrict_with_error` on the parent.
 - Don't use callbacks for business logic that spans multiple models — that belongs in a service object.
 - Don't use `after_initialize` or `after_find` — they run on every object instantiation/query and kill performance.
+- Don't assume `after_commit` is skipped when a save changes nothing — it fires on every completed transaction regardless of whether any attribute actually changed. If that callback's own effects (directly, or via a job it enqueues) can loop back and save the same record again, that's an infinite loop, not a rare edge case. Guard with an explicit flag (e.g. a transient `attr_accessor` set before the internal write) rather than assuming a no-op save is a no-op callback.
 
 ---
 
