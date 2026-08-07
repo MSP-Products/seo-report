@@ -12,11 +12,6 @@ class AdminUser < ApplicationRecord
   # Associations
   belongs_to :role
 
-  has_many :admin_user_permissions, dependent: :destroy
-  has_many :permissions, through: :admin_user_permissions
-  has_many :admin_user_client_assignments, dependent: :destroy
-  has_many :assigned_clients, through: :admin_user_client_assignments, source: :client
-
   # Validations
   validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :password, length: { minimum: 8 }, if: -> { password.present? }
@@ -30,9 +25,7 @@ class AdminUser < ApplicationRecord
   # require_editor! still call #admin? unchanged. Must keep returning exactly
   # what the old enum-backed admin?/support? returned for every migrated
   # account (admin/Super Admin & Admin -> admin? true; support/Account
-  # Manager -> support? true). Deliberately role-only, not permission-aware:
-  # a future Account Manager granted extra overrides still won't pass
-  # require_editor!, since changing that gate's behavior is out of scope here.
+  # Manager -> support? true).
   def admin?
     role.key.in?([ Role::SUPER_ADMIN, Role::ADMIN ])
   end
@@ -42,7 +35,7 @@ class AdminUser < ApplicationRecord
   end
 
   def can?(permission_key)
-    effective_permission_keys.include?(permission_key.to_s)
+    permission_keys.include?(permission_key.to_s)
   end
 
   def invited?
@@ -71,12 +64,8 @@ class AdminUser < ApplicationRecord
 
   private
 
-  def effective_permission_keys
-    @effective_permission_keys ||= begin
-      keys = role.permissions.pluck(:key).to_set
-      admin_user_permissions.each { |override| override.granted? ? keys.add(override.permission_key) : keys.delete(override.permission_key) }
-      keys
-    end
+  def permission_keys
+    @permission_keys ||= role.permissions.pluck(:key).to_set
   end
 
   def downcase_email

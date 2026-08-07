@@ -30,9 +30,7 @@ class TeamMembersController < ApplicationController
   def update
     admin_user = AdminUser.kept.find(params[:id])
     attrs = params.require(:admin_user).permit(:email, :first_name, :last_name, :role_id)
-    overrides = current_admin_user.can?(:user_permissions_manage) ? params.fetch(:permission_overrides, {}).permit(*Permission::KEYS).to_h : {}
-    @admin_user = TeamMemberUpdater.new(admin_user: admin_user, attrs: attrs, actor: current_admin_user,
-      permission_overrides: overrides, client_ids: params[:client_ids]).call
+    @admin_user = TeamMemberUpdater.new(admin_user: admin_user, attrs: attrs, actor: current_admin_user).call
 
     if @admin_user.errors.empty?
       redirect_to team_members_path, notice: "#{@admin_user.display_name} updated."

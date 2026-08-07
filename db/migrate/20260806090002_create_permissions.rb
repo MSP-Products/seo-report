@@ -16,7 +16,6 @@ class CreatePermissions < ActiveRecord::Migration[8.1]
     connections_view connections_edit
     users_view users_invite users_edit users_remove
     roles_manage
-    user_permissions_manage
   ].freeze
 
   def change

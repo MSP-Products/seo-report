@@ -9,7 +9,7 @@ class Role < ApplicationRecord
   # db/seeds.rb (and test_helper.rb) to populate role_permissions.
   DEFAULT_PERMISSIONS = {
     SUPER_ADMIN => Permission::KEYS,
-    ADMIN => Permission::KEYS - %w[clients_delete roles_manage user_permissions_manage],
+    ADMIN => Permission::KEYS - %w[clients_delete roles_manage],
     ACCOUNT_MANAGER => %w[clients_view dashboard_view reports_view reports_generate]
   }.freeze
 

@@ -11,11 +11,9 @@ class Permission < ApplicationRecord
     connections_view connections_edit
     users_view users_invite users_edit users_remove
     roles_manage
-    user_permissions_manage
   ].freeze
 
   has_many :role_permissions, foreign_key: :permission_key, inverse_of: :permission, dependent: :destroy
-  has_many :admin_user_permissions, foreign_key: :permission_key, inverse_of: :permission, dependent: :destroy
 
   validates :key, presence: true
 end

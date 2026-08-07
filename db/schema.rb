@@ -10,26 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_06_090006) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_07_091014) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
-
-  create_table "admin_user_client_assignments", force: :cascade do |t|
-    t.bigint "admin_user_id", null: false
-    t.string "client_id", limit: 36, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["admin_user_id", "client_id"], name: "idx_admin_user_client_assignments_unique", unique: true
-  end
-
-  create_table "admin_user_permissions", force: :cascade do |t|
-    t.bigint "admin_user_id", null: false
-    t.datetime "created_at", null: false
-    t.boolean "granted", null: false
-    t.string "permission_key", null: false
-    t.datetime "updated_at", null: false
-    t.index ["admin_user_id", "permission_key"], name: "idx_admin_user_permissions_unique", unique: true
-  end
 
   create_table "admin_users", force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -307,10 +290,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_090006) do
     t.index ["client_id", "url"], name: "index_sitemap_pages_on_client_id_and_url", unique: true
   end
 
-  add_foreign_key "admin_user_client_assignments", "admin_users"
-  add_foreign_key "admin_user_client_assignments", "clients"
-  add_foreign_key "admin_user_permissions", "admin_users"
-  add_foreign_key "admin_user_permissions", "permissions", column: "permission_key", primary_key: "key"
   add_foreign_key "admin_users", "roles"
   add_foreign_key "agency_connections", "services", column: "service", primary_key: "key"
   add_foreign_key "client_keywords", "clients"
@@ -336,10 +315,4 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_090006) do
   add_foreign_key "send_logs", "monthly_reports"
   add_foreign_key "service_sync_logs", "clients"
   add_foreign_key "sitemap_pages", "clients"
-  add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
 end

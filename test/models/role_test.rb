@@ -20,13 +20,12 @@ class RoleTest < ActiveSupport::TestCase
     assert_equal "super_admin", Role.super_admin.key
   end
 
-  test "DEFAULT_PERMISSIONS grants Admin everything except role and permission management, and client deletion" do
+  test "DEFAULT_PERMISSIONS grants Admin everything except role management and client deletion" do
     admin_permissions = Role::DEFAULT_PERMISSIONS.fetch("admin")
 
     assert_includes admin_permissions, "clients_edit"
     assert_not_includes admin_permissions, "clients_delete"
     assert_not_includes admin_permissions, "roles_manage"
-    assert_not_includes admin_permissions, "user_permissions_manage"
   end
 
   test "DEFAULT_PERMISSIONS restricts Account Manager to viewing and generating reports" do

@@ -2,14 +2,14 @@
 title: Team
 slug: team
 status: partial
-last_verified: 2026-08-06
+last_verified: 2026-08-07
 related: [admin-panel]
 ---
 
 # Team
 
 > **Status:** partial — listing, inviting, managing, and removing all work; resending
-> doesn't yet · **Last verified:** 2026-08-06
+> doesn't yet · **Last verified:** 2026-08-07
 >
 > Lets authorized MSP staff invite and manage their own colleagues' accounts and access,
 > replacing developer-run console commands.
@@ -32,10 +32,7 @@ MSP staff only, once built. Three roles are planned:
 |---|---|
 | **Super Admin** | Everything Admin can, plus manage roles/permissions and delete clients |
 | **Admin** | Day-to-day management: clients, connections, reports, and inviting/editing/removing other users |
-| **Account Manager** | View and generate reports only for clients specifically assigned to them |
-
-Every account also carries individual permission overrides on top of its role's defaults,
-so a one-off exception never requires a new role.
+| **Account Manager** | View and generate reports, but can't create/edit/delete clients or manage the team |
 
 ### How it behaves
 
@@ -55,12 +52,7 @@ so a one-off exception never requires a new role.
 7. Only a Super Admin can invite someone in as a Super Admin — an Admin doesn't see that
    option on the form, and submitting it anyway (e.g. by hand-crafting the request) is
    rejected server-side too.
-8. Clicking **Manage** on any row opens an edit page: name, email, and role are always
-   there; a Super Admin also sees a checklist of every individual permission, pre-ticked
-   to match what the member can currently do, so ticking or unticking one is an explicit
-   exception on top of their role. If the member is an Account Manager, a third section
-   lists every client, letting a Super Admin or Admin pick which ones they're responsible
-   for.
+8. Clicking **Manage** on any row opens an edit page for their name, email, and role.
 9. The same Super-Admin-only rule applies here too — an Admin can change someone's role to
    anything except Super Admin, on the form and server-side both.
 10. Clicking **Remove** on a row asks for confirmation, then removes that person — they
@@ -99,10 +91,6 @@ This PR lays the schema and model foundation only:
 - `Permission` — a fixed lookup table (same shape as `Service`) of every capability the
   system can gate.
 - `RolePermission` — a role's default permission grants.
-- `AdminUserPermission` — per-user overrides on top of the role default (the hybrid part
-  of the RBAC model): `granted: true` adds a permission the role doesn't include,
-  `granted: false` revokes one it does.
-- `AdminUserClientAssignment` — which clients an Account Manager is responsible for.
 - `AdminUser#admin?`/`#support?` are now computed from the new role system instead of the
   old `role` enum, but return identical results for every migrated account, so
   `ClientsController`'s and `ConnectionsController`'s `require_editor!` needed no changes.
@@ -132,19 +120,8 @@ redirecting, so the one-time password never has to survive a round-trip through 
 else (a session flash, a redirect param) that could leak or persist it.
 
 `TeamMembersController#edit`/`#update` are Manage, gated by `require_permission!(:users_edit)`.
-`#update` delegates to `TeamMemberUpdater` (`admin_user:`, `attrs:`, `actor:`,
-`permission_overrides:`, `client_ids:`), same Super-Admin-only guard as the inviter. The
-controller only reads `permission_overrides` from params when
-`current_admin_user.can?(:user_permissions_manage)` — an Admin's request simply never
-looks at that key, so hand-crafting it changes nothing; this is the actual enforcement
-point, the edit view hiding the section is cosmetic. Each permission checkbox means
-"should this be effectively granted" — `TeamMemberUpdater` diffs that against the (possibly
-just-changed) role's own defaults and only ever stores the difference: matching the
-default removes any override row, differing creates or updates one. Client assignment
-follows the same shape: `client_ids: nil` (the field wasn't submitted at all, e.g. the
-member isn't an Account Manager) leaves existing assignments untouched, while an empty
-array explicitly clears them — the view guarantees an empty submission is `[]` not absent
-via a leading hidden `client_ids[]` field, matching Rails' own checkbox-collection idiom.
+`#update` delegates to `TeamMemberUpdater` (`admin_user:`, `attrs:`, `actor:`), same
+Super-Admin-only guard as the inviter.
 
 `TeamMembersController#destroy` is Remove, gated by `require_permission!(:users_remove)`.
 It's a one-liner calling `admin_user.discard` directly — no dedicated service, since
@@ -163,8 +140,6 @@ app's point of view without any row actually being deleted.
 | `app/models/role.rb` | The role entity, and `DEFAULT_PERMISSIONS` — the single source of truth for each built-in role's default grants |
 | `app/models/permission.rb` | Fixed lookup of every gateable capability (`KEYS`) |
 | `app/models/role_permission.rb` | A role's default permission grants |
-| `app/models/admin_user_permission.rb` | Per-user permission override, on top of the role default |
-| `app/models/admin_user_client_assignment.rb` | Which clients an Account Manager is responsible for |
 | `app/models/admin_user.rb` | `can?`, `admin?`/`support?` (legacy-compatible), `invited?`, `display_name`, last-Super-Admin guards |
 | `app/services/admin_role_backfill.rb` | Maps legacy string roles onto the new role system |
 | `lib/tasks/team.rake` | `team:backfill_roles` — the required manual deploy step before the eventual `role_id` NOT NULL migration |
@@ -180,8 +155,8 @@ app's point of view without any row actually being deleted.
 | `app/services/team_member_inviter.rb` | Creates the account, generates the password, enforces the Super-Admin-only assignment rule |
 | `app/services/credential_delivery.rb` | The swappable seam for real credential delivery, currently a no-op |
 | `app/models/admin_user.rb` | `assignable_roles` — keeps the invite/edit forms' visible role options honest |
-| `app/services/team_member_updater.rb` | Manage: details, role, permission-override diffing, client-assignment sync, the same Super-Admin-only guard |
-| `app/views/team_members/edit.html.erb` | The Manage page's three conditional sections |
+| `app/services/team_member_updater.rb` | Manage: name, email, role, the same Super-Admin-only guard |
+| `app/views/team_members/edit.html.erb` | The Manage page's Details form |
 
 ### Data
 
@@ -190,8 +165,6 @@ app's point of view without any row actually being deleted.
 | `roles` | `key`, `name` — real rows, editable later |
 | `permissions` | `key` — fixed, code-defined |
 | `role_permissions` | `role_id`, `permission_key` |
-| `admin_user_permissions` | `admin_user_id`, `permission_key`, `granted` |
-| `admin_user_client_assignments` | `admin_user_id`, `client_id` |
 | `admin_users` | Added `role_id` (FK, nullable for now — see Gotchas), `last_active_at`, `discarded_at`. `first_name`/`last_name` already existed on `main` with no matching migration; this PR's migration adds them idempotently (`unless column_exists?`) so it works whichever starting state a database is in. |
 
 ### Failure modes
@@ -225,10 +198,15 @@ app's point of view without any row actually being deleted.
   `password_digest`.** `AdminUser#generated_password` is an `attr_accessor`, not a column —
   it only survives for the lifetime of the request that created it. There is deliberately
   no way to recover it later, from the database or otherwise.
-- **The assigned-clients section's visibility is decided at page load, from the member's
-  *current* role** — changing the role dropdown and the assigned-clients checkboxes in the
-  same submission works server-side (both are just params), but the section won't
-  dynamically show or hide client-side without a page reload. No JS wires this up yet.
+- **Per-user permission overrides and per-Account-Manager client assignment were built,
+  then removed.** An earlier version of this feature had `AdminUserPermission` (a
+  per-user grant/revoke on top of the role default) and `AdminUserClientAssignment`
+  (scoping an Account Manager to specific clients), with matching sections on the Manage
+  page. Neither was ever actually requested by the client, and per-user permission
+  checkboxes in particular didn't hold up as usable at this scale — both were cut back
+  out, tables and all. Access control is role-only now: every Account Manager can view
+  and generate reports for every client, and the only way to change what someone can do
+  is to change their role.
 
 ### Not built yet
 
@@ -236,7 +214,6 @@ app's point of view without any row actually being deleted.
 - Reactivating a removed member — `discard` provides `#undiscard` for free, but no UI calls
   it, since nothing in the mockup this was built against shows a "removed" or "reactivate"
   state.
-- Enforcing Account Manager's client-assignment scope in Clients/Dashboard/Reports.
 - Custom role creation/editing (Super Admin capability, later phase).
 - Real credential delivery on invite (no mailer is wired anywhere in this app yet).
 - The `role_id` `NOT NULL` constraint and dropping the legacy `role` column.

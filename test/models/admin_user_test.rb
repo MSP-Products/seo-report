@@ -20,22 +20,6 @@ class AdminUserTest < ActiveSupport::TestCase
     assert_not account_manager.can?(:connections_edit)
   end
 
-  test "an override can grant a permission beyond the role's defaults" do
-    account_manager = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "account_manager"))
-    account_manager.admin_user_permissions.create!(permission_key: "connections_edit", granted: true)
-
-    assert account_manager.can?(:connections_edit)
-  end
-
-  test "an override can revoke a permission the role would otherwise grant" do
-    admin = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "admin"))
-    admin.admin_user_permissions.create!(permission_key: "clients_view", granted: false)
-
-    assert_not admin.can?(:clients_view)
-  end
-
   test "display_name falls back to email when no name is set" do
     admin_user = AdminUser.new(email: "nameless@example.com")
 

@@ -10,7 +10,7 @@ module TeamMembersHelper
     "connections_view" => "View connections", "connections_edit" => "Edit API credentials",
     "users_view" => "View team members", "users_invite" => "Invite team members",
     "users_edit" => "Edit team members", "users_remove" => "Remove team members",
-    "roles_manage" => "Manage roles", "user_permissions_manage" => "Manage individual permissions"
+    "roles_manage" => "Manage roles"
   }.freeze
 
   ROLE_BADGE_CLASSES = {

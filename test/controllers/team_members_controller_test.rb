@@ -154,67 +154,6 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
     assert_equal "New", member.reload.first_name
   end
 
-  test "an Admin does not see the individual-permissions section" do
-    sign_in_as(role_key: "admin")
-    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "account_manager"))
-
-    get edit_team_member_path(member)
-
-    assert_select "h2", text: "Individual permissions", count: 0
-  end
-
-  test "a Super Admin sees and can change individual permissions" do
-    sign_in_as(role_key: "super_admin")
-    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "account_manager"))
-
-    get edit_team_member_path(member)
-    assert_select "h2", text: "Individual permissions"
-
-    patch team_member_path(member), params: { admin_user: { email: member.email },
-      permission_overrides: { "connections_edit" => "1" } }
-
-    assert member.reload.can?(:connections_edit)
-  end
-
-  test "an Admin's submitted permission_overrides are silently ignored" do
-    sign_in_as(role_key: "admin")
-    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "account_manager"))
-
-    patch team_member_path(member), params: { admin_user: { email: member.email },
-      permission_overrides: { "connections_edit" => "1" } }
-
-    assert_response :redirect
-    assert_not member.reload.can?(:connections_edit)
-  end
-
-  test "the assigned-clients section only appears for an Account Manager" do
-    sign_in_as(role_key: "admin")
-    account_manager = AdminUser.create!(email: "am-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "account_manager"))
-    admin_member = AdminUser.create!(email: "adm-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "admin"))
-
-    get edit_team_member_path(account_manager)
-    assert_select "h2", text: "Assigned clients"
-
-    get edit_team_member_path(admin_member)
-    assert_select "h2", text: "Assigned clients", count: 0
-  end
-
-  test "assigning clients to an Account Manager through the form" do
-    sign_in_as(role_key: "admin")
-    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
-      role: Role.find_by!(key: "account_manager"))
-    client = Client.create!(name: "Assignable Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
-
-    patch team_member_path(member), params: { admin_user: { email: member.email }, client_ids: [ client.id ] }
-
-    assert_includes member.reload.assigned_clients, client
-  end
-
   test "an Admin cannot promote a member to Super Admin through the manage form" do
     sign_in_as(role_key: "admin")
     member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
