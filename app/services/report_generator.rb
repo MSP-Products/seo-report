@@ -4,15 +4,20 @@
 # retry after a partial failure); re-running replaces that month's synced
 # data rather than duplicating it.
 #
-# A per-adapter failure is logged as a warning but doesn't abort the whole
-# run — a report with some sections missing (rendered as placeholders) is
-# the intended degraded state, not a failure of the generator itself. Only
-# an unexpected exception (a bug, not an API being down) marks the attempt
-# "failed".
+# HubSpot, Google Analytics, Yext, and SEMrush are mandatory: any failure
+# raises AdapterFailureError, aborting the whole run — a client is assumed
+# to have all four properly configured, so a failure here is something to
+# fix, not a placeholder to render. GHL and AI SEO are the two opt-in
+# exceptions: a client with no GHL link, or not enrolled in AI SEO, simply
+# has that section omitted — but once a client *is* opted in, that source
+# becomes mandatory for them too (a configured GHL link or an AI-SEO-enrolled
+# client whose sync fails also raises). Any exception marks the attempt
+# "failed" and logs it.
 class ReportGenerator
   include MonthlyRange
 
   class MonthNotCompleteError < StandardError; end
+  class AdapterFailureError < StandardError; end
 
   def initialize(client:, month:)
     @client = client
@@ -24,7 +29,6 @@ class ReportGenerator
       raise MonthNotCompleteError, "cannot generate a report for the current or a future month"
     end
 
-    @warnings = []
     report = find_or_create_report
     mark_generating(report)
 
@@ -46,7 +50,7 @@ class ReportGenerator
 
   private
 
-  attr_reader :client, :month, :warnings
+  attr_reader :client, :month
 
   def find_or_create_report
     client.find_or_create_monthly_report(month)
@@ -73,27 +77,22 @@ class ReportGenerator
 
   def sync_hubspot(report)
     result = SyncClientFromHubspot.new(client).call
-    warnings << "hubspot: #{result.error}" unless result.success?
+    raise AdapterFailureError, "hubspot: #{result.error}" unless result.success?
   end
 
   def sync_traffic(report)
     traffic = report.report_traffic || report.build_report_traffic
 
     ga4_result = Adapters::GoogleAnalyticsAdapter.new(client, report_month: month).call
-    if ga4_result.success?
-      traffic.assign_attributes(ga4_result.data)
-    else
-      warnings << ga4_result.error
-    end
+    raise AdapterFailureError, "google_analytics: #{ga4_result.error}" unless ga4_result.success?
+
+    traffic.assign_attributes(ga4_result.data)
 
     if client.client_service_links.exists?(service: "ghl")
       ghl_result = Adapters::GhlAdapter.new(client, report_month: month).call
-      if ghl_result.success?
-        traffic.assign_attributes(ghl_result.data)
-      else
-        traffic.ghl_data_status = "access_unavailable"
-        warnings << "ghl: #{ghl_result.error}"
-      end
+      raise AdapterFailureError, "ghl: #{ghl_result.error}" unless ghl_result.success?
+
+      traffic.assign_attributes(ghl_result.data)
     else
       traffic.ghl_data_status = "not_connected"
     end
@@ -103,7 +102,7 @@ class ReportGenerator
 
   def sync_yext(report)
     result = Adapters::YextAdapter.new(client, report_month: month).call
-    return warnings << "yext: #{result.error}" unless result.success?
+    raise AdapterFailureError, "yext: #{result.error}" unless result.success?
 
     sync_citations(report, result.data[:citations])
     sync_ai_visibility(report, result.data[:ai_visibility])
@@ -127,8 +126,15 @@ class ReportGenerator
 
   # Frozen per report, not re-derived from client.ai_seo_enrolled? later — see
   # ReportPresenter#ai_visibility_available? for why.
+  #
+  # Not enrolled: skip entirely, same as an unconfigured service — not every
+  # client buys AI SEO. Enrolled: this data is mandatory, same as any other
+  # opted-in source (see GHL in #sync_traffic) — a blank payload here is a
+  # real failure, not a placeholder.
   def sync_ai_visibility(report, ai)
-    return unless client.ai_seo_enrolled? && ai.present?
+    return unless client.ai_seo_enrolled?
+
+    raise AdapterFailureError, "yext: no AI visibility data returned for an AI-SEO-enrolled client" if ai.blank?
 
     previous = previous_report&.report_ai_visibility
     report.report_ai_visibility&.destroy
@@ -191,7 +197,7 @@ class ReportGenerator
 
   def sync_keywords(report)
     result = Adapters::SemrushAdapter.new(client, report_month: month).call
-    return warnings << "semrush: #{result.error}" unless result.success?
+    raise AdapterFailureError, "semrush: #{result.error}" unless result.success?
 
     result.data[:rankings].each do |ranking|
       previous_position = previous_report&.report_keyword_rankings
@@ -245,13 +251,11 @@ class ReportGenerator
   end
 
   def record_generation_log(report, status:, fatal_error: nil)
-    error_log = fatal_error ? ([ fatal_error.message ] + warnings).join("\n") : warnings.join("\n")
-
     report.report_generation_logs.create!(
       status: status,
       attempted_at: Time.current,
-      error_summary: fatal_error&.message || warnings.first,
-      error_log: error_log.presence
+      error_summary: fatal_error&.message,
+      error_log: fatal_error&.message
     )
   end
 
@@ -259,8 +263,7 @@ class ReportGenerator
     practice_month = "#{client.name}'s #{month.strftime("%B %Y")} report"
 
     if status == "success"
-      warning_note = " (#{warnings.size} warning#{"s" unless warnings.size == 1})" if warnings.any?
-      Rails.logger.info("ReportGenerator: generated #{practice_month}#{warning_note}")
+      Rails.logger.info("ReportGenerator: generated #{practice_month}")
     else
       Rails.logger.error("ReportGenerator: failed to generate #{practice_month} — #{fatal_error&.message}")
     end

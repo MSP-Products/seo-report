@@ -45,7 +45,7 @@ class ConnectionsController < ApplicationController
   # set_connection halts the chain via redirect for an unknown service, so
   # @connection is always present by the time this runs.
   def ensure_configurable!
-    return if @connection.credential_fields.present?
+    return if @connection.credential_fields.present? || @connection.oauth_managed?
 
     redirect_to connections_path, alert: "#{@connection.display_name} isn't configurable yet."
   end

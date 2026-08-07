@@ -1,8 +1,6 @@
-<%# Sidebar nav shell, shown on every authenticated admin page (see layouts/application.html.erb).
-    Clients isn't built yet — it routes to Connections for now, same as before,
-    so nothing 404s. %>
+<%# Sidebar nav shell, shown on every authenticated admin page (see layouts/application.html.erb). %>
 <aside data-mobile-nav-target="panel"
-  class="fixed inset-y-0 left-0 z-40 flex h-screen w-64 shrink-0 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-out md:static md:w-60 md:translate-x-0">
+  class="fixed inset-y-0 left-0 z-40 flex h-full w-64 shrink-0 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-out md:static md:w-60 md:translate-x-0">
   <div class="flex items-center gap-2.5 border-b border-slate-200 px-5 py-4">
     <div class="flex size-9 items-center justify-center rounded-lg bg-teal-primary text-sm font-bold text-white">MSP</div>
     <span class="flex-1 font-semibold text-slate-900">My Social Practice</span>
@@ -14,7 +12,7 @@
   <nav class="flex-1 space-y-1 px-3 py-4">
     <% [
       [:dashboard, "Dashboard", dashboard_path, "dashboard"],
-      [:clients, "Clients", connections_path, "clients"],
+      [:clients, "Clients", clients_path, "clients"],
       [:report_log, "Report Log", report_log_path, "report_logs"],
       [:connections, "Connections", connections_path, "connections"],
       [:team_members, "Team", team_members_path, "team_members"]

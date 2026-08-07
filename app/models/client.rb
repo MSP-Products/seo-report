@@ -17,12 +17,57 @@ class Client < ApplicationRecord
   has_many :monthly_reports, dependent: :destroy
   has_many :client_keywords, dependent: :destroy
   has_many :sitemap_pages, dependent: :destroy
+  accepts_nested_attributes_for :client_service_links
+
+  # A HubSpot company ID means the sync (triggered right after this saves,
+  # see ClientServiceLink#enqueue_hubspot_sync) is about to fill in name,
+  # address, and website_url — so don't force an admin to type a name by
+  # hand just to satisfy this validation before that happens.
+  before_validation :set_placeholder_name_for_hubspot_sync
 
   # Validations
-  validates :name, presence: true
+  validates :name, presence: true, unless: :syncing_from_hubspot?
 
   # Scopes
   scope :with_ai_seo, -> { where(ai_seo_enrolled: true) }
+  scope :search, ->(q) { where("name ILIKE ?", "%#{sanitize_sql_like(q)}%") if q.present? }
+  scope :by_status, ->(status) { where(onboarding_status: status) if status.present? }
+
+  # Counts behind the Clients index's status tabs, keyed by tab ("all" plus each
+  # onboarding_status). Lives here rather than in the view because CLAUDE.md
+  # forbids DB queries in ERB, and it folds what were five separate count
+  # queries into two.
+  #
+  # "offboarded" counts *discarded* rows: offboarding soft-deletes, so those
+  # practices are outside the kept scope the other tabs read from.
+  def self.status_counts(query)
+    kept_by_status = kept.search(query).group(:onboarding_status).count
+    discarded_count = discarded.search(query).count
+
+    counts = onboarding_statuses.keys.index_with do |status|
+      status == "offboarded" ? discarded_count : kept_by_status.fetch(status, 0)
+    end
+
+    counts.merge("all" => kept_by_status.values.sum + discarded_count)
+  end
+
+  # One row per known service, in the Edit practice form — existing links
+  # for the ones already linked, an unsaved stub for the rest, so every
+  # service always has an input to fill in.
+  def service_links_for_form
+    Service::KEYS.map do |service|
+      client_service_links.find { |link| link.service == service } ||
+        client_service_links.build(service: service)
+    end
+  end
+
+  def online_scheduler_connected?
+    client_service_links.any? { |link| link.service == "ghl" && link.external_id.present? }
+  end
+
+  def hubspot_link
+    client_service_links.find { |link| link.service == "hubspot" }
+  end
 
   # Shared by EnqueueMonthlyReportsJob (creates it queued, ahead of actually
   # running) and ReportGenerator (finds the same row when the job runs) —
@@ -34,6 +79,16 @@ class Client < ApplicationRecord
   end
 
   private
+
+  def syncing_from_hubspot?
+    hubspot_link&.external_id.present?
+  end
+
+  def set_placeholder_name_for_hubspot_sync
+    return if name.present? || !syncing_from_hubspot?
+
+    self.name = "Syncing from HubSpot…"
+  end
 
   # Per SOW #9, HubSpot's onboarding date (onboarded_at, synced from
   # gmb_seo_start_date — confirmed with MSP) is the source of truth for which

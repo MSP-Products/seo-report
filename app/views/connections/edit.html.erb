@@ -9,21 +9,37 @@
 </div>
 
 <div class="max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-  <%= form_with url: connection_path(@connection.service), method: :patch, class: "space-y-5" do %>
-    <% @connection.credential_fields.each do |field| %>
-      <%= render "shared/form_group",
-            label: field[:label],
-            field_name: "agency_connection[#{field[:key]}]",
-            type: field[:multiline] ? "textarea" : "password",
-            toggle: !field[:multiline],
-            placeholder: @connection.configured? ? "Leave blank to keep the current value" : "Enter #{field[:label].downcase}" %>
+  <% if @connection.oauth_managed? %>
+    <div class="flex items-center gap-2">
+      <span class="size-2 rounded-full <%= @connection.status_dot_class %>"></span>
+      <p class="text-sm font-medium text-slate-900"><%= @connection.status_label %></p>
+    </div>
+    <% if @connection.last_verified_at.present? %>
+      <p class="mt-1 text-xs text-slate-500">Last verified <%= time_ago_in_words(@connection.last_verified_at) %> ago</p>
     <% end %>
 
-    <div class="flex items-center gap-3">
-      <button type="submit" class="rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark">
-        Save
-      </button>
+    <div class="mt-5 flex items-center gap-3">
+      <%= link_to @connection.configured? ? "Reauthorize" : "Connect to GoHighLevel", connections_ghl_authorize_path,
+            class: "rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
       <%= link_to "Cancel", connections_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
     </div>
+  <% else %>
+    <%= form_with url: connection_path(@connection.service), method: :patch, class: "space-y-5" do %>
+      <% @connection.credential_fields.each do |field| %>
+        <%= render "shared/form_group",
+              label: field[:label],
+              field_name: "agency_connection[#{field[:key]}]",
+              type: field[:multiline] ? "textarea" : "password",
+              toggle: !field[:multiline],
+              placeholder: @connection.configured? ? "Leave blank to keep the current value" : "Enter #{field[:label].downcase}" %>
+      <% end %>
+
+      <div class="flex items-center gap-3">
+        <button type="submit" class="rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark">
+          Save
+        </button>
+        <%= link_to "Cancel", connections_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+      </div>
+    <% end %>
   <% end %>
 </div>

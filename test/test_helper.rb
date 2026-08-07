@@ -33,9 +33,23 @@ module ActiveSupport
     # threshold (workers all finished, exited, and were never reaped by the
     # parent — a coordination bug in this environment, not in the tests
     # themselves), so the threshold is raised well above the current size
-    # rather than fought. Lower it again once the suite has grown enough that
-    # parallelization's speed actually matters more than its fragility here.
-    parallelize(workers: :number_of_processors, threshold: 200)
+    # rather than fought. Also: parallelize forks worker processes, and
+    # fork() is unimplemented on Windows outright (NotImplementedError, not
+    # just flaky) — a harder blocker than the original IPC hang, hit the
+    # moment the suite crossed 200 while building the Team module. Raised
+    # again for the same reason. Lower it once the suite has grown enough
+    # that parallelization's speed actually matters more than its fragility
+    # on every platform this runs on.
+    parallelize(workers: :number_of_processors, threshold: 1000)
+
+    # Each parallel worker gets its own database, rebuilt from schema.rb
+    # (structure only) fresh on every run — the top-level Service::KEYS seed
+    # above only ever reaches the primary connection, not these, so without
+    # this every worker's tests fail on the services foreign key the moment
+    # parallelization actually kicks in (the whole point of this line).
+    parallelize_setup do |_worker|
+      Service::KEYS.each { |key| Service.find_or_create_by!(key: key) }
+    end
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all

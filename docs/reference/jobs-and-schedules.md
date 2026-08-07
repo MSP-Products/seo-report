@@ -2,7 +2,7 @@
 title: Jobs and schedules
 slug: jobs-and-schedules
 kind: reference
-last_verified: 2026-08-03
+last_verified: 2026-08-06
 ---
 
 # Jobs and schedules
@@ -19,7 +19,8 @@ Everything that runs in the background, when, and what happens when it doesn't.
 |---|---|---|
 | `clear_solid_queue_finished_jobs` | Every hour at minute 12 | Solid Queue housekeeping |
 | `scan_client_sitemaps` | Every day at 3am | `Client.kept.active.find_each { ScanClientSitemapJob.perform_later(_1.id) }` |
-| `enqueue_hubspot_sync` | Every day at 3:30am | `EnqueueHubspotSyncJob` |
+| `enqueue_hubspot_sync` | Every hour at minute 45 | `EnqueueHubspotSyncJob` |
+| `refresh_ghl_token` | Every hour | `RefreshGhlTokenJob` |
 | `enqueue_monthly_reports` | The 1st of every month at 4am | `EnqueueMonthlyReportsJob` |
 
 **Report generation is now scheduled; sending it is not.** `EnqueueMonthlyReportsJob` fans
@@ -81,6 +82,22 @@ The fan-out: one `SyncHubspotClientJob` per kept client with a HubSpot `ClientSe
   the general mechanism keeping practice name/address/website/AI SEO enrollment in sync with
   HubSpot everywhere in the app (Dashboard, Report Log, eventually the Clients page), not
   only ahead of generation.
+
+### `RefreshGhlTokenJob`
+
+Keeps the agency-wide GoHighLevel OAuth grant from ever sitting near expiry between monthly
+report runs — see [integration-ghl](../features/integration-ghl.md#token-lifecycle).
+
+- `queue_as :default`
+- `retry_on Faraday::TimeoutError, Faraday::ConnectionFailed, wait: :polynomially_longer, attempts: 3`
+- **No `discard_on`** — an unhandled `Faraday::Error` (e.g. an invalid-grant response) is
+  left to fail the job outright, since that's a real anomaly worth surfacing rather than
+  silently discarding.
+- Delegates to `GhlOauthClient#refresh_if_stale!`, which is a no-op — not an error — when
+  GHL has never been connected at all.
+- **Runs hourly**, deliberately narrower than the ~24h agency access token lifetime:
+  `GhlOauthClient::EXPIRY_BUFFER` (90 minutes) is wider than this job's cadence specifically
+  so the job always catches a token before it actually expires.
 
 ### `EnqueueMonthlyReportsJob`
 
@@ -152,8 +169,11 @@ EnqueueMonthlyReportsJob.perform_later
 # sync one client from HubSpot now instead of waiting for the daily job
 SyncHubspotClientJob.perform_later(client.id)
 
-# run the HubSpot sync fan-out now instead of waiting for 3:30am
+# run the HubSpot sync fan-out now instead of waiting for the next hourly tick
 EnqueueHubspotSyncJob.perform_later
+
+# refresh the GHL agency token now instead of waiting for the next hourly tick
+RefreshGhlTokenJob.perform_later
 
 # rescan one practice's website now
 ScanClientSitemapJob.perform_later(client.id)
