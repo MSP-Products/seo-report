@@ -8,8 +8,8 @@ related: [admin-panel]
 
 # Team
 
-> **Status:** partial — the team list is real; inviting a member works, nothing else writes
-> yet · **Last verified:** 2026-08-06
+> **Status:** partial — listing, inviting, and managing (role, individual permissions,
+> assigned clients) all work; removing and resending don't yet · **Last verified:** 2026-08-06
 >
 > Lets authorized MSP staff invite and manage their own colleagues' accounts and access,
 > replacing developer-run console commands.
@@ -55,6 +55,14 @@ so a one-off exception never requires a new role.
 7. Only a Super Admin can invite someone in as a Super Admin — an Admin doesn't see that
    option on the form, and submitting it anyway (e.g. by hand-crafting the request) is
    rejected server-side too.
+8. Clicking **Manage** on any row opens an edit page: name, email, and role are always
+   there; a Super Admin also sees a checklist of every individual permission, pre-ticked
+   to match what the member can currently do, so ticking or unticking one is an explicit
+   exception on top of their role. If the member is an Account Manager, a third section
+   lists every client, letting a Super Admin or Admin pick which ones they're responsible
+   for.
+9. The same Super-Admin-only rule applies here too — an Admin can change someone's role to
+   anything except Super Admin, on the form and server-side both.
 
 ### When data is missing
 
@@ -118,6 +126,21 @@ real boundary. On success, `#create` **renders** `created.html.erb` rather than
 redirecting, so the one-time password never has to survive a round-trip through anywhere
 else (a session flash, a redirect param) that could leak or persist it.
 
+`TeamMembersController#edit`/`#update` are Manage, gated by `require_permission!(:users_edit)`.
+`#update` delegates to `TeamMemberUpdater` (`admin_user:`, `attrs:`, `actor:`,
+`permission_overrides:`, `client_ids:`), same Super-Admin-only guard as the inviter. The
+controller only reads `permission_overrides` from params when
+`current_admin_user.can?(:user_permissions_manage)` — an Admin's request simply never
+looks at that key, so hand-crafting it changes nothing; this is the actual enforcement
+point, the edit view hiding the section is cosmetic. Each permission checkbox means
+"should this be effectively granted" — `TeamMemberUpdater` diffs that against the (possibly
+just-changed) role's own defaults and only ever stores the difference: matching the
+default removes any override row, differing creates or updates one. Client assignment
+follows the same shape: `client_ids: nil` (the field wasn't submitted at all, e.g. the
+member isn't an Account Manager) leaves existing assignments untouched, while an empty
+array explicitly clears them — the view guarantees an empty submission is `[]` not absent
+via a leading hidden `client_ids[]` field, matching Rails' own checkbox-collection idiom.
+
 ### Key files
 
 | Path | Role in this feature |
@@ -141,7 +164,9 @@ else (a session flash, a redirect param) that could leak or persist it.
 | `app/views/shared/_admin_sidebar.html.erb` | Team now links to the real page instead of Connections |
 | `app/services/team_member_inviter.rb` | Creates the account, generates the password, enforces the Super-Admin-only assignment rule |
 | `app/services/credential_delivery.rb` | The swappable seam for real credential delivery, currently a no-op |
-| `app/models/admin_user.rb` | `assignable_roles` — keeps the invite form's visible role options honest |
+| `app/models/admin_user.rb` | `assignable_roles` — keeps the invite/edit forms' visible role options honest |
+| `app/services/team_member_updater.rb` | Manage: details, role, permission-override diffing, client-assignment sync, the same Super-Admin-only guard |
+| `app/views/team_members/edit.html.erb` | The Manage page's three conditional sections |
 
 ### Data
 
@@ -162,6 +187,8 @@ else (a session flash, a redirect param) that could leak or persist it.
 | Account Manager visits `/team` or `/team/new` | Redirect to the dashboard | Nothing |
 | An Admin submits a Super Admin invite anyway | 422, form re-rendered with an error, nothing created | Nothing |
 | Invite form has any other validation error (blank email, etc.) | 422, form re-rendered | Nothing |
+| An Admin tries to promote someone to Super Admin via Manage | 422, form re-rendered with an error | Nothing |
+| Manage form has any other validation error | 422, form re-rendered | Nothing |
 
 ### Gotchas
 
@@ -178,16 +205,18 @@ else (a session flash, a redirect param) that could leak or persist it.
   adding them — someone edited the schema file directly. A database built by replaying
   migrations from scratch (rather than `db:schema:load`) was actually missing them.
 
-### Gotchas (continued)
-
 - **The generated password is never persisted anywhere except the hashed
   `password_digest`.** `AdminUser#generated_password` is an `attr_accessor`, not a column —
   it only survives for the lifetime of the request that created it. There is deliberately
   no way to recover it later, from the database or otherwise.
+- **The assigned-clients section's visibility is decided at page load, from the member's
+  *current* role** — changing the role dropdown and the assigned-clients checkboxes in the
+  same submission works server-side (both are just params), but the section won't
+  dynamically show or hide client-side without a page reload. No JS wires this up yet.
 
 ### Not built yet
 
-- Manage, remove, resend. The team list and invite are the only write surface so far.
+- Remove, resend.
 - Enforcing Account Manager's client-assignment scope in Clients/Dashboard/Reports.
 - Custom role creation/editing (Super Admin capability, later phase).
 - Real credential delivery on invite (no mailer is wired anywhere in this app yet).

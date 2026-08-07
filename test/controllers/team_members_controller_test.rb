@@ -132,4 +132,107 @@ class TeamMembersControllerTest < ActionDispatch::IntegrationTest
     assert_select "option", text: "Super Admin", count: 0
     assert_select "option", text: "Admin"
   end
+
+  test "an Account Manager cannot reach the manage form" do
+    sign_in_as(role_key: "account_manager")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "admin"))
+
+    get edit_team_member_path(member)
+
+    assert_redirected_to root_path
+  end
+
+  test "an Admin can update a member's name" do
+    sign_in_as(role_key: "admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      first_name: "Old", role: Role.find_by!(key: "account_manager"))
+
+    patch team_member_path(member), params: { admin_user: { first_name: "New" } }
+
+    assert_redirected_to team_members_path
+    assert_equal "New", member.reload.first_name
+  end
+
+  test "an Admin does not see the individual-permissions section" do
+    sign_in_as(role_key: "admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+
+    get edit_team_member_path(member)
+
+    assert_select "h2", text: "Individual permissions", count: 0
+  end
+
+  test "a Super Admin sees and can change individual permissions" do
+    sign_in_as(role_key: "super_admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+
+    get edit_team_member_path(member)
+    assert_select "h2", text: "Individual permissions"
+
+    patch team_member_path(member), params: { admin_user: { email: member.email },
+      permission_overrides: { "connections_edit" => "1" } }
+
+    assert member.reload.can?(:connections_edit)
+  end
+
+  test "an Admin's submitted permission_overrides are silently ignored" do
+    sign_in_as(role_key: "admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+
+    patch team_member_path(member), params: { admin_user: { email: member.email },
+      permission_overrides: { "connections_edit" => "1" } }
+
+    assert_response :redirect
+    assert_not member.reload.can?(:connections_edit)
+  end
+
+  test "the assigned-clients section only appears for an Account Manager" do
+    sign_in_as(role_key: "admin")
+    account_manager = AdminUser.create!(email: "am-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+    admin_member = AdminUser.create!(email: "adm-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "admin"))
+
+    get edit_team_member_path(account_manager)
+    assert_select "h2", text: "Assigned clients"
+
+    get edit_team_member_path(admin_member)
+    assert_select "h2", text: "Assigned clients", count: 0
+  end
+
+  test "assigning clients to an Account Manager through the form" do
+    sign_in_as(role_key: "admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+    client = Client.create!(name: "Assignable Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+
+    patch team_member_path(member), params: { admin_user: { email: member.email }, client_ids: [ client.id ] }
+
+    assert_includes member.reload.assigned_clients, client
+  end
+
+  test "an Admin cannot promote a member to Super Admin through the manage form" do
+    sign_in_as(role_key: "admin")
+    member = AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "admin"))
+
+    patch team_member_path(member), params: { admin_user: { role_id: Role.super_admin.id } }
+
+    assert_response :unprocessable_entity
+    assert_not_equal Role.super_admin, member.reload.role
+  end
+
+  test "Manage link only appears for a viewer who can edit members" do
+    sign_in_as(role_key: "admin")
+    AdminUser.create!(email: "member-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      role: Role.find_by!(key: "account_manager"))
+
+    get team_members_path
+
+    assert_select "a", text: "Manage", minimum: 1
+  end
 end
