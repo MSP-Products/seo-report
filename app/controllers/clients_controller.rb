@@ -1,20 +1,20 @@
 class ClientsController < ApplicationController
   include FindsClient
 
-  before_action :require_editor!, only: [ :new, :create, :edit, :update, :destroy ]
+  before_action :require_editor!, only: %i[ new create edit update destroy ]
 
   def index
-    @status = params[:status].presence_in(["all", *Client.onboarding_statuses.keys]) || "active"
+    @status = params[:status].presence_in([ "all", *Client.onboarding_statuses.keys ]) || "active"
     # Show all records (active + pending + offboarded) or filtered by status
     clients = case @status
-              when "offboarded"
-                Client.discarded.search(params[:q]).by_status(@status)
-              when "all"
-                # Combine kept (active, pending) with discarded (offboarded)
-                Client.unscoped.search(params[:q]).includes(:monthly_reports, :client_service_links).order(:name)
-              else
-                Client.kept.search(params[:q]).by_status(@status)
-              end
+    when "offboarded"
+      Client.discarded.search(params[:q]).by_status(@status)
+    when "all"
+      # Combine kept (active, pending) with discarded (offboarded)
+      Client.unscoped.search(params[:q]).includes(:monthly_reports, :client_service_links).order(:name)
+    else
+      Client.kept.search(params[:q]).by_status(@status)
+    end
     clients = clients.includes(:monthly_reports, :client_service_links).order(:name) unless @status == "all"
     @query = PaginatedClientsQuery.new(clients, page: params[:page])
   end
