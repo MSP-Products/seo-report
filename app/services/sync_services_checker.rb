@@ -27,10 +27,16 @@ class SyncServicesChecker
   # Yields each service's result as it completes, so broadcasts can go out
   # one at a time instead of all at once. Used by SyncClientServicesJob to
   # keep "Checking…" visible until each specific service finishes.
+  #
+  # The elapsed milliseconds are yielded alongside the outcome because this is
+  # the only place that sees the check start — a caller handed the finished
+  # outcome can no longer time it, and that timing is what feeds the next
+  # sync's countdown estimate (ServiceSyncLog.average_duration_for).
   def call_with_yields
     self.class.unlinked_services(@client).each do |service|
+      started_at = Time.current
       outcome = check(service)
-      yield(service, outcome)
+      yield(service, outcome, ((Time.current - started_at) * 1000).round)
     end
   end
 

@@ -55,6 +55,28 @@ class SyncServicesCheckerTest < ActiveSupport::TestCase
     assert_equal false, outcomes["semrush"]
   end
 
+  # Regression: the elapsed time used to be measured by the caller
+  # (SyncClientServicesJob) around the *broadcast* rather than around the check,
+  # so every ServiceSyncLog row recorded ~0ms and the countdown estimate built
+  # from those rows (ServiceSyncLog.average_duration_for) was meaningless.
+  # travel rather than sleep, per CLAUDE.md's "never sleep" rule.
+  test "call_with_yields reports how long each check actually took" do
+    %w[yext semrush].each { |service| @client.client_service_links.create!(service: service, external_id: "linked-#{service}") }
+    stub_request(:get, GHL_LOCATIONS_URL).with(query: hash_including({})).to_return do
+      travel 3.seconds
+      { status: 200, body: { locations: [] }.to_json }
+    end
+
+    durations = {}
+    # freeze_time first so the baseline has no sub-second remainder for `travel`
+    # (which truncates) to throw away — otherwise the delta lands short of 3000.
+    freeze_time do
+      SyncServicesChecker.new(@client).call_with_yields { |service, _outcome, duration_ms| durations[service] = duration_ms }
+    end
+
+    assert_equal 3000, durations["ghl"]
+  end
+
   test "returns an empty hash when every service is already linked" do
     %w[ghl yext semrush].each { |service| @client.client_service_links.create!(service: service, external_id: "linked-#{service}") }
 

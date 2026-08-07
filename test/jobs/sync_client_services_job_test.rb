@@ -36,6 +36,28 @@ class SyncClientServicesJobTest < ActiveJob::TestCase
     assert_equal "replace", ghl_stream["action"]
     assert_match "loc-1", ghl_stream.to_html
     assert_match "No match found", yext_stream.to_html
+
+    # Regression: the "Use this match" button is wired by Stimulus' value naming
+    # convention — a value named externalId on controller apply-suggestion must
+    # render as data-apply-suggestion-external-id-value. A wrong name leaves a
+    # button that silently does nothing, which no other assertion here catches.
+    assert_match 'data-apply-suggestion-external-id-value="loc-1"', ghl_stream.to_html
+  end
+
+  test "logs one row per checked service, with the status the check returned" do
+    stub_request(:get, GHL_LOCATIONS_URL).with(query: hash_including({}))
+      .to_return(status: 200, body: { locations: [
+        { "id" => "loc-1", "name" => "Adams Dental Associates", "website" => "https://www.adamsdentalassociates.com" }
+      ] }.to_json)
+    stub_request(:get, YEXT_ENTITIES_URL).with(query: hash_including({})).to_return(status: 200, body: { response: { entities: [] } }.to_json)
+    stub_request(:get, SEMRUSH_PROJECTS_URL).with(query: hash_including({})).to_return(status: 500)
+
+    SyncClientServicesJob.perform_now(@client.id)
+
+    logs = ServiceSyncLog.where(client: @client).index_by(&:service)
+    assert_equal "success", logs["ghl"].status
+    assert_equal "not_found", logs["yext"].status
+    assert_equal "error", logs["semrush"].status
   end
 
   test "does not broadcast anything when every service is already linked" do

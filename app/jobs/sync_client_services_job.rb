@@ -12,35 +12,34 @@ class SyncClientServicesJob < ApplicationJob
   def perform(client_id)
     client = Client.kept.find(client_id)
 
-    SyncServicesChecker.new(client).call_with_yields do |service, outcome|
-      # Record the timing and result for this service check
-      start_time = Time.current
-
-      Turbo::StreamsChannel.broadcast_replace_to(
-        client, :sync_services,
-        target: "service_outcome_#{service}",
-        partial: "clients/service_outcome",
-        locals: { service: service, outcome: outcome }
-      )
-
-      duration_ms = ((Time.current - start_time) * 1000).to_i
-
-      # Determine status and error message
-      status = if outcome.is_a?(Data)
-                 :success
-               elsif outcome == false
-                 :not_found
-               else
-                 :error
-               end
-
-      ServiceSyncLog.create!(
-        client: client,
-        service: service,
-        duration_ms: duration_ms,
-        status: status,
-        error_message: nil
-      )
+    SyncServicesChecker.new(client).call_with_yields do |service, outcome, duration_ms|
+      broadcast_outcome(client, service, outcome)
+      log_outcome(client, service, outcome, duration_ms)
     end
+  end
+
+  private
+
+  def broadcast_outcome(client, service, outcome)
+    Turbo::StreamsChannel.broadcast_replace_to(
+      client, :sync_services,
+      target: "service_outcome_#{service}",
+      partial: "clients/service_outcome",
+      locals: { service: service, outcome: outcome }
+    )
+  end
+
+  def log_outcome(client, service, outcome, duration_ms)
+    ServiceSyncLog.create!(client: client, service: service,
+      duration_ms: duration_ms, status: status_for(outcome))
+  end
+
+  # The three outcomes SyncServicesChecker#check returns: a Match, false
+  # (checked, nothing matched), or :error (couldn't check at all).
+  def status_for(outcome)
+    return :success if outcome.is_a?(Data)
+    return :not_found if outcome == false
+
+    :error
   end
 end

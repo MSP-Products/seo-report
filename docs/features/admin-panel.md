@@ -298,7 +298,8 @@ error handling.
 | `app/views/clients/new.html.erb` | Thin wrapper around `_form` for `create` |
 | `app/views/clients/edit.html.erb` | Thin wrapper around `_form` for `update` |
 | `app/javascript/controllers/copy_controller.js` | Copy-to-clipboard for the report link and any other `data-controller="copy"` field |
-| `app/controllers/clients/ghl_location_matches_controller.rb` | The **Find GHL match** action — see [integration-ghl](integration-ghl.md#location-auto-match-by-domain) |
+| `app/javascript/controllers/client_menu_controller.js` | The per-row actions menu on the index (View / Edit / Offboard, or Recover / Delete permanently for an offboarded practice) |
+| `app/controllers/clients/sync_services_controller.rb` | The **Sync services** action, which replaced the GHL-only Find GHL match — see [client-onboarding](client-onboarding.md) |
 | `app/services/ghl_location_matcher.rb` | The domain-matching logic itself |
 | `app/javascript/controllers/apply_suggestion_controller.js` | Click-to-fill the suggested location ID into the field above |
 | `test/controllers/clients_controller_test.rb` | Search/filter/pagination, create/update incl. nested attributes, HubSpot sync enqueue, role gating, discard-not-delete |

@@ -105,6 +105,15 @@ class GhlOauthClient
 
   private
 
+  # On by default in development, because GHL's OAuth consent redirect can't
+  # complete against localhost — without the stub, nothing downstream of
+  # "Connect to GoHighLevel" is reachable locally at all. Opt out with
+  # GHL_STUB=false to work against a real connection.
+  #
+  # Be aware when reading local results: a stubbed "match found" is
+  # indistinguishable in the UI from a real one, so GHL behaviour verified
+  # locally proves the code path, not the integration.
+  # Kept in step with config/initializers/ghl_stub.rb's identical guard.
   def stub_enabled?
     Rails.env.development? && ENV["GHL_STUB"] != "false"
   end

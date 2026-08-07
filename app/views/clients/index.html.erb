@@ -41,12 +41,10 @@
 
 <!-- Tabs -->
 <nav class="mb-6 flex gap-1 border-b border-slate-200 overflow-x-auto">
-  <% all_count = Client.kept.search(params[:q]).count + Client.discarded.search(params[:q]).count %>
-  <%= link_to "All #{all_count}", clients_path(q: params[:q], status: "all"),
+  <%= link_to "All #{@status_counts["all"]}", clients_path(q: params[:q], status: "all"),
         class: "shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium #{@status == "all" ? "border-teal-primary text-teal-dark" : "border-transparent text-slate-500 hover:text-slate-700"}" %>
   <% Client.onboarding_statuses.each_key do |status| %>
-    <% count = status == "offboarded" ? Client.discarded.search(params[:q]).by_status(status).count : Client.kept.search(params[:q]).by_status(status).count %>
-    <%= link_to "#{status.capitalize} #{count}", clients_path(q: params[:q], status: status),
+    <%= link_to "#{status.capitalize} #{@status_counts[status]}", clients_path(q: params[:q], status: status),
           class: "shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium #{@status == status ? "border-teal-primary text-teal-dark" : "border-transparent text-slate-500 hover:text-slate-700"}" %>
   <% end %>
 </nav>

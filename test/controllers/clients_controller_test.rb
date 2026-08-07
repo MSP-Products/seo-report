@@ -32,6 +32,62 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
     assert_select "p", text: other.name, count: 0
   end
 
+  test "index defaults to the active tab and hides offboarded practices" do
+    sign_in_as(role: "admin")
+    active = Client.create!(name: "Still Here #{SecureRandom.hex(4)}", onboarding_status: "active")
+    gone = Client.create!(name: "Moved On #{SecureRandom.hex(4)}", onboarding_status: "active")
+    delete client_path(gone)
+
+    get clients_path
+
+    assert_response :success
+    assert_select "p", text: active.name
+    assert_select "p", text: gone.name, count: 0
+  end
+
+  test "index offboarded tab lists only offboarded practices" do
+    sign_in_as(role: "admin")
+    active = Client.create!(name: "Still Here #{SecureRandom.hex(4)}", onboarding_status: "active")
+    gone = Client.create!(name: "Moved On #{SecureRandom.hex(4)}", onboarding_status: "active")
+    delete client_path(gone)
+
+    get clients_path(status: "offboarded")
+
+    assert_response :success
+    assert_select "p", text: gone.name
+    assert_select "p", text: active.name, count: 0
+  end
+
+  test "index all tab lists both kept and offboarded practices" do
+    sign_in_as(role: "admin")
+    active = Client.create!(name: "Still Here #{SecureRandom.hex(4)}", onboarding_status: "active")
+    gone = Client.create!(name: "Moved On #{SecureRandom.hex(4)}", onboarding_status: "active")
+    delete client_path(gone)
+
+    get clients_path(status: "all")
+
+    assert_response :success
+    assert_select "p", text: active.name
+    assert_select "p", text: gone.name
+  end
+
+  test "index tab counts cover offboarded practices and respect the search query" do
+    sign_in_as(role: "admin")
+    Client.create!(name: "Willow Active #{SecureRandom.hex(4)}", onboarding_status: "active")
+    Client.create!(name: "Willow Pending #{SecureRandom.hex(4)}", onboarding_status: "pending")
+    gone = Client.create!(name: "Willow Gone #{SecureRandom.hex(4)}", onboarding_status: "active")
+    delete client_path(gone)
+    Client.create!(name: "Oakview Elsewhere #{SecureRandom.hex(4)}", onboarding_status: "active")
+
+    get clients_path(q: "Willow")
+
+    assert_response :success
+    assert_select "a", text: "All 3"
+    assert_select "a", text: "Active 1"
+    assert_select "a", text: "Pending 1"
+    assert_select "a", text: "Offboarded 1"
+  end
+
   test "index filters by onboarding status" do
     sign_in_as(role: "admin")
     active = Client.create!(name: "Active Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
@@ -55,14 +111,16 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
     assert_select "a.border-teal-primary", text: "Overview"
   end
 
-  test "show 404s for a discarded client" do
+  test "show renders an offboarded client so it can be recovered or deleted" do
     sign_in_as(role: "admin")
     client = Client.create!(name: "Gone Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
     client.discard
 
     get client_path(client)
 
-    assert_response :not_found
+    assert_response :success
+    assert_select "h1", text: client.name
+    assert_select "p", text: /archived/
   end
 
   test "new renders the add-client form" do
@@ -212,7 +270,46 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
     assert client.reload.discarded?
   end
 
-  test "support role can view clients but not create, update, or destroy" do
+  test "restore brings an offboarded client back" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Returning Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    client.discard
+
+    post restore_client_path(client)
+
+    assert_redirected_to client_path(client)
+    assert_not client.reload.discarded?
+  end
+
+  # Regression: restore used to undiscard without clearing onboarding_status, so a
+  # recovered practice was kept-but-still-"offboarded" — matching no status tab at
+  # all (the Offboarded tab counts discarded rows only) and vanishing from the list.
+  test "restore moves the client back into a status tab that lists it" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Recovered Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
+    delete client_path(client) # the real offboard path, which also sets the status
+
+    post restore_client_path(client)
+
+    assert_equal "pending", client.reload.onboarding_status
+    get clients_path(status: "pending")
+    assert_select "p", text: client.name
+  end
+
+  # destroy is soft for a live practice and permanent only for an already-offboarded
+  # one, so the same button can't skip the reversible step.
+  test "destroy permanently deletes a client that is already offboarded" do
+    sign_in_as(role: "admin")
+    client = Client.create!(name: "Gone For Good #{SecureRandom.hex(4)}", onboarding_status: "active")
+    client.discard
+
+    delete client_path(client)
+
+    assert_redirected_to clients_path
+    assert_nil Client.find_by(id: client.id)
+  end
+
+  test "support role can view clients but not create, update, destroy, or restore" do
     sign_in_as(role: "support")
     client = Client.create!(name: "Read Only Practice #{SecureRandom.hex(4)}", onboarding_status: "active")
 
@@ -230,5 +327,9 @@ class ClientsControllerTest < ActionDispatch::IntegrationTest
 
     delete client_path(client)
     assert_not client.reload.discarded?
+
+    client.discard
+    post restore_client_path(client)
+    assert client.reload.discarded?
   end
 end

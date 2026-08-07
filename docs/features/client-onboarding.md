@@ -228,18 +228,27 @@ So `https://www.example.com/` and `http://example.com` and `EXAMPLE.COM` all nor
 `ServiceSyncLog` tracks each check:
 - `client_id`, `service`, `duration_ms`, `status` (success/not_found/error), `error_message`, `created_at`
 
-`ServiceSyncLog.average_duration_for(service)` returns the average of the last 3-4 **successful** checks:
+`ServiceSyncLog.average_duration_for(service)` returns the average of the last four
+**successful** checks — a short window, so the estimate tracks a service that has recently got
+slower instead of being anchored by its whole history:
+
 ```ruby
 def self.average_duration_for(service)
-  where(service: service, status: :success)
-    .order(created_at: :desc)
-    .limit(4)
-    .average(:duration_ms)
-    .to_i
+  recent = where(service: service, status: :success).order(created_at: :desc).limit(RECENT_CHECKS)
+
+  from(recent, :service_sync_logs).average(:duration_ms).to_i
 end
 ```
 
-Defaults to 2500ms if no history exists.
+The window has to be applied in a **subquery**. Writing it as `.limit(4).average(:duration_ms)`
+silently ignores the limit, because SQL applies `LIMIT` to the aggregate's single output row
+rather than to the rows being averaged — so it would quietly average every row ever recorded.
+
+It returns `0` when a service has no successful history, which is the caller's cue to fall back
+to its own default estimate (2500ms, in `Clients::SyncServicesController#create`).
+
+**Errored checks are excluded deliberately**: a failed check usually fails fast, so averaging
+those in would under-estimate how long a real check takes.
 
 ### Unsaved changes warning
 

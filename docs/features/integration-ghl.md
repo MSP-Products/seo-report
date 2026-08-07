@@ -354,6 +354,29 @@ handle it like any other credential. `ghl:print_connection` should only ever be 
 by a human in their own terminal, never piped through a channel that might log or display
 it — that's exactly the mistake to avoid (see Gotchas).
 
+### The local-dev stub — fake GHL data is the default, and it looks real
+
+Because localhost can't complete the consent redirect (above), local dev **stubs GHL by
+default**. `config/initializers/ghl_stub.rb` intercepts every GHL endpoint with WebMock and
+returns canned data, and `GhlOauthClient#authorize_url` short-circuits the consent step by
+redirecting straight back to its own callback with a fake code. Everything downstream — the
+token exchange, `GhlAdapter`, `GhlLocationMatcher` — runs its real code path against those
+stubbed responses, so the wiring is genuinely exercised.
+
+```bash
+bin/dev                  # stubbed: "Connect to GoHighLevel" works with no credentials
+GHL_STUB=false bin/dev   # real GHL, needs credentials and a reachable redirect URI
+```
+
+**The thing to internalise: a stubbed "match found" is pixel-identical to a real one.** GHL
+behaviour confirmed in local dev proves the code path, not the integration — so never conclude
+from a green local run that the GHL connection itself works. Only `GHL_STUB=false` (or a
+deployed environment) tells you that.
+
+Both guards check the same variable and must stay in step: the initializer's, and
+`GhlOauthClient#stub_enabled?`. The stub never activates outside `Rails.env.development?`, so
+test and production are untouched — the test suite stubs GHL explicitly per test instead.
+
 ### Field mapping
 
 → `ReportTraffic`
@@ -388,9 +411,10 @@ no third `ghl_data_status` value is ever written (see
 | `config/routes.rb` | `/connections/scheduler/authorize` / `/connections/scheduler/callback` (path avoids GHL's brand-reference check; route helpers stay `ghl_*`) |
 | `config/initializers/filter_parameter_logging.rb` | Filters `:code` so the callback's query string never lands unredacted in logs |
 | `app/services/ghl_location_matcher.rb` | Paginated `/locations/search` + domain-normalized matching |
-| `app/controllers/clients/ghl_location_matches_controller.rb` | `create` — computes the suggestion, re-renders `clients/edit` |
-| `app/controllers/concerns/finds_client.rb` | `set_client` — accepts `params[:client_id]` (this controller's nested-resource param) as well as `params[:id]` |
-| `app/views/clients/_form.html.erb` | The GHL row's suggestion caption + the standalone `ghl_location_match_form` (see Gotchas) |
+| `app/controllers/clients/sync_services_controller.rb` | `create` — GHL is now checked alongside Yext and SEMrush by one **Sync services** action rather than a GHL-only button; see [client-onboarding](client-onboarding.md) |
+| `app/services/sync_services_checker.rb` | Runs `GhlLocationMatcher` for a client whose GHL `external_id` is blank, isolating its failure from the other services' |
+| `app/controllers/concerns/finds_client.rb` | `set_client` — accepts `params[:client_id]` (the nested-resource param) as well as `params[:id]` |
+| `app/views/clients/_form.html.erb` | The GHL row's suggestion caption + the standalone `sync_services_form` (see Gotchas) |
 | `app/javascript/controllers/apply_suggestion_controller.js` | Click-to-fill the suggested location ID; JS optional, the ID is always visible as plain text too |
 | `lib/tasks/ghl.rake` | `ghl:print_connection` / `ghl:import_connection` — the cross-environment recovery path |
 | `test/services/ghl_oauth_client_test.rb` | Code exchange, refresh + rotation, `refresh_if_stale!`, `agency_access_token!`, failure paths |
@@ -399,7 +423,8 @@ no third `ghl_data_status` value is ever written (see
 | `test/jobs/refresh_ghl_token_job_test.rb` | Delegates to `refresh_if_stale!`; no-op when never connected |
 | `test/models/agency_connection_test.rb` | `oauth_managed?`, `status_label` branching |
 | `test/services/ghl_location_matcher_test.rb` | Match found (incl. across pagination), no match, blank `website_url`/missing `company_id` short-circuit without an HTTP call, HTTP failure propagates |
-| `test/controllers/clients/ghl_location_matches_controller_test.rb` | Match found, no match, GHL error → generic alert, `support` role blocked |
+| `test/controllers/clients/sync_services_controller_test.rb` | Enqueues the check, the per-service "Searching…" turbo_stream response, `support` role blocked |
+| `test/services/sync_services_checker_test.rb` | GHL's failure isolated from Yext/SEMrush, already-linked services skipped |
 
 ### Data
 

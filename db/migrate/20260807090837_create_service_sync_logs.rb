@@ -9,6 +9,6 @@ class CreateServiceSyncLogs < ActiveRecord::Migration[8.1]
     end
 
     add_foreign_key :service_sync_logs, :clients, column: :client_id
-    add_index :service_sync_logs, [:service, :created_at]
+    add_index :service_sync_logs, [ :service, :created_at ]
   end
 end

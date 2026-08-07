@@ -1,8 +1,13 @@
 # frozen_string_literal: true
 
-# GHL OAuth stub for local development without real credentials. Auto-enabled in development.
-# Fakes the entire OAuth flow + API calls with realistic canned responses. Disable with
-# GHL_STUB=false if you want to test against real GHL (requires credentials).
+# GHL OAuth stub for local development. On by default in development, because GHL's
+# OAuth consent redirect cannot complete against localhost — without it, nothing
+# downstream of "Connect to GoHighLevel" is reachable locally at all. Fakes the whole
+# flow (consent through data calls) with realistic canned responses.
+#
+# Opt out with GHL_STUB=false to work against a real connection. Worth knowing when
+# reading local results: a stubbed "match found" looks identical to a real one in the
+# UI, so GHL behaviour verified locally proves the code path, not the integration.
 #
 # This works by:
 # 1. GhlOauthClient#authorize_url skips the real GHL OAuth URL and returns our callback directly
@@ -11,13 +16,13 @@
 #    WebMock's responses instead of the real GHL API
 #
 # Usage:
-#   bin/dev
+#   bin/dev                  # stubbed (the local default)
+#   GHL_STUB=false bin/dev   # real GHL, needs credentials + a reachable redirect URI
 #   # Click "Connect to GoHighLevel" on the Connections page — it will redirect
 #   # straight back without leaving the browser, and Sync services will work against
 #   # the stubbed location/calendar/opportunity data. No real GHL credentials needed.
 
-# Auto-enable the stub in development unless explicitly disabled with GHL_STUB=false.
-# This way "Connect to GoHighLevel" just works locally without needing real credentials.
+# Kept in step with GhlOauthClient#stub_enabled?'s identical guard.
 if Rails.env.development? && ENV["GHL_STUB"] != "false"
   require "webmock"
   WebMock.enable!

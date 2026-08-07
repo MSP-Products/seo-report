@@ -59,27 +59,29 @@ class ClientRowPresenter
     service_link("hubspot")
   end
 
-  # Short form for the index's tight grid column — shows all service statuses
+  # One badge per service for the index's tight grid column. The detail edit page
+  # shows the fuller "Synced 3 minutes ago" via ClientsHelper#hubspot_sync_status_label.
   def service_status_labels
     @service_status_labels ||= Service::KEYS.map do |service|
-      link = service_link(service)
-      label = if link.nil? || link.external_id.blank?
-                "Not linked"
-              elsif link.last_sync_error.present?
-                "Failed"
-              elsif link.last_synced_at.present?
-                "Linked"
-              else
-                "Syncing…"
-              end
-
-      { service: service, label: label, link: link }
+      { service: service, label: service_status_label(service), link: service_link(service) }
     end
   end
 
+  # "Syncing…" is the fall-through, not a branch: a link with an external_id but
+  # neither a success nor an error timestamp is one whose first sync is still in
+  # flight (ClientServiceLink#reset_sync_status clears both when the ID changes).
+  def service_status_label(service)
+    link = service_link(service)
+
+    return "Not linked" if link.nil? || link.external_id.blank?
+    return "Failed" if link.last_sync_error.present?
+    return "Linked" if link.last_synced_at.present?
+
+    "Syncing…"
+  end
+
   def hubspot_sync_label
-    hubspot_status = service_status_labels.find { |s| s[:service] == "hubspot" }
-    hubspot_status[:label]
+    service_status_label("hubspot")
   end
 
   def delivery_label
