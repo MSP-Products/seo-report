@@ -3,11 +3,12 @@
 How to run the SEO reporting system. Written for MSP staff, organised by the task you're
 trying to do.
 
-> **Read this first.** The admin panel has **two working pages** today: Dashboard and
-> Connections. Adding a practice, connecting it to a data source, getting a report's link,
-> and troubleshooting one client's history are all commands a developer runs. Where that's
-> the case, this guide says so and gives the exact command. It is not a permanent state, but
-> it is today's state, and pretending otherwise would waste your time.
+> **Read this first.** The admin panel has **three working pages** today: Dashboard,
+> Connections, and Clients. Adding a practice and connecting it to a data source are now
+> done from Clients — see below. Getting a practice's report link and troubleshooting one
+> client's history are also done from Clients now (its Overview and Reports tabs). Tracked
+> keywords and Google Analytics setup still need a developer or a source-system change;
+> this guide says so and gives the exact command where that's the case.
 >
 > **Generating a report is the one exception** — it now runs automatically every 1st of
 > the month. A developer is only needed to generate one on demand (a backfill, a retry
@@ -24,9 +25,10 @@ trying to do.
   - [Add or update an API credential](#add-or-update-an-api-credential)
   - [Check whether a connection is healthy](#check-whether-a-connection-is-healthy)
   - [Check this cycle's status](#check-this-cycles-status)
-- **Needs a developer**
   - [Add a new practice](#add-a-new-practice)
   - [Connect a practice to the data sources](#connect-a-practice-to-the-data-sources)
+  - [Offboard, recover, or delete a practice](#offboard-recover-or-delete-a-practice)
+- **Needs a developer**
   - [Set up Google Analytics for a practice](#set-up-google-analytics-for-a-practice)
   - [Tracked keywords](#tracked-keywords)
   - [Generate a report](#generate-a-report)
@@ -118,10 +120,15 @@ What each service needs:
 | Service | Field(s) |
 |---|---|
 | HubSpot | Access Token |
-| GoHighLevel | Access Token |
 | Yext | API Key |
 | SEMrush | API Key |
 | Google Analytics | Client Email **and** Private Key (see [GA4 setup](#set-up-google-analytics-for-a-practice)) |
+
+**GoHighLevel is the one exception — there's no field to paste.** Click **Connect to
+GoHighLevel** instead and authorize once through GHL's own consent screen; from then on the
+Connections page shows a live status (Active / Expiring soon / Expired) that refreshes
+itself automatically, and reconnecting only comes up again if the grant is revoked on GHL's
+side.
 
 ---
 
@@ -137,10 +144,13 @@ The Connections page shows a coloured dot and a label per service:
 | Unverified | Saved, but not yet checked against the live service |
 | Not configured | No credential saved |
 
-**These statuses are not yet updated automatically.** Nothing currently sets them by
-testing the credential, so treat them as a note rather than live monitoring. The reliable
-way to know a service is working is to [generate a report and read the
-warnings](#check-whether-a-report-worked).
+**For every service except GoHighLevel, these statuses are not yet updated
+automatically.** Nothing currently sets them by testing the credential, so treat them as a
+note rather than live monitoring for HubSpot, Yext, SEMrush, and Google Analytics. **GHL is
+the exception:** its status is live — set on every connect and refreshed hourly in the
+background — because the OAuth connection genuinely is verified each time it renews. For
+everything else, the reliable way to know a service is working is to [generate a report and
+read the warnings](#check-whether-a-report-worked).
 
 ---
 
@@ -168,36 +178,106 @@ send is held, the Dashboard is showing what's actually in the database right now
 
 ## Add a new practice
 
-**Needs a developer.** There is no Clients page yet.
+**Go to Clients → Add client → pick your entry point:**
 
-```ruby
-Client.create!(
-  name: "Woodside Dental Care",
-  website_url: "www.woodsidedentalcare.net",
-  address: "10883 Telegraph Rd, Ventura, CA 93004",
-  onboarding_status: "active",
-  onboarded_at: Time.current,
-  ai_seo_enrolled: true
-)
-```
+### Entry point 1: Import from HubSpot (recommended)
 
-- **`ai_seo_enrolled`** decides whether the AI search section appears in their reports.
-- **`website_url`** is used to find their sitemap and to match their SEMrush rankings, so
-  it must be the real site.
-- HubSpot is the source of truth for name, address, website, onboarding status, onboarding
-  date, and AI SEO enrolment — **once this client has a HubSpot Company ID linked** (see
-  "Connect a practice to the data sources" below), whatever HubSpot says overwrites what
-  you type here, within the hour. Until then, these values just sit as typed.
+1. Click **Add client** dropdown → **Import from HubSpot**
+2. Search for the practice by name or domain
+3. Pick it from the results (HubSpot company name shown with domain)
+4. Click **"Use this"** → opens the New form with:
+   - Practice name pre-filled from HubSpot
+   - **HubSpot service ID pre-filled** (but NOT synced yet — just pre-filled)
+5. (Optional) Fill in remaining details: website, phone, address
+6. Click **"Add client"** → **This is when the sync happens**:
+   - Creates the practice
+   - Enqueues `SyncHubspotClientJob` immediately
+   - Shows "Syncing…" on the Edit page while it fetches onboarding_status, onboarded_at, and AI SEO enrollment from HubSpot
+
+HubSpot's Search API returns real-time results, so this is the fastest way to onboard a new practice — no typing.
+
+### Entry point 2: Add manually
+
+1. Click **Add client** dropdown → **Add manually**
+2. Type practice name (required), website, phone, address (optional)
+3. Save → practice created as **Pending** with a blank HubSpot ID field
+
+This path is for practices not yet in HubSpot, or ones where you know the other service IDs but need to set up HubSpot later.
+
+### Both paths: HubSpot sync happens immediately on save
+
+Once you save (whichever entry path you took), if a HubSpot company ID is present, `SyncHubspotClientJob` enqueues immediately:
+
+1. Fetches: Company name, Address, Website, Active checkbox, GMB SEO Start Date, Services Purchased multi-select
+2. Updates the practice record with name/address/website if they came from HubSpot
+3. Maps HubSpot's **Active** checkbox → **Onboarding status** (`Active` if checked, `Offboarded` if unchecked)
+4. Maps **GMB SEO Start Date** → **Onboarded on** date
+5. Maps **Services Purchased** → **AI SEO enrolled** (true if the multi-select includes the exact text **"AI SEO"**)
+6. Edit form shows **green dot** + **"Synced *n* ago"** once complete
+
+**A practice cannot reach Active onboarding status unless this HubSpot sync succeeds.** If the HubSpot "Active" checkbox was never set, the sync will pull "Offboarded" — check HubSpot directly before assuming the sync is broken.
+
+**Re-syncing happens automatically:** Once a HubSpot ID is linked, `EnqueueHubspotSyncJob` runs daily and re-syncs the practice. Any changes to the HubSpot record flow through to the system automatically (within 24 hours, or immediately if you re-sync by hand on the Edit form).
+
+**`website_url` must be the canonical domain** — it's used to find the practice's sitemap and to match keywords in SEMrush. If the practice is at `www.example.com/dental` , save just `https://example.com` so domain matching works across all services.
 
 ---
 
 ## Connect a practice to the data sources
 
-**Needs a developer.** Each service identifies the practice by its own ID, so every
-practice needs one link per service. See [where each ID comes
-from](#where-each-id-comes-from).
+**Go to the practice's Edit page.** The Data sources section has five services, and you have
+two ways to fill them:
 
-The supported route today is a rake task driven by environment variables:
+### Option A: Auto-match by domain (recommended for new practices)
+
+**Click the "Sync services" button** (appears after you save the practice):
+
+1. System checks GoHighLevel, Yext, and SEMrush simultaneously for domain matches
+2. Each service shows an animated spinner with a countdown timer (estimated from real past checks)
+3. As each completes (usually 2–3 seconds per service):
+   - **Match found:** Shows company name, domain, and ID in a card. Click **"Use this"** to fill the field, or **"×"** to dismiss it
+   - **No match found:** "No match found matching this practice's website."
+   - **API error:** "Couldn't reach this service — try again in a moment."
+4. Click **"Save practice"** to persist all filled IDs
+
+**The timer is real:** It's the average from your last 3–4 checks of that same service, so it gets more accurate as you add more practices.
+
+**Unsaved changes warning:** If you navigate away during editing, the browser warns you (you can still click back).
+
+### Option B: Enter IDs by hand
+
+Skip the Sync services button and paste IDs directly:
+
+1. Find the ID (see [where each ID comes from](#where-each-id-comes-from))
+2. Paste into the field
+3. **Save practice**
+4. Status dots show: Not linked / Linked (or for HubSpot, Syncing / Synced / Sync failed)
+
+### HubSpot-specific behavior
+
+HubSpot is the first field — the mandatory, single source of truth. Once you link it, all five services behave differently:
+- **Must have HubSpot ID to reach Active status** (the onboarding status, date, and AI SEO enrollment come from there, nowhere else)
+- Links with a **green dot + "Synced *n* ago"** after the first sync
+- Re-syncs automatically every day
+- If sync fails, shows **red dot + error reason** — click to see what went wrong
+
+For GoHighLevel specifically,
+**Find GHL match** under that row and the system checks every sub-account in the agency's
+connected GHL account for one whose own website matches this practice's — if it finds one,
+it shows the match (name, website, location ID) for you to review. Nothing is linked yet at
+that point; you still need to click **Save practice** to actually confirm it, same as if
+you'd typed the ID in yourself. If nothing comes back ("No GHL location found matching this
+practice's website"), the practice either isn't a GHL sub-account under this agency yet, or
+its website in GHL doesn't exactly match what's on file here — type the ID in by hand if you
+have it from elsewhere.
+
+**Changing a HubSpot ID re-syncs immediately** and clears whatever the previous ID's sync
+found, so the status briefly shows "Syncing…" again rather than a stale result from the ID
+you just replaced.
+
+The old rake task still works for bulk-seeding a practice from environment variables in one
+shot (useful when standing up several practices from a script), but the Edit practice page
+is the normal path now:
 
 ```bash
 REAL_CLIENT_NAME="Woodside Dental Care" \
@@ -209,11 +289,77 @@ bin/rails reports:seed_real_client
 ```
 
 Any service whose variables are missing is skipped and reported as such. A practice with
-no link for a service simply has that section unavailable in their report.
+no link for a service simply has that section unavailable in their report — same as leaving
+a field blank on the Edit page.
 
 **GoHighLevel is special:** whether a GHL link exists *is* the "does this practice use our
 appointment scheduler" signal. No link means appointments and revenue show `?`, and the
-system never calls GHL at all for that practice.
+system never calls GHL at all for that practice. This is shown on the Edit page's Reporting
+section as "Online scheduler — Connected / Not connected".
+
+---
+
+## Offboard, recover, or delete a practice
+
+When a practice ends their engagement you **offboard** them. That hides them from the working
+client list and stops their reports, but keeps every past report intact — so it is safe, and
+reversible.
+
+### Offboard a practice
+
+1. **Clients** → find the practice
+2. Click the **⋯** actions menu on its row → **Offboard**
+   (on a phone, the archive icon in the same place)
+3. Confirm
+
+They move to the **Offboarded** tab, disappear from **Active**, and stop being picked up when
+reports are generated. Their own page still opens, showing an "archived" notice and their full
+report history.
+
+### Recover a practice
+
+1. **Clients** → the **Offboarded** tab
+2. Find the practice → **⋯** → **Recover**
+3. Read the warning, then confirm
+
+The practice comes back as **Pending**, not Active. That is deliberate: only a successful
+HubSpot sync is allowed to make a practice Active.
+
+> **The warning matters.** HubSpot is the source of truth for whether a practice is active, and
+> it re-syncs about once an hour. **If the practice is still marked offboarded in HubSpot, that
+> sync will offboard them again** — your change here will look like it silently undid itself.
+> **Fix HubSpot first, then recover here.**
+
+### Delete a practice permanently
+
+1. Offboard the practice first if it isn't already — **you can only permanently delete from the
+   Offboarded tab.** There is deliberately no way to permanently delete a live practice in one
+   step.
+2. **Clients** → **Offboarded** tab → find the practice → **⋯** → **Delete permanently**
+3. Confirm
+
+**This cannot be undone.** It removes the practice, every report ever generated for them, and
+their report history. Their report links stop working immediately. Offboarding is what you want
+in almost every case; reach for this only when a practice was created in error or you have been
+asked to erase their data.
+
+### Which to use
+
+| Situation | Do this |
+|---|---|
+| Engagement ended | **Offboard** — keeps the history |
+| Offboarded by mistake, or they came back | Fix HubSpot, then **Recover** |
+| Created by mistake, duplicate row, or data must be erased | **Delete permanently** |
+| Just don't want them in your list this week | **Offboard** — never delete for tidiness |
+
+### Where they show up
+
+| Tab | Shows |
+|---|---|
+| **All** | Every practice, offboarded included |
+| **Active** | Live practices only |
+| **Pending** | Awaiting a successful HubSpot sync — including anything just recovered |
+| **Offboarded** | Offboarded practices only |
 
 ---
 
@@ -236,7 +382,8 @@ saved under Connections → Google Analytics.
    practice's own Google login, it doesn't have to be MSP — goes to **Admin → Property
    Access Management → + → Add users**, pastes the service account email, sets the role to
    **Viewer**, and clicks **Add**.
-3. Give the Property ID to a developer to save against the practice.
+3. Paste the Property ID into that practice's **Edit practice → Data sources → Google
+   Analytics** field yourself — no developer needed for this step anymore.
 
 That's the whole per-practice cost. No new service account, no OAuth screen, no code
 change.
@@ -308,7 +455,10 @@ Attempting the current month is refused — reports cover completed months only.
 
 ## Get a practice's report link
 
-**Open the Report Log page** — find the practice and month, and click **View** on its
+**Fastest: open that practice's page → Overview tab → Secure report link.** It shows the
+full URL for the current month's report with a one-click **Copy** button.
+
+**Or open the Report Log page** — find the practice and month, and click **View** on its
 row (only `ready` reports have one). That opens the actual report; copy its URL from the
 browser to send it.
 
@@ -418,20 +568,28 @@ returns "campaign not found" and the practice's keyword section comes back empty
 
 ## What a practice sees when data is missing
 
-The report never shows an error and never invents a number. Each missing source produces
-a specific, deliberate placeholder — worth knowing, because practices ask.
+**Most of the time, the practice sees nothing missing at all — because HubSpot, Google
+Analytics, Yext, and SEMrush are all required for generation to succeed.** If any of them
+fails, no report is produced for that practice that month; there's no placeholder to show.
+The only genuinely degraded states left are opt-in ones (GoHighLevel, AI SEO) and small
+per-field gaps within an otherwise-successful call:
 
 | What's missing | What they see |
 |---|---|
 | No GoHighLevel link (no scheduler with us) | Appointments and revenue show **?**, with a note that connecting the scheduler will populate them |
-| Google Analytics not connected | Visits show **—** and "Google Analytics isn't connected yet for this practice"; the traffic-sources breakdown is hidden |
 | Not enrolled in AI SEO | The "Google & AI Search Performance" section is omitted entirely, not shown empty |
-| Yext unavailable that month | Citation figures blank; nothing else affected |
-| SEMrush unavailable, or keywords not tracked | Keyword table empty; nothing else affected |
+| A practice tracks zero keywords in their SEMrush Position Tracking project | Keyword table empty; nothing else affected — this is a successful call that just returned nothing |
 | SEMrush's Keyword Difficulty/Intent/SERP-feature call fails (rankings still succeed) | Rows still show position and movement; KD%, Intent, and SF show blank for that keyword only |
 | Nothing genuinely positive to summarise | The highlights paragraph is omitted rather than padded with filler |
 | Yext gives no directions/clicks split | That breakdown is omitted; the combined engagement total still shows |
 | It's the practice's first month | A "baseline month" introduction replaces the month-over-month summary |
+
+**HubSpot, Google Analytics, Yext, or SEMrush actually failing** (bad credentials, an
+expired ID, the service being down) doesn't produce any of the above — it fails the whole
+month's generation instead. See ["Check whether a report
+worked"](#check-whether-a-report-worked) and
+[report-generation](features/report-generation.md#when-data-is-missing) for what that looks
+like and how to fix it.
 
 ---
 
@@ -466,3 +624,18 @@ It will appear from the next month's report onward.
 **The numbers in an old report look wrong.**
 That's by design. Reports are frozen snapshots of what was true when generated, not live
 views. They are not recalculated.
+
+**A practice I recovered went back to offboarded on its own.**
+HubSpot re-synced and overwrote it. HubSpot is the source of truth for whether a practice is
+active, so recovering here only sticks once the practice is marked active in HubSpot too. Fix it
+in HubSpot, then recover again — see
+[Offboard, recover, or delete a practice](#offboard-recover-or-delete-a-practice).
+
+**A practice I recovered isn't in the Active tab.**
+That's expected — a recovered practice comes back as **Pending**, because only a successful
+HubSpot sync may promote it to Active. It should move to Active within about an hour, once that
+sync runs. If it doesn't, check the HubSpot sync status on its Edit page.
+
+**A practice has vanished from the Clients list.**
+Check the **Offboarded** tab, then the **All** tab. The default view is Active only, so an
+offboarded practice — whether offboarded by hand or by a HubSpot sync — won't appear in it.

@@ -1,0 +1,43 @@
+<% content_for :title, "Search HubSpot — My Social Practice" %>
+
+<div class="mb-6">
+  <%= link_to "← Clients", clients_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+  <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Add client</h1>
+  <p class="mt-1 text-sm text-slate-500">
+    Search HubSpot by practice name or domain and pick the right company —
+    name, website, phone, and address fill in automatically from there.
+    <%= link_to "Enter details manually instead", new_client_path, class: "font-medium text-teal-dark hover:underline" %>.
+  </p>
+</div>
+
+<div class="max-w-2xl">
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <%= form_with url: hubspot_search_clients_path, method: :get, class: "flex gap-3" do %>
+      <%= text_field_tag :q, @query, placeholder: "Practice name or domain",
+            class: "flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-primary focus:outline-none focus:ring-3 focus:ring-teal-600/15" %>
+      <%= submit_tag "Search", class: "cursor-pointer rounded-lg bg-teal-primary px-4 py-2 text-sm font-medium text-white hover:bg-teal-dark" %>
+    <% end %>
+
+    <% if @query.present? %>
+      <div class="mt-4 divide-y divide-slate-100 border-t border-slate-100">
+        <% if @matches.empty? %>
+          <p class="py-4 text-sm text-slate-500">
+            No HubSpot companies found matching "<%= @query %>".
+            <%= link_to "Enter details manually instead", new_client_path, class: "font-medium text-teal-dark hover:underline" %>.
+          </p>
+        <% else %>
+          <% @matches.each do |match| %>
+            <div class="flex items-center justify-between gap-4 py-3">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-slate-900"><%= match.name %></p>
+                <p class="truncate text-xs text-slate-500"><%= match.domain %> · <code><%= match.company_id %></code></p>
+              </div>
+              <%= link_to "Use this", new_client_path(hubspot_company_id: match.company_id, hubspot_name: match.name),
+                    class: "shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50" %>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>

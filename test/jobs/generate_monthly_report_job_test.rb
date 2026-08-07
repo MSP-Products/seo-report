@@ -1,18 +1,20 @@
 require "test_helper"
 
 class GenerateMonthlyReportJobTest < ActiveJob::TestCase
-  test "generates a (mostly placeholder) report for a client with no service links configured" do
+  test "fails to generate a report for a client with no service links configured" do
+    # HubSpot, GA4, Yext, and SEMrush are all mandatory (see ReportGenerator)
+    # — a client with none of them configured can't generate at all.
     client = Client.create!(name: "Bare Practice", onboarding_status: "active")
     month = Date.current.beginning_of_month - 1.month
 
-    GenerateMonthlyReportJob.perform_now(client.id, month.year, month.month)
+    assert_raises(ReportGenerator::AdapterFailureError) do
+      GenerateMonthlyReportJob.perform_now(client.id, month.year, month.month)
+    end
 
     report = client.monthly_reports.find_by(report_month: month)
     assert report.present?
-    assert report.generated_at.present?
-    assert_equal "not_connected", report.report_traffic.ghl_data_status
-    assert_equal "success", report.report_generation_logs.last.status
-    assert report.report_generation_logs.last.error_log.present? # adapter warnings, still non-fatal
+    assert report.failed?
+    assert_equal "failed", report.report_generation_logs.last.status
   end
 
   test "discards rather than retries when the client no longer exists" do
